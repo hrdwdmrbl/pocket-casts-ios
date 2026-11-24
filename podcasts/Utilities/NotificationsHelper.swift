@@ -49,12 +49,11 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
         registerForPushNotifications()
     }
 
-    /// Handles a user-initiated change to per-podcast push notifications: requests permission if needed, persists the change, notifies observers, and shows a confirmation toast. Callers are responsible for tracking their own analytics event.
+    /// Handles a user-initiated change to per-podcast push notifications: requests permission if needed, persists the change, notifies observers, and shows a confirmation toast.
     func setNotificationsEnabled(_ enabled: Bool, for podcast: Podcast) {
         registerForPushNotifications { granted in
             guard granted || !enabled else {
                 Toast.show(L10n.notificationsPermissionsNeedsAction, actions: [.init(title: L10n.notificationsPermissionsOpenSettings, action: {
-                    Analytics.track(.notificationsPermissionsOpenSystemSettings)
                     UIApplication.shared.openNotificationSettings()
                 })])
                 return
@@ -99,19 +98,14 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
 
             notificationCenter.requestAuthorization(options: [.alert, .badge, .sound], completionHandler: { granted, _ in
                 if granted {
-                    Analytics.track(.notificationsOptInAllowed)
                     DispatchQueue.main.async {
                         UIApplication.shared.registerForRemoteNotifications()
                     }
-                } else {
-                    Analytics.track(.notificationsOptInDenied)
                 }
                 DispatchQueue.main.async {
                     completion?(granted)
                 }
             })
-
-            Analytics.track(.notificationsOptInShown)
         }
     }
 
@@ -120,14 +114,6 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
         FileLog.shared.addMessage("[Notifications] push notification received with category: \(response.notification.request.content.categoryIdentifier)")
         let categoryIdentifier = response.notification.request.content.categoryIdentifier
         let category = NotificationsCategory(rawValue: categoryIdentifier)
-
-        var properties: [String: Any] = ["category": categoryIdentifier]
-        let identifier = response.notification.request.identifier
-        if let type = NotificationType(rawValue: identifier) {
-            properties["type"] = type.rawValue
-            NotificationsCoordinator.shared.markNotification(type)
-        }
-        Analytics.track(.notificationOpened, properties: properties)
 
         switch category {
         case .episodes, .podcasts, .none:
@@ -145,7 +131,6 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
         }
 
         if downloadEpisodeActionId == response.actionIdentifier {
-            AnalyticsHelper.downloadFromNotification()
             findEpisode(episodeUuid: episodeUuid) { episode in
                 if let episode {
                     DownloadManager.shared.addToQueue(episodeUuid: episode.uuid)
@@ -155,7 +140,6 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
             }
         } else if addToQueueFirstActionId == response.actionIdentifier || addToQueueLastActionId == response.actionIdentifier {
             let playFirst = addToQueueFirstActionId == response.actionIdentifier
-            AnalyticsHelper.addToUpNextFromNotification(playFirst: playFirst)
 
             findEpisode(episodeUuid: episodeUuid) { episode in
                 if let episode {
@@ -165,7 +149,6 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
                 completionHandler()
             }
         } else if playNowActionid == response.actionIdentifier {
-            AnalyticsHelper.playNowFromNotification()
             findEpisode(episodeUuid: episodeUuid) { episode in
                 if let episode {
                     PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
@@ -174,7 +157,6 @@ class NotificationsHelper: NSObject, UNUserNotificationCenterDelegate {
                 completionHandler()
             }
         } else if archiveActionId == response.actionIdentifier {
-            AnalyticsHelper.archiveFromNotification()
             findEpisode(episodeUuid: episodeUuid) { episode in
                 if let episode = episode as? Episode {
                     EpisodeManager.archiveEpisode(episode: episode, fireNotification: false)

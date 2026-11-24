@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct LegalAndMoreView: View {
     @EnvironmentObject var theme: Theme
@@ -12,15 +13,12 @@ struct LegalAndMoreView: View {
             List {
                 Section {
                     AboutRow(mainText: L10n.aboutTermsOfService, showChevronIcon: true) {
-                        track(row: "terms_of_service")
                         navigationPath.append(.termsOfService)
                     }
                     AboutRow(mainText: L10n.aboutPrivacyPolicy, showChevronIcon: true) {
-                        track(row: "privacy_policy")
                         navigationPath.append(.privacyPolicy)
                     }
                     AboutRow(mainText: L10n.aboutAcknowledgements, showChevronIcon: true) {
-                        track(row: "acknowledgements")
                         navigationPath.append(.acknowledgements)
                     }
                 }
@@ -32,10 +30,6 @@ struct LegalAndMoreView: View {
         .navigationBarTitle(L10n.aboutLegalAndMore, displayMode: .inline)
     }
 
-    private func track(row: String) {
-        Analytics.track(.settingsAboutLegalAndMoreTapped, properties: ["row": row])
-    }
-
     enum Constants {
         static let termsOfUseURL = URL(string: "https://support.pocketcasts.com/article/terms-of-use-overview/")!
         static let privacyPolicyURL = URL(string: "https://support.pocketcasts.com/article/privacy-policy/")!
@@ -43,12 +37,18 @@ struct LegalAndMoreView: View {
     }
 }
 
-struct WebView: UIViewControllerRepresentable {
-    var url: URL
+struct WebView: UIViewRepresentable {
+    let url: URL
 
-    func makeUIViewController(context: Context) -> OnlineSupportController {
-        OnlineSupportController(url: url, source: .about)
+    func makeUIView(context: Context) -> WKWebView {
+        let view = WKWebView()
+        if url.isFileURL {
+            view.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            view.load(URLRequest(url: url))
+        }
+        return view
     }
 
-    func updateUIViewController(_ uiViewController: OnlineSupportController, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }

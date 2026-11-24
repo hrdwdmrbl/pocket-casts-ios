@@ -1,5 +1,6 @@
 import XCTest
 import AVFoundation
+import Network
 import PocketCastsUtils
 @testable import podcasts
 
@@ -16,6 +17,51 @@ final class MediaExporterResourceLoaderDelegateErrorHandlingTests: XCTestCase {
         try? FileManager.default.removeItem(atPath: tempFilePath)
         tempFilePath = nil
         super.tearDown()
+    }
+
+    func testCancelledDownloadDeletesPartialFileAndReportsCancellation() async throws {
+        // Hold a local HTTP response open so reset must cancel an active URLSession.
+        let listener = try NWListener(using: .tcp, on: .any)
+        let listening = expectation(description: "Local server ready")
+        let serverQueue = DispatchQueue(label: "AppResetTests.server")
+        let connection = Mutex<NWConnection?>(nil)
+        listener.stateUpdateHandler = { state in
+            if case .ready = state { listening.fulfill() }
+        }
+        listener.newConnectionHandler = { client in
+            connection.withLock { $0 = client }
+            client.start(queue: serverQueue)
+            client.receive(minimumIncompleteLength: 1, maximumLength: 8192) { _, _, _, _ in
+                let response = "HTTP/1.1 200 OK\r\nContent-Type: audio/mpeg\r\nContent-Length: 1000000\r\n\r\npartial audio"
+                client.send(content: Data(response.utf8), completion: .contentProcessed { _ in })
+            }
+        }
+        listener.start(queue: serverQueue)
+        defer {
+            connection.withLock { $0?.cancel() }
+            listener.cancel()
+        }
+        await fulfillment(of: [listening], timeout: 3)
+        let port = try XCTUnwrap(listener.port)
+        let downloading = expectation(description: "Download started")
+        let cancelled = expectation(description: "Download cancelled")
+        let delegate = MediaExporterResourceLoaderDelegate(saveFilePath: tempFilePath) { status, _, _, _ in
+            switch status {
+            case .downloading:
+                downloading.fulfill()
+            case .failed(let error) where (error as? URLError)?.code == .cancelled:
+                cancelled.fulfill()
+            default:
+                XCTFail("Unexpected download status: \(status)")
+            }
+        }
+        delegate.startDataRequest(with: URL(string: "http://127.0.0.1:\(port.rawValue)/episode.mp3")!)
+        await fulfillment(of: [downloading], timeout: 3)
+
+        await delegate.cancelDownload()
+
+        await fulfillment(of: [cancelled], timeout: 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempFilePath))
     }
 
     // MARK: - Failure callback propagation

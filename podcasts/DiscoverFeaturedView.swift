@@ -107,9 +107,9 @@ class DiscoverFeaturedView: ThemeableView {
         podcastImage.alpha = selected ? 0.6 : 1.0
     }
 
-    func populateFrom(_ discoverPodcast: DiscoverPodcast, isSubscribed: Bool, listName: String, isSponsored: Bool) {
+    func populateFrom(_ discoverPodcast: DiscoverPodcast, isSubscribed: Bool, listName: String) {
         self.discoverPodcast = discoverPodcast
-        listType.text = isSponsored ? L10n.discoverSponsored : listName.uppercased()
+        listType.text = listName.uppercased()
         listType.setLetterSpacing(1.57)
 
         let isExplicit = discoverPodcast.isExplicit ?? false

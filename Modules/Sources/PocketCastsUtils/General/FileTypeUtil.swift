@@ -92,7 +92,7 @@ public enum FileTypeUtil {
             .m4v,
             .m4a,
             .mpeg4AudioB,
-            .appleProtectedMPEG4Audio, // m4p
+            .appleProtectedMPEG4Audio
         ]
     }
 }

@@ -28,27 +28,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - findUserEpisode(uploadTaskId:) Tests
-
-    func testFindUserEpisodeByUploadTaskIdReturnsUserEpisode() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uploadTaskId: "upload-task-123", dataManager: dataManager)
-
-            let found = dataManager.findUserEpisode(uploadTaskId: "upload-task-123")
-
-            XCTAssertNotNil(found, "Should find user episode by upload task ID")
-            XCTAssertEqual(found?.uuid, episode.uuid, "UUID should match")
-        }
-    }
-
-    func testFindUserEpisodeByUploadTaskIdReturnsNilForNonExistent() throws {
-        try runWithDataManager { dataManager in
-            let found = dataManager.findUserEpisode(uploadTaskId: "non-existent-task")
-
-            XCTAssertNil(found, "Should not find user episode with non-existent upload task ID")
-        }
-    }
-
     // MARK: - findBaseEpisode(downloadTaskId:) Tests
 
     func testFindBaseEpisodeByDownloadTaskIdReturnsUserEpisode() throws {
@@ -81,17 +60,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let episodes = dataManager.allUserEpisodes(sortedBy: .newestToOldest)
 
             XCTAssertEqual(episodes.count, 3, "Should return all 3 episodes")
-        }
-    }
-
-    func testAllUserEpisodesExcludesDeletePending() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestUserEpisode(title: "Active", uploadStatus: UploadStatus.notUploaded.rawValue, dataManager: dataManager)
-            _ = self.createTestUserEpisode(title: "Delete Pending", uploadStatus: UploadStatus.deleteFromCloudPending.rawValue, dataManager: dataManager)
-
-            let episodes = dataManager.allUserEpisodes(sortedBy: .newestToOldest)
-
-            XCTAssertTrue(episodes.allSatisfy { $0.uploadStatus != UploadStatus.deleteFromCloudPending.rawValue }, "Should exclude delete pending episodes")
         }
     }
 
@@ -212,43 +180,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - findUserEpisodesWithUploadStatus Tests
-
-    func testFindUserEpisodesWithUploadStatusReturnsMatchingStatus() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestUserEpisode(title: "Uploaded", uploadStatus: UploadStatus.uploaded.rawValue, dataManager: dataManager)
-            _ = self.createTestUserEpisode(title: "Not Uploaded", uploadStatus: UploadStatus.notUploaded.rawValue, dataManager: dataManager)
-
-            let episodes = dataManager.findUserEpisodesWithUploadStatus(.uploaded)
-
-            XCTAssertTrue(episodes.allSatisfy { $0.uploadStatus == UploadStatus.uploaded.rawValue }, "Should only return uploaded episodes")
-        }
-    }
-
-    // MARK: - unsyncedUserEpisodes Tests
-
-    func testUnsyncedUserEpisodesReturnsEpisodesWithModifiedFields() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestUserEpisode(title: "Unsynced", playingStatusModified: 1, dataManager: dataManager)
-            _ = self.createTestUserEpisode(title: "Synced", playingStatusModified: 0, dataManager: dataManager)
-
-            let episodes = dataManager.unsyncedUserEpisodes()
-
-            XCTAssertTrue(episodes.contains { $0.title == "Unsynced" }, "Should include unsynced episode")
-        }
-    }
-
-    func testUnsyncedUserEpisodesChecksMultipleModifiedFields() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestUserEpisode(title: "Title Modified", titleModified: 1, dataManager: dataManager)
-            _ = self.createTestUserEpisode(title: "Playing Modified", playingStatusModified: 1, dataManager: dataManager)
-
-            let episodes = dataManager.unsyncedUserEpisodes()
-
-            XCTAssertGreaterThanOrEqual(episodes.count, 2, "Should detect all modified fields")
-        }
-    }
-
     // MARK: - frameCount Tests
 
     func testSaveAndFindFrameCount() throws {
@@ -280,7 +211,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let orphaned = self.createTestUserEpisode(
                 title: "Orphaned",
                 episodeStatus: DownloadStatus.notDownloaded.rawValue,
-                uploadStatus: UploadStatus.notUploaded.rawValue,
                 dataManager: dataManager
             )
 
@@ -296,7 +226,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let downloaded = self.createTestUserEpisode(
                 title: "Downloaded",
                 episodeStatus: DownloadStatus.downloaded.rawValue,
-                uploadStatus: UploadStatus.notUploaded.rawValue,
                 dataManager: dataManager
             )
 
@@ -304,22 +233,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
 
             let found = dataManager.findUserEpisode(uuid: downloaded.uuid)
             XCTAssertNotNil(found, "Should keep downloaded episode")
-        }
-    }
-
-    func testRemoveOrphanedUserEpisodesKeepsUploadedEpisodes() throws {
-        try runWithDataManager { dataManager in
-            let uploaded = self.createTestUserEpisode(
-                title: "Uploaded",
-                episodeStatus: DownloadStatus.notDownloaded.rawValue,
-                uploadStatus: UploadStatus.uploaded.rawValue,
-                dataManager: dataManager
-            )
-
-            dataManager.removeOrphanedUserEpisodes()
-
-            let found = dataManager.findUserEpisode(uuid: uploaded.uuid)
-            XCTAssertNotNil(found, "Should keep uploaded episode")
         }
     }
 
@@ -363,19 +276,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - clearUploadTaskId Tests
-
-    func testClearUploadTaskIdClearsTaskId() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uploadTaskId: "task-123", dataManager: dataManager)
-
-            dataManager.clearUploadTaskId(episode: episode)
-
-            let found = dataManager.findUserEpisode(uuid: episode.uuid)
-            XCTAssertNil(found?.uploadTaskId, "Upload task ID should be cleared")
-        }
-    }
-
     // MARK: - downloadedEpisodeCount Tests (includes UserEpisodes)
 
     func testDownloadedEpisodeCountIncludesUserEpisodes() throws {
@@ -412,7 +312,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             episode.playedUpTo = 300.5
             episode.playingStatus = PlayingStatus.inProgress.rawValue
             episode.episodeStatus = DownloadStatus.downloaded.rawValue
-            episode.uploadStatus = UploadStatus.uploaded.rawValue
             episode.autoDownloadStatus = AutoDownloadStatus.autoDownloaded.rawValue
             episode.sizeInBytes = 1024000
             episode.fileType = "audio/mpeg"
@@ -429,7 +328,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             XCTAssertEqual(found?.playedUpTo, 300.5, "playedUpTo should match")
             XCTAssertEqual(found?.playingStatus, PlayingStatus.inProgress.rawValue, "playingStatus should match")
             XCTAssertEqual(found?.episodeStatus, DownloadStatus.downloaded.rawValue, "episodeStatus should match")
-            XCTAssertEqual(found?.uploadStatus, UploadStatus.uploaded.rawValue, "uploadStatus should match")
             XCTAssertEqual(found?.autoDownloadStatus, AutoDownloadStatus.autoDownloaded.rawValue, "autoDownloadStatus should match")
             XCTAssertEqual(found?.sizeInBytes, 1024000, "sizeInBytes should match")
             XCTAssertEqual(found?.fileType, "audio/mpeg", "fileType should match")
@@ -510,7 +408,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             episode.addedDate = Date()
             episode.downloadUrl = "https://example.com/episode.mp3"
             episode.downloadTaskId = "download-task-123"
-            episode.uploadTaskId = "upload-task-456"
             episode.imageUrl = "https://example.com/image.jpg"
             episode.downloadErrorDetails = "Test error"
             episode.playbackErrorDetails = "Playback error"
@@ -520,7 +417,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let found = dataManager.findUserEpisode(uuid: "optional-test-uuid")
             XCTAssertEqual(found?.downloadUrl, "https://example.com/episode.mp3", "downloadUrl should be preserved")
             XCTAssertEqual(found?.downloadTaskId, "download-task-123", "downloadTaskId should be preserved")
-            XCTAssertEqual(found?.uploadTaskId, "upload-task-456", "uploadTaskId should be preserved")
             XCTAssertEqual(found?.imageUrl, "https://example.com/image.jpg", "imageUrl should be preserved")
             XCTAssertEqual(found?.downloadErrorDetails, "Test error", "downloadErrorDetails should be preserved")
             XCTAssertEqual(found?.playbackErrorDetails, "Playback error", "playbackErrorDetails should be preserved")
@@ -605,7 +501,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestUserEpisode(uuid: "user-ep-1", title: "Episode 1", playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
             let episode2 = self.createTestUserEpisode(uuid: "user-ep-2", title: "Episode 2", playingStatus: PlayingStatus.inProgress.rawValue, dataManager: dataManager)
 
-            dataManager.bulkMarkAsPlayed(episodes: [episode1, episode2], updateSyncFlag: false)
+            dataManager.bulkMarkAsPlayed(episodes: [episode1, episode2])
 
             let found1 = dataManager.findUserEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findUserEpisode(uuid: episode2.uuid)
@@ -620,7 +516,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let episode = self.createTestUserEpisode(uuid: "already-played", title: "Already Played", playingStatus: PlayingStatus.completed.rawValue, dataManager: dataManager)
 
             // Should not crash or cause issues
-            dataManager.bulkMarkAsPlayed(episodes: [episode], updateSyncFlag: false)
+            dataManager.bulkMarkAsPlayed(episodes: [episode])
 
             let found = dataManager.findUserEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playingStatus, PlayingStatus.completed.rawValue, "Should still be played")
@@ -634,7 +530,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestUserEpisode(uuid: "user-ep-1", title: "Episode 1", playingStatus: PlayingStatus.completed.rawValue, dataManager: dataManager)
             let episode2 = self.createTestUserEpisode(uuid: "user-ep-2", title: "Episode 2", playingStatus: PlayingStatus.inProgress.rawValue, dataManager: dataManager)
 
-            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode1, episode2], updateSyncFlag: false)
+            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode1, episode2])
 
             let found1 = dataManager.findUserEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findUserEpisode(uuid: episode2.uuid)
@@ -648,7 +544,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         try runWithDataManager { dataManager in
             let episode = self.createTestUserEpisode(uuid: "user-ep-1", title: "Episode 1", playingStatus: PlayingStatus.inProgress.rawValue, playedUpTo: 300.0, dataManager: dataManager)
 
-            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode], updateSyncFlag: false)
+            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode])
 
             let found = dataManager.findUserEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playedUpTo, 0, "playedUpTo should be reset to 0")
@@ -661,21 +557,10 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         try runWithDataManager { dataManager in
             let episode = self.createTestUserEpisode(uuid: "status-ep", playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
 
-            dataManager.saveEpisode(playingStatus: .completed, episode: episode, updateSyncFlag: false)
+            dataManager.saveEpisode(playingStatus: .completed, episode: episode)
 
             let found = dataManager.findUserEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playingStatus, PlayingStatus.completed.rawValue, "Playing status should be updated")
-        }
-    }
-
-    func testSaveEpisodePlayingStatusUpdatesSyncFlag() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uuid: "status-ep", playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
-
-            dataManager.saveEpisode(playingStatus: .completed, episode: episode, updateSyncFlag: true)
-
-            let found = dataManager.findUserEpisode(uuid: episode.uuid)
-            XCTAssertGreaterThan(found?.playingStatusModified ?? 0, 0, "Playing status modified should be set")
         }
     }
 
@@ -685,23 +570,10 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         try runWithDataManager { dataManager in
             let episode = self.createTestUserEpisode(uuid: "played-ep", dataManager: dataManager)
 
-            dataManager.saveEpisode(playedUpTo: 150.5, episode: episode, updateSyncFlag: false)
+            dataManager.saveEpisode(playedUpTo: 150.5, episode: episode)
 
             let found = dataManager.findUserEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playedUpTo, 150.5, "Played up to should be updated")
-        }
-    }
-
-    // MARK: - saveEpisode uploadStatus Tests
-
-    func testSaveEpisodeUploadStatusUpdatesStatus() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uuid: "upload-ep", uploadStatus: UploadStatus.notUploaded.rawValue, dataManager: dataManager)
-
-            dataManager.saveEpisode(uploadStatus: .uploaded, episode: episode)
-
-            let found = dataManager.findUserEpisode(uuid: episode.uuid)
-            XCTAssertEqual(found?.uploadStatus, UploadStatus.uploaded.rawValue, "Upload status should be updated")
         }
     }
 
@@ -736,7 +608,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         try runWithDataManager { dataManager in
             let episode = self.createTestUserEpisode(uuid: "duration-ep", duration: 3600, dataManager: dataManager)
 
-            dataManager.saveEpisode(duration: 7200, episode: episode, updateSyncFlag: false)
+            dataManager.saveEpisode(duration: 7200, episode: episode)
 
             let found = dataManager.findUserEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.duration, 7200, "Duration should be updated")
@@ -767,32 +639,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
             let found = dataManager.findUserEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.episodeStatus, DownloadStatus.downloadFailed.rawValue, "Download status should be downloadFailed")
             XCTAssertEqual(found?.downloadErrorDetails, "Network error", "Error details should be saved")
-        }
-    }
-
-    // MARK: - saveEpisode uploadStatus with taskId Tests
-
-    func testSaveEpisodeUploadStatusWithTaskIdUpdatesFields() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uuid: "upload-task-ep", dataManager: dataManager)
-
-            dataManager.saveEpisode(uploadStatus: .uploading, uploadTaskId: "task-456", episode: episode)
-
-            let found = dataManager.findUserEpisode(uuid: episode.uuid)
-            XCTAssertEqual(found?.uploadStatus, UploadStatus.uploading.rawValue, "Upload status should be uploading")
-        }
-    }
-
-    // MARK: - saveEpisode uploadStatus with error Tests
-
-    func testSaveEpisodeUploadStatusWithErrorUpdatesFields() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uuid: "upload-error-ep", dataManager: dataManager)
-
-            dataManager.saveEpisode(uploadStatus: .uploadFailed, uploadError: "Upload failed", uploadTaskId: nil, episode: episode)
-
-            let found = dataManager.findUserEpisode(uuid: episode.uuid)
-            XCTAssertEqual(found?.uploadStatus, UploadStatus.uploadFailed.rawValue, "Upload status should be uploadFailed")
         }
     }
 
@@ -836,20 +682,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - markImageUploaded Tests
-
-    func testMarkImageUploadedClearsImageModifiedAndUrl() throws {
-        try runWithDataManager { dataManager in
-            let episode = self.createTestUserEpisode(uuid: "image-upload-ep", imageModified: 12345, imageUrl: "http://example.com/image.jpg", dataManager: dataManager)
-
-            dataManager.markImageUploaded(episode: episode)
-
-            let found = dataManager.findUserEpisode(uuid: episode.uuid)
-            XCTAssertEqual(found?.imageModified, 0, "Image modified should be reset to 0")
-            XCTAssertNil(found?.imageUrl, "Image URL should be cleared")
-        }
-    }
-
     // MARK: - bulkUserFileDelete Tests
 
     func testBulkUserFileDeleteUpdatesStatus() throws {
@@ -877,21 +709,6 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - allUserEpisodesUploaded Tests
-
-    func testAllUserEpisodesUploadedReturnsOnlyUploaded() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestUserEpisode(title: "Uploaded", uploadStatus: UploadStatus.uploaded.rawValue, dataManager: dataManager)
-            _ = self.createTestUserEpisode(title: "Not Uploaded", uploadStatus: UploadStatus.notUploaded.rawValue, dataManager: dataManager)
-            _ = self.createTestUserEpisode(title: "Uploading", uploadStatus: UploadStatus.uploading.rawValue, dataManager: dataManager)
-
-            let episodes = dataManager.allUserEpisodesUploaded()
-
-            XCTAssertEqual(episodes.count, 1, "Should only return uploaded episodes")
-            XCTAssertEqual(episodes.first?.title, "Uploaded", "Should return the uploaded episode")
-        }
-    }
-
     // MARK: - findUserEpisodesWhereNotNull Tests
 
     func testFindUserEpisodesWhereNotNullReturnsMatchingEpisodes() throws {
@@ -913,9 +730,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         uuid: String = UUID().uuidString,
         title: String = "Test Episode",
         episodeStatus: Int32 = DownloadStatus.notDownloaded.rawValue,
-        uploadStatus: Int32 = UploadStatus.notUploaded.rawValue,
         downloadTaskId: String? = nil,
-        uploadTaskId: String? = nil,
         playingStatus: Int32 = PlayingStatus.notPlayed.rawValue,
         playedUpTo: Double = 0,
         playingStatusModified: Int64 = 0,
@@ -931,9 +746,7 @@ final class UserEpisodeDataManagerTests: DataManagerTestCase {
         episode.uuid = uuid
         episode.title = title
         episode.episodeStatus = episodeStatus
-        episode.uploadStatus = uploadStatus
         episode.downloadTaskId = downloadTaskId
-        episode.uploadTaskId = uploadTaskId
         episode.playingStatus = playingStatus
         episode.playedUpTo = playedUpTo
         episode.playingStatusModified = playingStatusModified

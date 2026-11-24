@@ -28,15 +28,15 @@ extension DiscoverItem {
         case ("podcast_list", "large_list_with_podcast", _):
             return .largeListWithPodcast
         case ("lists_list", "large_list", _):
-            return FeatureFlag.networkDiscovery.enabled ? .networksList : nil
+            return .networksList
         case ("network_list", _, _):
             FileLog.shared.addMessage("Skipping legacy network_list Discover item") // Should never be used anymore
             return nil
         default:
             FileLog.shared.addMessage("Unknown Discover Item: \(type ?? "unknown") \(summaryStyle ?? "unknown")")
-#if DEBUG
+            #if DEBUG
             UnknownDiscoverItemAlert.showIfNeeded(type: type, summaryStyle: summaryStyle, expandedStyle: expandedStyle)
-#endif
+            #endif
             return nil
         }
     }

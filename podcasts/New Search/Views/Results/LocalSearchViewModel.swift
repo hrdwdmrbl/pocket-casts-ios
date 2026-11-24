@@ -9,16 +9,12 @@ final class LocalSearchViewModel: ObservableObject {
     @Published var searchText: String = ""
     @Published private(set) var episodes: [EpisodeSearchResult] = []
     @Published private(set) var selectedPodcast: Podcast?
-    @Published private(set) var selectedFolder: Folder?
-    @Published private(set) var folderPodcasts: [Podcast] = []
-    @Published private(set) var filteredFolderPodcasts: [Podcast] = []
     @Published private(set) var isEpisodeSearchInFlight = false
     @Published private(set) var addedEpisodeCount = 0
-    @Published private(set) var searchResultsPodcasts: [PodcastFolderSearchResult] = []
+    @Published private(set) var searchResultsPodcasts: [PodcastSearchResult] = []
     @Published private(set) var disableLibraryAnimation = false
-    @Published private(set) var defaultLibraryItems: [PodcastFolderSearchResult] = []
+    @Published private(set) var defaultLibraryItems: [PodcastSearchResult] = []
     @Published private(set) var isLoadingDefaultLibrary = false
-    @Published private(set) var isLoadingFolderPodcasts = false
     @Published private(set) var isLoadingPlaylistEpisodes = false
 
     let playlist: EpisodeFilter
@@ -30,12 +26,9 @@ final class LocalSearchViewModel: ObservableObject {
 
     private struct PodcastSearchState {
         let term: String
-        let results: [PodcastFolderSearchResult]
+        let results: [PodcastSearchResult]
     }
-
-    private var previouslySelectedFolder: Folder?
     private var previousPodcastSearchState: PodcastSearchState?
-    private var folderSearchStateStack: [PodcastSearchState] = []
 
     init(playlist: EpisodeFilter) {
         self.playlist = playlist
@@ -53,17 +46,14 @@ final class LocalSearchViewModel: ObservableObject {
     }
 
     var podcastListMode: PodcastListMode {
-        if selectedFolder != nil {
-            return .folder
-        }
-        if !trimmedSearchText.isEmpty || previousPodcastSearchState != nil || !folderSearchStateStack.isEmpty {
+        if !trimmedSearchText.isEmpty || previousPodcastSearchState != nil {
             return .search
         }
         return .library
     }
 
     var rootListMode: PodcastListMode {
-        if !trimmedSearchText.isEmpty || previousPodcastSearchState != nil || !folderSearchStateStack.isEmpty {
+        if !trimmedSearchText.isEmpty || previousPodcastSearchState != nil {
             return .search
         }
         return .library
@@ -75,17 +65,9 @@ final class LocalSearchViewModel: ObservableObject {
         }
 
         let items = await Task.detached {
-            let sortOrder = Settings.homeFolderSortOrder
+            let sortOrder = Settings.librarySortOrder
             let items = HomeGridDataHelper.gridItems(orderedBy: sortOrder)
-            return items.compactMap { item in
-                if let podcast = item.podcast {
-                    return PodcastFolderSearchResult(from: podcast)
-                }
-                if let folder = item.folder {
-                    return PodcastFolderSearchResult(from: folder)
-                }
-                return nil
-            }
+            return items.compactMap { PodcastSearchResult(from: $0.podcast) }
         }.value
 
         await MainActor.run {
@@ -94,20 +76,10 @@ final class LocalSearchViewModel: ObservableObject {
         }
     }
 
-    var filteredFolderPodcastResults: [PodcastFolderSearchResult] {
-        filteredFolderPodcasts.compactMap { PodcastFolderSearchResult(from: $0) }
-    }
-
-    var hasAnyPodcastsInFolder: Bool {
-        !folderPodcasts.isEmpty
-    }
-
     var isPodcastListLoading: Bool {
         switch podcastListMode {
         case .library:
             return isLoadingDefaultLibrary
-        case .folder:
-            return isLoadingFolderPodcasts
         case .search:
             return false // Search results use the searchResultsModel which handles its own loading
         }
@@ -144,7 +116,7 @@ final class LocalSearchViewModel: ObservableObject {
         episodeCoordinator?.cancelPendingSearch()
     }
 
-    func podcast(from result: PodcastFolderSearchResult) -> Podcast? {
+    func podcast(from result: PodcastSearchResult) -> Podcast? {
         guard result.kind == .podcast,
               let podcast = DataManager.shared.findPodcast(uuid: result.uuid) else {
             return nil
@@ -154,7 +126,6 @@ final class LocalSearchViewModel: ObservableObject {
 
     func beginEpisodeMode(with podcast: Podcast) {
         previousPodcastSearchState = currentSearchState()
-        previouslySelectedFolder = selectedFolder
         selectedPodcast = podcast
         searchText = ""
 
@@ -165,90 +136,28 @@ final class LocalSearchViewModel: ObservableObject {
         }
     }
 
-    func selectFolder(_ folderResult: PodcastFolderSearchResult) {
-        guard folderResult.kind == .folder,
-              let folder = DataManager.shared.findFolder(uuid: folderResult.uuid) else {
-            return
-        }
-
-        if let searchState = currentSearchState() {
-            folderSearchStateStack.append(searchState)
-        }
-
-        selectedFolder = folder
-        previouslySelectedFolder = folder
-        selectedPodcast = nil
-        episodeCoordinator?.clearResults()
-
-        Task {
-            await loadPodcastsForSelectedFolder(folder)
-            if !trimmedSearchText.isEmpty {
-                searchText = ""
-            } else {
-                await filterPodcasts(using: searchText)
-            }
-        }
-    }
-
     func clearSelectedPodcast() {
         let searchState = previousPodcastSearchState
         selectedPodcast = nil
 
-        Task {
-            if let folder = previouslySelectedFolder {
-                selectedFolder = folder
-                await loadPodcastsForSelectedFolder(folder)
-                let restoreTerm = searchState?.term ?? ""
-                if searchText != restoreTerm {
-                    searchText = restoreTerm
-                } else {
-                    await filterPodcasts(using: restoreTerm)
-                }
-            } else if let searchState, !searchState.term.isEmpty {
-                selectedFolder = nil
-                searchResultsPodcasts = searchState.results
-                if searchText != searchState.term {
-                    searchText = searchState.term
-                } else {
-                    await filterPodcasts(using: searchState.term)
-                }
+        Task {if let searchState, !searchState.term.isEmpty {
+            searchResultsPodcasts = searchState.results
+            if searchText != searchState.term {
+                searchText = searchState.term
             } else {
-                selectedFolder = nil
-                if !searchText.isEmpty {
-                    searchText = ""
-                }
-                await filterPodcasts(using: "")
+                await filterPodcasts(using: searchState.term)
             }
-
-            await MainActor.run {
-                self.episodeCoordinator?.clearResults()
-            }
-            previousPodcastSearchState = nil
-        }
-    }
-
-    func clearSelectedFolder() {
-        selectedFolder = nil
-        folderPodcasts = []
-        filteredFolderPodcasts = []
-
-        Task {
-            if let previousState = folderSearchStateStack.popLast() {
-                searchResultsPodcasts = previousState.results
-                if searchText != previousState.term {
-                    searchText = previousState.term
-                } else {
-                    await filterPodcasts(using: previousState.term)
-                }
-            } else {
+        } else {
+            if !searchText.isEmpty {
                 searchText = ""
-                await filterPodcasts(using: searchText, disableAnimationsWhenClearing: false)
             }
+            await filterPodcasts(using: "")
+        }
 
-            await MainActor.run {
-                self.episodeCoordinator?.clearResults()
-            }
-            previouslySelectedFolder = nil
+        await MainActor.run {
+            self.episodeCoordinator?.clearResults()
+        }
+        previousPodcastSearchState = nil
         }
     }
 
@@ -280,7 +189,7 @@ final class LocalSearchViewModel: ObservableObject {
             .sink { [weak self] results in
                 guard let self else { return }
                 self.searchResultsPodcasts = results.filter { result in
-                    (result.kind == .podcast || result.kind == .folder) && (result.isLocal ?? true)
+                    (result.isLocal ?? true)
                 }
             }
             .store(in: &cancellables)
@@ -324,27 +233,6 @@ final class LocalSearchViewModel: ObservableObject {
         await filterPodcasts(using: searchText)
     }
 
-    private func loadPodcastsForSelectedFolder(_ folder: Folder) async {
-        await MainActor.run {
-            self.isLoadingFolderPodcasts = true
-        }
-
-        let sorted = await Task.detached {
-            let podcasts = DataManager.shared.allPodcastsInFolder(folder: folder)
-            return podcasts.sorted { lhs, rhs in
-                let lhsTitle = lhs.title ?? ""
-                let rhsTitle = rhs.title ?? ""
-                return lhsTitle.localizedCaseInsensitiveCompare(rhsTitle) == .orderedAscending
-            }
-        }.value
-
-        await MainActor.run {
-            self.folderPodcasts = sorted
-            self.filteredFolderPodcasts = sorted
-            self.isLoadingFolderPodcasts = false
-        }
-    }
-
     private func refreshPlaylistEpisodes() async {
         isLoadingPlaylistEpisodes = true
         await episodeCoordinator?.refreshPlaylistEpisodes()
@@ -365,42 +253,23 @@ final class LocalSearchViewModel: ObservableObject {
     private func filterPodcasts(using term: String, disableAnimationsWhenClearing: Bool = true) async {
         let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if selectedFolder != nil {
-            let folderPodcastsCopy = folderPodcasts
-            let filtered: [Podcast]
+        guard let searchResultsModel else { return }
 
-            if trimmed.isEmpty {
-                filtered = folderPodcastsCopy
-            } else {
-                filtered = await Task.detached {
-                    folderPodcastsCopy.filter { podcast in
-                        guard let title = podcast.title else { return false }
-                        return title.localizedCaseInsensitiveContains(trimmed)
-                    }
-                }.value
+        if trimmed.isEmpty {
+            if disableAnimationsWhenClearing {
+                disableLibraryAnimation = true
             }
-
-            await MainActor.run {
-                self.filteredFolderPodcasts = filtered
+            let transaction = disableAnimationsWhenClearing ? Transaction(animation: nil) : Transaction()
+            withTransaction(transaction) {
+                searchResultsModel.clearSearch()
+            }
+            if disableAnimationsWhenClearing {
+                DispatchQueue.main.async { [weak self] in
+                    self?.disableLibraryAnimation = false
+                }
             }
         } else {
-            guard let searchResultsModel else { return }
-            if trimmed.isEmpty {
-                if disableAnimationsWhenClearing {
-                    disableLibraryAnimation = true
-                }
-                let transaction = disableAnimationsWhenClearing ? Transaction(animation: nil) : Transaction()
-                withTransaction(transaction) {
-                    searchResultsModel.clearSearch()
-                }
-                if disableAnimationsWhenClearing {
-                    DispatchQueue.main.async { [weak self] in
-                        self?.disableLibraryAnimation = false
-                    }
-                }
-            } else {
-                searchResultsModel.searchLocally(term: trimmed)
-            }
+            searchResultsModel.searchLocally(term: trimmed)
         }
     }
 

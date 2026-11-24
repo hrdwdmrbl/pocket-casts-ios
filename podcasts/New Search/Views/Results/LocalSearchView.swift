@@ -29,7 +29,6 @@ struct LocalSearchView: View {
                     .background(theme.secondaryUi01)
             }
             .onAppear {
-                Analytics.track(.filterAddEpisodesShown)
                 viewModel.onAppear(searchResultsModel: searchResults)
                 previousNavigationPath = navigationPath
             }
@@ -73,34 +72,11 @@ struct LocalSearchView: View {
         }
     }
 
-    private func handleSelection(for result: PodcastFolderSearchResult) {
-        switch result.kind {
-        case .folder:
-            Analytics.track(.filterAddEpisodesFolderTapped)
-            viewModel.selectFolder(result)
-            let route = LocalSearchRoute.folder(result.uuid)
-            if navigationPath.last != route {
-                withAnimation(navigationAnimation) {
-                    navigationPath.append(route)
-                }
-            }
-        case .podcast:
-            Analytics.track(.filterAddEpisodesPodcastTapped)
-            if navigationPath.last?.isPodcast == true {
-                withAnimation(navigationAnimation) {
-                    _ = navigationPath.removeLast()
-                }
-            }
-            guard let podcast = viewModel.podcast(from: result) else { return }
-            viewModel.beginEpisodeMode(with: podcast)
-            let route = LocalSearchRoute.podcast(podcast.uuid)
-            if navigationPath.last != route {
-                withAnimation(navigationAnimation) {
-                    navigationPath.append(route)
-                }
-            }
-        @unknown default:
-            break
+    private func handleSelection(for result: PodcastSearchResult) {
+        guard let podcast = viewModel.podcast(from: result) else { return }
+        viewModel.beginEpisodeMode(with: podcast)
+        withAnimation(navigationAnimation) {
+            navigationPath.append(.podcast(podcast.uuid))
         }
     }
 
@@ -114,7 +90,7 @@ struct LocalSearchView: View {
 }
 
 enum PodcastListMode {
-    case library, folder, search
+    case library, search
 }
 
 private extension LocalSearchView {
@@ -125,11 +101,8 @@ private extension LocalSearchView {
     private var podcastsView: some View {
         LocalSearchPodcastResultsView(
             listMode: viewModel.rootListMode,
-            selectedFolder: nil,
             searchText: viewModel.searchText,
             defaultLibraryItems: viewModel.defaultLibraryItems,
-            folderResults: viewModel.filteredFolderPodcastResults,
-            hasAnyPodcastsInFolder: viewModel.hasAnyPodcastsInFolder,
             searchResults: viewModel.searchResultsPodcasts,
             onSelectResult: { handleSelection(for: $0) },
             disableLibraryAnimation: viewModel.disableLibraryAnimation,
@@ -202,22 +175,6 @@ private extension LocalSearchView {
     @ViewBuilder
     private func destinationView(for route: LocalSearchRoute) -> some View {
         switch route {
-        case .folder:
-            LocalSearchPodcastResultsView(
-                listMode: .folder,
-                selectedFolder: viewModel.selectedFolder,
-                searchText: viewModel.searchText,
-                defaultLibraryItems: viewModel.defaultLibraryItems,
-                folderResults: viewModel.filteredFolderPodcastResults,
-                hasAnyPodcastsInFolder: viewModel.hasAnyPodcastsInFolder,
-                searchResults: viewModel.searchResultsPodcasts,
-                onSelectResult: { handleSelection(for: $0) },
-                disableLibraryAnimation: viewModel.disableLibraryAnimation,
-                isLoading: viewModel.isPodcastListLoading
-            )
-            .background(backgroundColor.ignoresSafeArea())
-            .navigationTitle(viewModel.navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
         case .podcast:
             LocalSearchEpisodeResultsView(
                 isLoading: viewModel.isEpisodeSearchInFlight,
@@ -254,12 +211,6 @@ private extension LocalSearchView {
         if newPodcastCount < previousPodcastCount {
             viewModel.clearSelectedPodcast()
         }
-
-        let previousFolderCount = previousPath.filter(\.isFolder).count
-        let newFolderCount = newPath.filter(\.isFolder).count
-        if newFolderCount < previousFolderCount {
-            viewModel.clearSelectedFolder()
-        }
     }
 
     func popNavigation() {
@@ -271,13 +222,7 @@ private extension LocalSearchView {
 }
 
 private enum LocalSearchRoute: Hashable {
-    case folder(String)
     case podcast(String)
-
-    var isFolder: Bool {
-        if case .folder = self { return true }
-        return false
-    }
 
     var isPodcast: Bool {
         if case .podcast = self { return true }
@@ -296,7 +241,6 @@ private final class LocalSearchFieldTheme: SearchField.SearchTheme {
 struct LocalSearchView_Previews: PreviewProvider {
     static var previews: some View {
         LocalSearchView(playlist: EpisodeFilter())
-            .environmentObject(SearchAnalyticsHelper(source: .unknown))
             .environmentObject(SearchResultsModel())
             .environmentObject(SearchHistoryModel(userDefaults: UserDefaults(suiteName: "LocalSearchViewPreview") ?? .standard))
             .previewWithAllThemes()

@@ -36,8 +36,6 @@ class PlayerChapterCell: UITableViewCell {
     @IBOutlet var seperatorView: UIView!
     @IBOutlet var progressViewWidth: NSLayoutConstraint!
     @IBOutlet var isPlayingView: UIView!
-    @IBOutlet weak var toggleChapterButton: BouncyButton!
-    @IBOutlet weak var chapterButtonWidth: NSLayoutConstraint!
 
     private var onLinkTapped: ((URL) -> Void)?
     private var chapter: ChapterInfo?
@@ -45,22 +43,6 @@ class PlayerChapterCell: UITableViewCell {
     enum ChapterPlayState { case played, currentlyPlaying, currentlyPaused, future }
 
     private var playState = ChapterPlayState.played
-
-    private var isChapterToggleEnabled: Bool = false
-
-    /// Shown in place of the chapter number while a fingerprint-based seek is being
-    /// resolved for this row (generated chapters — see `ChaptersViewController`).
-    private lazy var resolvingSpinner: UIActivityIndicatorView = {
-        let spinner = UIActivityIndicatorView(style: .medium)
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        spinner.hidesWhenStopped = true
-        contentView.addSubview(spinner)
-        NSLayoutConstraint.activate([
-            spinner.centerXAnchor.constraint(equalTo: chapterNumber.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: chapterNumber.centerYAnchor)
-        ])
-        return spinner
-    }()
 
     override func awakeFromNib() {
         super.awakeFromNib()
@@ -88,13 +70,12 @@ class PlayerChapterCell: UITableViewCell {
         }
     }
 
-    func populateFrom(chapter: ChapterInfo, playState: ChapterPlayState, isChapterToggleEnabled: Bool, linkTapped: @escaping ((URL) -> Void)) {
+    func populateFrom(chapter: ChapterInfo, playState: ChapterPlayState, linkTapped: @escaping ((URL) -> Void)) {
         self.playState = playState
-        self.isChapterToggleEnabled = isChapterToggleEnabled
         chapterName.text = chapter.title
         chapterLength.text = TimeFormatter.shared.singleUnitFormattedShortestTime(time: chapter.duration)
         chapterNumber.text = "\(chapter.index + 1)"
-        linkView.isHidden = (chapter.url == nil || isChapterToggleEnabled)
+        linkView.isHidden = (chapter.url == nil)
 
         nowPlayingAnimation.animating = false
         setColors(dim: playState == .played)
@@ -109,80 +90,11 @@ class PlayerChapterCell: UITableViewCell {
         self.chapter = chapter
         isPlayingView.backgroundColor = ThemeColor.playerContrast06()
         progressUpdated(animated: false)
-
-        setUpSelectedChapterButton()
-
-        toggleChapterButton.currentlyOn = chapter.shouldPlay
-
-        isChapterToggleEnabled ? showSelectedChapterButton() : hideSelectedChapterButton()
-    }
-
-    private func setUpSelectedChapterButton() {
-        toggleChapterButton.onImage = UIImage(named: "rounded-selected")
-        toggleChapterButton.offImage = UIImage(named: "rounded-deselected")
-        toggleChapterButton.tintColor = .white
-        toggleChapterButton.isUserInteractionEnabled = false
-    }
-
-    private func hideSelectedChapterButton() {
-        toggleChapterButton.isHidden = true
-        chapterButtonWidth.constant = 20
-    }
-
-    private func showSelectedChapterButton() {
-        toggleChapterButton.isHidden = false
-        chapterButtonWidth.constant = 48
-        setColors(dim: chapter?.isPlayable() == false)
-    }
-
-    /// Toggle the resolving spinner for this row. Driven from
-    /// `ChaptersViewController`'s `resolvingIndexPath` in `cellForRowAt` so it
-    /// survives cell reuse.
-    func setResolving(_ resolving: Bool) {
-        if resolving {
-            resolvingSpinner.color = ThemeColor.playerContrast01()
-            resolvingSpinner.startAnimating()
-            chapterNumber.isHidden = true
-        } else {
-            // Only tear down when a spinner was actually shown (chapter number
-            // hidden). Otherwise skip — touching `resolvingSpinner` here would
-            // force-create the lazy view for every non-resolving row.
-            guard chapterNumber.isHidden else { return }
-            resolvingSpinner.stopAnimating()
-            chapterNumber.isHidden = false
-        }
     }
 
     @IBAction func linkTapped(_ sender: Any) {
         guard let chapter, let link = chapter.url, let url = URL(string: link), let linkTapped = onLinkTapped else { return }
-        PlaybackManager.shared.trackChapterEvent(.chapterLinkClicked, properties: [
-            "podcast_uuid": PlaybackManager.shared.currentPodcast?.uuid ?? "unknown",
-            "episode_uuid": PlaybackManager.shared.currentEpisode?.uuid ?? "unknown",
-            "chapter_title": chapter.title
-        ])
         linkTapped(url)
-    }
-
-
-    @IBAction func toggleChapterTapped(_ sender: Any) {
-        chapter?.shouldPlay.toggle()
-        toggleChapterButton.currentlyOn.toggle()
-
-        setColors(dim: chapter?.isPlayable() == false)
-
-        if let currentEpisode = PlaybackManager.shared.currentEpisode, let index = chapter?.index {
-            if chapter?.shouldPlay == true {
-                currentEpisode.select(chapterIndex: index)
-                track(.deselectChaptersChapterSelected)
-            } else {
-                currentEpisode.deselect(chapterIndex: index)
-                track(.deselectChaptersChapterDeselected)
-            }
-
-            currentEpisode.deselectedChaptersModified = TimeFormatter.currentUTCTimeInMillis()
-
-            DataManager.shared.save(episode: currentEpisode)
-        }
     }
 
     @objc func progressUpdated(animated: Bool = true) {
@@ -214,9 +126,5 @@ class PlayerChapterCell: UITableViewCell {
         chapterName.textColor = shouldDim ? ThemeColor.playerContrast02() : ThemeColor.playerContrast01()
         chapterNumber.textColor = chapterName.textColor
         chapterLength.textColor = chapterName.textColor
-    }
-
-    private func track(_ event: AnalyticsEvent) {
-        PlaybackManager.shared.trackChapterEvent(event, properties: ["podcast_uuid": PlaybackManager.shared.currentPodcast?.uuid ?? "unknown", "episode_uuid": PlaybackManager.shared.currentEpisode?.uuid ?? "unknown"])
     }
 }

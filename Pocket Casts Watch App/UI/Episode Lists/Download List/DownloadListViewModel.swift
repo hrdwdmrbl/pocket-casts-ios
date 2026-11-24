@@ -6,7 +6,7 @@ class DownloadListViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var episodes: [EpisodeRowViewModel] = []
     @Published var downloadedCount: Int = 0
-    let playSourceViewModel = PlaySourceHelper.playSourceViewModel
+    let playSourceViewModel = PhoneSourceViewModel()
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -16,12 +16,12 @@ class DownloadListViewModel: ObservableObject {
             Publishers.Notification.dataUpdated,
             Publishers.Notification.episodeDownloadStatusChanged,
             Publishers.Notification.episodeDownloaded
-            )
-            .receive(on: RunLoop.main)
-            .sink(receiveValue: { [unowned self] _ in
-                self.loadEpisodes()
-            })
-            .store(in: &cancellables)
+        )
+        .receive(on: RunLoop.main)
+        .sink(receiveValue: { [unowned self] _ in
+            self.loadEpisodes()
+        })
+        .store(in: &cancellables)
     }
 
     public func loadEpisodes() {

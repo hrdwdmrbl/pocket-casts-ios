@@ -9,7 +9,6 @@ class PodcastGridCell: UICollectionViewCell {
     @IBOutlet var podcastName: UILabel!
 
     @IBOutlet var badgeView: GridBadgeView!
-    @IBOutlet var supporterHeart: PodcastHeartView!
 
     private var podcastUuid: String?
     private var badgeType = BadgeType.off
@@ -44,11 +43,6 @@ class PodcastGridCell: UICollectionViewCell {
         podcastName.accessibilityLabel = podcast.title
 
         updateBadge(podcast: podcast, badgeType: badgeType, libraryType: libraryType)
-
-        supporterHeart.isHidden = !podcast.isPaid
-        if podcast.isPaid {
-            supporterHeart.setPodcastColor(podcast: podcast)
-        }
     }
 
     @objc private func podcastImageCacheCleared() {
@@ -86,10 +80,6 @@ class PodcastGridCell: UICollectionViewCell {
         backgroundColor = .clear
         containerView.backgroundColor = bgColor
         podcastName.backgroundColor = bgColor
-
-        if podcast.isPaid {
-            supporterHeart.setPodcastColor(podcast: podcast)
-        }
     }
 
     private func updateBadge(podcast: Podcast, badgeType: BadgeType, libraryType: LibraryType) {

@@ -228,8 +228,6 @@ class ShowNotesPlayerItemViewController: PlayerItemViewController, @preconcurren
                 safariViewController?.delegate = self
 
                 SceneHelper.rootViewController()?.present(safariViewController!, animated: true, completion: nil)
-
-                Analytics.track(.playerShowNotesLinkTapped, properties: ["episode_uuid": lastEpisodeUuidRendered])
             } else if URLHelper.isMailtoScheme(url.scheme), UIApplication.shared.canOpenURL(url) {
                 UIApplication.shared.open(url, options: [:], completionHandler: nil)
             }
@@ -242,7 +240,7 @@ class ShowNotesPlayerItemViewController: PlayerItemViewController, @preconcurren
         showNotesWebView.evaluateJavaScript("document.readyState", completionHandler: { [weak self] complete, _ in
             guard let self,
                   let result = complete as? String,
-                  result == "complete" // ensure that the load of HTML is complete and not in another loading state
+                  result == "complete"
             else {
                 return
             }

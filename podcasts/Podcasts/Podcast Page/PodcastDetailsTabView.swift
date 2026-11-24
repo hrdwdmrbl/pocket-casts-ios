@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 import PocketCastsUtils
 
-/// Displays a fake set of tabs that allows the user to open the bookmarks view from the podcast list
+/// Switches between episodes and related podcasts.
 struct PodcastDetailsTabView: View {
     @EnvironmentObject var theme: Theme
     @State private var selectedTab: Tab = .episodes
@@ -11,15 +11,12 @@ struct PodcastDetailsTabView: View {
 
     enum Tab {
         case episodes
-        case bookmarks
         case youMightLike
 
         init(from viewMode: PodcastViewController.ViewMode) {
             switch viewMode {
             case .episodes:
                 self = .episodes
-            case .bookmarks:
-                self = .bookmarks
             case .youMightLike:
                 self = .youMightLike
             }
@@ -28,12 +25,7 @@ struct PodcastDetailsTabView: View {
 
     var body: some View {
         Group {
-            if FeatureFlag.recommendations.enabled {
-                ScrollView(.horizontal, showsIndicators: false) { tabs }
-                    .scrollClipDisabled()
-            } else {
-                tabs
-            }
+            tabs
         }
         .onReceive(delegate?.currentViewModePublisher ?? Just(.episodes).eraseToAnyPublisher()) { viewMode in
             selectedTab = Tab(from: viewMode)
@@ -49,16 +41,6 @@ struct PodcastDetailsTabView: View {
                 } customize: { config in
                     config.label
                         .applyStyle(theme: theme, highlighted: selectedTab == .episodes)
-                        .applyButtonEffect(isPressed: config.isPressed)
-                }
-
-            Text(L10n.bookmarks)
-                .buttonize {
-                    selectedTab = .bookmarks
-                    delegate?.showBookmarks()
-                } customize: { config in
-                    config.label
-                        .applyStyle(theme: theme, highlighted: selectedTab == .bookmarks)
                         .applyButtonEffect(isPressed: config.isPressed)
                 }
 

@@ -5,10 +5,7 @@ import XCTest
 
 final class PlaybackQueueTests: XCTestCase {
 
-    let featureFlagMock = FeatureFlagMock()
-
     func testOverrideAllEpisodesWith_shouldNotIncludeStaleEpisodesInReplace() {
-        FeatureFlagMock().set(.replaceSpecificEpisode, value: true)
 
         let playbackQueue = PlaybackQueue()
         let mockDataManager = MockDataManager()
@@ -118,7 +115,6 @@ final class PlaybackQueueTests: XCTestCase {
     }
 
     override func tearDown() {
-        featureFlagMock.reset()
     }
 }
 

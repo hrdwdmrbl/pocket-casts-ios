@@ -13,9 +13,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
         }
     }
     @IBOutlet var statusIndicator: UIImageView!
-    @IBOutlet var uploadStatusIndicator: UIImageView!
-
-    @IBOutlet var uploadProgressIndicator: ProgressPieView!
     @IBOutlet var upNextIndicator: UIImageView!
 
     @IBOutlet var leadingSpacerWidth: NSLayoutConstraint!
@@ -27,7 +24,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
             downloadingIndicator.transform = CGAffineTransform(scaleX: 0.75, y: 0.75)
         }
     }
-    @IBOutlet var bookmarkIcon: UIImageView!
 
     @IBOutlet var informationLabel: ThemeableLabel! {
         didSet {
@@ -171,8 +167,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(updateCellFromSpecificEvent(_:)), name: Constants.Notifications.playbackPositionSaved, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(updateCellFromSpecificEvent(_:)), name: Constants.Notifications.episodePlayStatusChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(updateCellFromSpecificEvent(_:)), name: Constants.Notifications.episodeDownloaded, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(updateCellFromSpecificEvent(_:)), name: ServerNotifications.userEpisodeUploadStatusChanged, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(uploadProgressDidUpdate), name: ServerNotifications.userEpisodeUploadProgress, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(reloadArtwork(_:)), name: Constants.Notifications.userEpisodeUpdated, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(upNextEpisodeChanged(_:)), name: Constants.Notifications.upNextEpisodeAdded, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(upNextEpisodeChanged(_:)), name: Constants.Notifications.upNextEpisodeRemoved, object: nil)
@@ -233,12 +227,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
         updateSize()
     }
 
-
-    /// Determines whether the bookmark indicator icon should appear
-    private var showBookmarksIcon: Bool {
-        PaidFeature.bookmarks.isUnlocked && episode?.hasBookmarks == true
-    }
-
     private func populate(progressOnly: Bool) {
         guard let episode else { return }
 
@@ -253,42 +241,20 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
             setUpNextIndicator(visible: PlaybackManager.shared.inUpNext(episode: episode), animated: false)
             upNextIndicator.tintColor = ThemeColor.support01()
 
-            var uploadFailed = false
-            if let userEpisode = episode as? UserEpisode {
-                uploadStatusIndicator.isHidden = !userEpisode.uploaded()
-                uploadFailed = userEpisode.uploadFailed()
-            } else {
-                uploadStatusIndicator.isHidden = true
-            }
-
-            // Since this calls out to the DB we'll cache the value here so later calls don't hit it again
-            let showBookmarksIcon = self.showBookmarksIcon
-
-            // Setup the bookmarks icon
-            bookmarkIcon.image = UIImage(named: "bookmark-icon-episode")
-            bookmarkIcon.tintColor = mainTintColor
-            bookmarkIcon.isHidden = !showBookmarksIcon
-
-            let hideStatus = !episode.archived && !episode.wasDeleted && !episode.downloaded(pathFinder: DownloadManager.shared) && !episode.downloadFailed() && !uploadFailed && !episode.playbackError()
+            let hideStatus = !episode.archived && !episode.wasDeleted && !episode.downloaded(pathFinder: DownloadManager.shared) && !episode.downloadFailed() && !episode.playbackError()
             if !hideStatus {
                 let statusImage: UIImage?
-                if episode.downloadFailed() || uploadFailed || episode.playbackError() {
+                if episode.downloadFailed() || episode.playbackError() {
                     statusImage = UIImage(named: "profile-alert")
                 } else if episode.downloaded(pathFinder: DownloadManager.shared) {
                     statusImage = UIImage(named: "list_downloaded")
+                } else {if episode.wasDeleted {
+                    statusImage = UIImage(named: "option-cross-circle")?.tintedImage(ThemeColor.primaryIcon02())
+                } else if episode.archived {
+                    statusImage = UIImage(named: "list_archived")?.tintedImage(ThemeColor.primaryIcon02())
                 } else {
-                    // To show the archive and bookmark indicator in the correct places we show the bookmark indicator
-                    // in the status image, and move the archive icon into the bookmarks place.
-                    if showBookmarksIcon {
-                        statusImage = UIImage(named: "bookmark-icon-episode")?.tintedImage(mainTintColor ?? ThemeColor.primaryIcon02())
-                        bookmarkIcon.image = UIImage(named: "list_archived")?.tintedImage(ThemeColor.primaryIcon02())
-                    } else if episode.wasDeleted {
-                        statusImage = UIImage(named: "option-cross-circle")?.tintedImage(ThemeColor.primaryIcon02())
-                    } else if episode.archived {
-                        statusImage = UIImage(named: "list_archived")?.tintedImage(ThemeColor.primaryIcon02())
-                    } else {
-                        statusImage = nil
-                    }
+                    statusImage = nil
+                }
                 }
                 statusIndicator.image = statusImage
             }
@@ -343,23 +309,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
             downloadingIndicator.stopAnimating()
         }
 
-        if let userEpisode = episode as? UserEpisode {
-            uploadProgressIndicator.isHidden = !(userEpisode.uploading() || userEpisode.uploadWaitingForWifi())
-            if userEpisode.uploading() {
-                if let progress = UploadManager.shared.progressManager.progress(forEpisodeUuid: userEpisode.uuid) {
-                    uploadProgressIndicator.progress = progress.percentageProgress()
-                } else {
-                    uploadProgressIndicator.progress = 0.1
-                }
-                uploadProgressIndicator.alpha = 1
-            } else if userEpisode.uploadWaitingForWifi() {
-                uploadProgressIndicator.progress = 0
-                uploadProgressIndicator.alpha = 0.5
-            }
-        } else {
-            uploadProgressIndicator.isHidden = true
-        }
-
         if episode.wasDeleted {
             actionButton.isHidden = true
         } else {
@@ -398,9 +347,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
         }
         if episode.keepEpisode {
             desc.append(L10n.statusStarred)
-        }
-        if let userEpisode = episode as? UserEpisode, userEpisode.uploaded() {
-            desc.append(L10n.statusUploaded)
         }
         if isMultiSelectEnabled {
             if showTick {
@@ -522,25 +468,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
         populate(progressOnly: true)
     }
 
-    @objc private func uploadProgressDidUpdate() {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated { uploadProgressDidUpdateOnMain() }
-        } else {
-            Task { @MainActor in uploadProgressDidUpdateOnMain() }
-        }
-    }
-
-    private func uploadProgressDidUpdateOnMain() {
-        guard let ourEpisode = episode as? UserEpisode, let _ = UploadManager.shared.progressManager.progress(forEpisodeUuid: ourEpisode.uuid) else { return }
-
-        // if this episode isn't listed as uploading, update it from the DB
-        if !ourEpisode.uploading() {
-            episode = reloadEpisode()
-        }
-
-        populate(progressOnly: true)
-    }
-
     @objc func reloadArtwork(_ notification: Notification) {
         guard let episodeUuid = notification.object as? String,
               episodeUuid == episode?.uuid,
@@ -564,11 +491,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
 
     func playTapped() {
         guard let episode else { return }
-
-        // if the user tapped play from a featured list, record that. We just want the first play, if they are unpausing it, that's not relevant (hence the last check below)
-        if let podcastUuid, let listUuid, !PlaybackManager.shared.isCurrentEpisode(uuid: episode.uuid) {
-            AnalyticsHelper.podcastEpisodePlayedFromList(listId: listUuid, podcastUuid: podcastUuid)
-        }
 
         PlaybackActionHelper.play(episode: episode, playlistUuid: playlistUuid, podcastUuid: podcastUuid, playlist: playlist)
     }
@@ -628,8 +550,6 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
         upNextIndicator.alpha = 1
         upNextIndicator.transform = .identity
         statusIndicator.isHidden = true
-        uploadProgressIndicator.isHidden = true
-        uploadStatusIndicator.isHidden = true
         playlistUuid = nil
         podcastUuid = nil
         showTick = false
@@ -701,9 +621,7 @@ class EpisodeCell: ThemeableSwipeCell, MainEpisodeActionViewDelegate {
 
         let iconSize = max(16, metric.scaledValue(for: 16))
         statusIndicator.updateSizeConstraints(to: iconSize)
-        uploadStatusIndicator.updateSizeConstraints(to: iconSize)
         upNextIndicator.updateSizeConstraints(to: iconSize)
-        bookmarkIcon.updateSizeConstraints(to: iconSize)
         starIndicator.updateSizeConstraints(to: iconSize)
         downloadingIndicator.updateSizeConstraints(to: iconSize)
         videoIndicator.updateSizeConstraints(to: iconSize)

@@ -41,6 +41,5 @@ extension Publishers {
         // Data Updates
         static let dataUpdated = NotificationCenter.default.publisher(for: WatchConstants.Notifications.dataUpdated, object: nil)
         static let podcastUpdated = NotificationCenter.default.publisher(for: Constants.Notifications.podcastUpdated)
-        static let folderChanged = NotificationCenter.default.publisher(for: Constants.Notifications.folderChanged)
     }
 }

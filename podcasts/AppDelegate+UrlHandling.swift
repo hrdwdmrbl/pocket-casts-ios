@@ -75,24 +75,17 @@ extension AppDelegate {
             guard let strongSelf = self, let shortcut = parameters["shortcut"] as? String else { return false }
 
             if shortcut == "pause" {
-                AnalyticsPlaybackHelper.shared.currentSource = .appIconMenu
                 PlaybackManager.shared.pause()
                 strongSelf.openPlayerWhenReadyFromExternalEvent()
-                AnalyticsHelper.forceTouchPause()
             } else if shortcut == "play" {
-                AnalyticsPlaybackHelper.shared.currentSource = .appIconMenu
                 PlaybackManager.shared.play()
                 strongSelf.openPlayerWhenReadyFromExternalEvent()
-                AnalyticsHelper.forceTouchPlay()
             } else if shortcut == "markAsPlayed" {
                 if let episode = PlaybackManager.shared.currentEpisode {
-                    AnalyticsEpisodeHelper.shared.currentSource = .appIconMenu
                     EpisodeManager.markAsPlayed(episode: episode, fireNotification: true)
-                    AnalyticsHelper.forceTouchMarkPlayed()
                 }
             } else if shortcut == "discover" {
                 NavigationManager.shared.navigateTo(NavigationManager.discoverPageKey, data: nil)
-                AnalyticsHelper.forceTouchDiscover()
             }
 
             return true
@@ -103,7 +96,6 @@ extension AppDelegate {
             guard let playlistId = parameters["filterId"] as? String, let playlist = DataManager.shared.findPlaylist(uuid: playlistId) else { return false }
 
             NavigationManager.shared.navigateTo(NavigationManager.filterPageKey, data: [NavigationManager.filterUuidKey: playlist.uuid])
-            AnalyticsHelper.forceTouchTopFilter()
 
             return true
         }
@@ -113,7 +105,6 @@ extension AppDelegate {
             guard let podcastUuid = parameters["podcastUuid"] as? String, let podcast = DataManager.shared.findPodcast(uuid: podcastUuid) else { return false }
 
             NavigationManager.shared.navigateTo(NavigationManager.podcastPageKey, data: [NavigationManager.podcastKey: podcast])
-            AnalyticsHelper.forceTouchPodcast()
 
             return true
         }
@@ -150,21 +141,12 @@ extension AppDelegate {
 
         // Open to discover
         JLRoutes.global().addRoute("/discover/*") { paramDict -> Bool in
-            if let sourceString = paramDict["source"] as? String, sourceString == "widget" {
-                Analytics.track(.widgetInteraction, properties: ["action": "discover"])
-            }
 
             var data: NSDictionary?
             if let pathComponents = paramDict[JLRouteWildcardComponentsKey] as? [String], let itemID = pathComponents.first {
                 data = [NavigationManager.discoverListKey: itemID]
             }
             NavigationManager.shared.navigateTo(NavigationManager.discoverPageKey, data: data)
-
-            return true
-        }
-        // developer features:
-        JLRoutes.global().addRoute("/resetalltours") { _ -> Bool in
-            Settings.whatsNewLastAcknowledged = 0
 
             return true
         }
@@ -243,9 +225,7 @@ extension AppDelegate {
 
             if PlaybackManager.shared.isCurrentEpisode(uuid: baseEpisode.uuid) {
                 strongSelf.openPlayerWhenReadyFromExternalEvent()
-                Analytics.track(.widgetInteraction, properties: ["action": "now_playing"])
             } else {
-                Analytics.track(.widgetInteraction, properties: ["action": "episode"])
                 if let episode = baseEpisode as? Episode {
                     NavigationManager.shared.navigateTo(NavigationManager.episodePageKey, data: [NavigationManager.episodeUuidKey: episode.uuid])
                 } else if baseEpisode is UserEpisode {
@@ -256,32 +236,11 @@ extension AppDelegate {
         }
 
         JLRoutes.global().addRoute("/last_opened/*") { _ in
-            Analytics.track(.widgetInteraction, properties: ["action": "open_app"])
             return true
         }
 
         JLRoutes.global().addRoute("/show_player") { [weak self] _ -> Bool in
-            Analytics.track(.widgetInteraction, properties: ["action": "now_playing"])
             self?.openPlayerWhenReadyFromExternalEvent()
-            return true
-        }
-
-        // Sonos App Link
-        JLRoutes.global().addRoute("/applink/sonos/*") { [weak self] parameters -> Bool in
-            guard let strongSelf = self, let originalUrl = parameters[JLRouteURLKey] as? URL else { return false }
-
-            let redirectUri = originalUrl.absoluteString.replacingOccurrences(of: "pktc://applink/sonos/", with: "")
-
-            if let modalController = strongSelf.modalController {
-                modalController.dismiss(animated: false, completion: nil)
-            }
-
-            let sonosController = SonosLinkController()
-            sonosController.callbackUri = redirectUri
-            let navController = SJUIUtils.navController(for: sonosController)
-            strongSelf.modalController = navController
-            SceneHelper.rootViewController()?.present(navController, animated: true, completion: nil)
-
             return true
         }
 
@@ -296,60 +255,6 @@ extension AppDelegate {
             return true
         }
 
-        // Promotion Codes:
-        JLRoutes.global().addRoute("/redeem/promo/*") { [weak self] parameters -> Bool in
-            guard self != nil else { return false }
-            var promoCode: String?
-            if let pathComponents = parameters[JLRouteWildcardComponentsKey] as? [String], !pathComponents.isEmpty {
-                promoCode = pathComponents[0]
-            }
-
-            NavigationManager.shared.navigateTo(NavigationManager.showPromotionPageKey, data: [NavigationManager.promotionInfoKey: promoCode as Any])
-            return true
-        }
-
-        // Supporter Podcasts
-        JLRoutes.global().addRoute("/premium/podcast/*") { [weak self] parameters -> Bool in
-            guard self != nil else { return false }
-
-            if let pathComponents = parameters[JLRouteWildcardComponentsKey] as? [String], !pathComponents.isEmpty, let podcastTitle = parameters["title"] as? String {
-                let uuid = pathComponents[0]
-
-                if SyncManager.isUserLoggedIn() {
-                    RefreshManager.shared.refreshPodcasts(forceEvenIfRefreshedRecently: true)
-                    ApiServerHandler.shared.retrieveSubscriptionStatus()
-                    var bundleUuid: String?
-                    if let bundle = SubscriptionHelper.bundleSubscription(forPodcastUuid: uuid) {
-                        bundleUuid = bundle.bundleUuid
-                    }
-                    NavigationManager.shared.navigateTo(NavigationManager.supporterBundlePageKey, data: [NavigationManager.supporterBundleUuid: bundleUuid as Any])
-                } else {
-                    var podcastInfo = PodcastInfo()
-                    podcastInfo.uuid = uuid
-                    podcastInfo.title = podcastTitle
-
-                    NavigationManager.shared.navigateTo(NavigationManager.supporterSignInKey, data: [NavigationManager.supporterPodcastInfo: podcastInfo])
-                }
-            }
-            return true
-        }
-
-        JLRoutes.global().addRoute("/premium/supporter-contributions/*") { [weak self] parameters -> Bool in
-            guard self != nil else { return false }
-            if let pathComponents = parameters[JLRouteWildcardComponentsKey] as? [String], !pathComponents.isEmpty {
-                let uuid = pathComponents[0]
-
-                if SyncManager.isUserLoggedIn() {
-                    RefreshManager.shared.refreshPodcasts(forceEvenIfRefreshedRecently: true)
-                    ApiServerHandler.shared.retrieveSubscriptionStatus()
-                    NavigationManager.shared.navigateTo(NavigationManager.supporterBundlePageKey, data: [NavigationManager.supporterBundleUuid: uuid])
-                } else {
-                    NavigationManager.shared.navigateTo(NavigationManager.supporterSignInKey, data: [NavigationManager.supporterBundleUuid: uuid])
-                }
-            }
-            return true
-        }
-
         JLRoutes.global().addRoute("/upnext/*") { [weak self] paramDict -> Bool in
             var source: UpNextViewSource = .unknown
             var showFromMiniPlayer: Bool = true
@@ -357,7 +262,6 @@ extension AppDelegate {
                 showFromMiniPlayer = false
             }
             if let sourceString = paramDict["source"] as? String {
-                Analytics.track(.widgetInteraction, properties: ["action": "up_next"])
                 source = UpNextViewSource(rawValue: sourceString) ?? .unknown
             }
             if showFromMiniPlayer {
@@ -366,20 +270,6 @@ extension AppDelegate {
                 NavigationManager.shared.navigateTo(NavigationManager.upNextPageKey)
             }
 
-            return true
-        }
-
-        // Support - send IAP purchase receipt to server:
-        JLRoutes.global().addRoute("/support/sendreceipt/*") { [weak self] _ -> Bool in
-            guard self != nil else { return false }
-
-            ApiServerHandler.shared.sendPurchaseReceipt(completion: { success in
-                if success {
-                    FileLog.shared.addMessage("AppDelegate successfully validated receipt")
-                } else {
-                    FileLog.shared.addMessage("AppDelegate failed to validate receipt")
-                }
-            })
             return true
         }
 
@@ -396,90 +286,6 @@ extension AppDelegate {
             }
 
             return self.handleOpenUrl(url: fileURL, rootViewController: rootViewController)
-        }
-
-        setupOnboardingRoutes()
-        setupNewFeaturesRoutes()
-        setupProfileRoutes()
-        setupTestFlightIAPRoutes()
-        setupTVPairingRoutes()
-    }
-
-    func setupOnboardingRoutes() {
-        JLRoutes.global().addRoute("/settings/themes") {[weak self] _ -> Bool in
-            guard self != nil else { return false }
-            NavigationManager.shared.navigateTo(NavigationManager.settingsAppearanceKey, data: [NavigationManager.settingsAppearanceShowThemeKey: true])
-            return true
-        }
-
-        JLRoutes.global().addRoute("/signup") {[weak self] _ -> Bool in
-            guard self != nil else { return false }
-            NavigationManager.shared.navigateTo(NavigationManager.signUpPageKey)
-            return true
-        }
-
-        JLRoutes.global().addRoute("/settings/import") {[weak self] _ -> Bool in
-            guard self != nil else { return false }
-            NavigationManager.shared.navigateTo(NavigationManager.settingsPageKey, data: [NavigationManager.settingsRowKey: SettingsViewController.TableRow.importSteps])
-            return true
-        }
-
-        JLRoutes.global().addRoute("/settings/storage-and-data") {[weak self] _ -> Bool in
-            guard self != nil else { return false }
-            NavigationManager.shared.navigateTo(NavigationManager.settingsPageKey, data: [NavigationManager.settingsRowKey: SettingsViewController.TableRow.storageAndDataUse])
-            return true
-        }
-
-        JLRoutes.global().addRoute("/filters") {[weak self] _ -> Bool in
-            guard self != nil else { return false }
-            NavigationManager.shared.navigateTo(NavigationManager.filterPageKey)
-            return true
-        }
-
-        JLRoutes.global().addRoute("/upsell") { parameters -> Bool in
-            guard let viewController = SceneHelper.rootViewController() else { return false }
-            let source = PlusUpgradeViewSource(routeParameters: parameters)
-            NavigationManager.shared.navigateTo(NavigationManager.subscriptionRequiredPageKey, data: ["source": source, NavigationManager.subscriptionUpgradeVCKey: viewController])
-            return true
-        }
-    }
-
-    func setupNewFeaturesRoutes() {
-        JLRoutes.global().addRoute("/features/*") {[weak self] parameters -> Bool in
-            guard self != nil,
-                  let pathComponents = parameters[JLRouteWildcardComponentsKey] as? [String],
-                  let feature = pathComponents.first
-            else {
-                return false
-            }
-            NavigationManager.shared.navigateTo(NavigationManager.featurePageKey, data: [NavigationManager.featureKey: feature])
-            return true
-        }
-    }
-
-    func setupProfileRoutes() {
-        JLRoutes.global().addRoute("/profile/*") { [weak self] parameters -> Bool in
-            guard self != nil,
-                  let pathComponents = parameters[JLRouteWildcardComponentsKey] as? [String],
-                  let row = pathComponents.first
-            else {
-                NavigationManager.shared.navigateTo(NavigationManager.settingsProfileKey, data: [:])
-                return true
-            }
-            NavigationManager.shared.navigateTo(NavigationManager.settingsProfileKey, data: [NavigationManager.profileRowKey: row])
-            return true
-        }
-    }
-
-    func setupTVPairingRoutes() {
-        JLRoutes.global().addRoute("/pair") { [weak self] parameters -> Bool in
-            guard self != nil else {
-                return true
-            }
-            let userCode = parameters["user_code"] as? String
-
-            NavigationManager.shared.navigateTo(NavigationManager.deviceApprovePageKey, data: [NavigationManager.deviceApproveCodeKey: userCode as Any])
-            return true
         }
     }
 
@@ -582,37 +388,5 @@ extension AppDelegate {
                 }
             }
         })
-    }
-
-    private func setupTestFlightIAPRoutes() {
-        if BuildEnvironment.current != .testFlight {
-            return
-        }
-        JLRoutes.global().addRoute("/iap/:enabled") {[weak self] parameters -> Bool in
-            guard
-                self != nil,
-                let value = parameters["enabled"] as? String
-            else { return false }
-
-            let isEnabled = value.lowercased() == "true"
-            Settings.shouldEnableIAPInTestFlightBuilds = isEnabled
-
-            let title = isEnabled ? "✅ In-App Purchases Enabled" : "🚫 In-App Purchases Disabled"
-            let message = isEnabled ? "This beta build uses a test environment. Purchases made here are for testing only—please don’t use your production account." : "In-App Purchases are turned off on this device."
-
-            SJUIUtils.showAlert(
-                title: title,
-                message: message,
-                from: SceneHelper.rootViewController()
-            )
-
-            return true
-        }
-    }
-}
-
-extension PlusUpgradeViewSource {
-    init(routeParameters parameters: [String: Any]) {
-        self = PlusUpgradeViewSource(rawValue: parameters["source"] as? String ?? PlusUpgradeViewSource.deepLink.rawValue) ?? .unknown
     }
 }

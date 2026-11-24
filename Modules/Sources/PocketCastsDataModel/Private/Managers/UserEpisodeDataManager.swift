@@ -13,29 +13,24 @@ class UserEpisodeDataManager {
         loadSingle(query: "SELECT * from \(DataManager.userEpisodeTableName) WHERE downloadTaskId = ?", values: [downloadTaskId], dbQueue: dbQueue)
     }
 
-    func findBy(uploadTaskId: String, dbQueue: GRDBQueue) -> UserEpisode? {
-        loadSingle(query: "SELECT * from \(DataManager.userEpisodeTableName) WHERE uploadTaskId = ?", values: [uploadTaskId], dbQueue: dbQueue)
-    }
-
     func findAll(sortedBy: UploadedSort, limit: Int? = nil, dbQueue: GRDBQueue) -> [UserEpisode] {
-        let whereClause = "WHERE uploadStatus != \(UploadStatus.deleteFromCloudPending.rawValue) AND uploadStatus != \(UploadStatus.deleteFromCloudAndLocalPending.rawValue)"
         var limitClause = ""
         if let limit {
             limitClause = " LIMIT \(limit)"
         }
         switch sortedBy {
         case .newestToOldest:
-            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) \(whereClause) ORDER BY addedDate DESC\(limitClause)", values: nil, dbQueue: dbQueue)
+            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) ORDER BY addedDate DESC\(limitClause)", values: nil, dbQueue: dbQueue)
         case .oldestToNewest:
-            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) \(whereClause) ORDER BY addedDate ASC\(limitClause)", values: nil, dbQueue: dbQueue)
+            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) ORDER BY addedDate ASC\(limitClause)", values: nil, dbQueue: dbQueue)
         case .titleAtoZ:
-            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) \(whereClause) ORDER BY LOWER(title) ASC\(limitClause)", values: nil, dbQueue: dbQueue)
+            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) ORDER BY LOWER(title) ASC\(limitClause)", values: nil, dbQueue: dbQueue)
         case .titleZtoA:
-            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) \(whereClause) ORDER BY LOWER(title) DESC\(limitClause)", values: nil, dbQueue: dbQueue)
+            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) ORDER BY LOWER(title) DESC\(limitClause)", values: nil, dbQueue: dbQueue)
         case .shortestToLongest:
-            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) \(whereClause) ORDER BY duration ASC\(limitClause)", values: nil, dbQueue: dbQueue)
+            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) ORDER BY duration ASC\(limitClause)", values: nil, dbQueue: dbQueue)
         case .longestToShortest:
-            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) \(whereClause) ORDER BY duration DESC\(limitClause)", values: nil, dbQueue: dbQueue)
+            return loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) ORDER BY duration DESC\(limitClause)", values: nil, dbQueue: dbQueue)
         }
     }
 
@@ -61,22 +56,14 @@ class UserEpisodeDataManager {
         }
     }
 
-    func findAllWithUploadStatus(_ status: UploadStatus, dbQueue: GRDBQueue) -> [UserEpisode] {
-        loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) WHERE uploadStatus = ?", values: [status.rawValue], dbQueue: dbQueue)
-    }
-
     func removeOrphaned(dbQueue: GRDBQueue) {
         dbQueue.write { db in
             do {
-                try db.executeUpdate("DELETE FROM \(DataManager.userEpisodeTableName) WHERE uploadStatus = ? AND  ( episodeStatus = ? OR episodeStatus = ? ) ", values: [UploadStatus.notUploaded.rawValue, DownloadStatus.notDownloaded.rawValue, DownloadStatus.downloadFailed.rawValue])
+                try db.executeUpdate("DELETE FROM \(DataManager.userEpisodeTableName) WHERE episodeStatus = ? OR episodeStatus = ? ", values: [DownloadStatus.notDownloaded.rawValue, DownloadStatus.downloadFailed.rawValue])
             } catch {
                 FileLog.shared.addMessage("UserEpisodeDataManager.removeOrphaned fieldname error: \(error)")
             }
         }
-    }
-
-    func unsyncedEpisodes(dbQueue: GRDBQueue) -> [UserEpisode] {
-        loadMultiple(query: "SELECT * from \(DataManager.userEpisodeTableName) WHERE titleModified > 0 OR imageColorModified > 0 OR playingStatusModified > 0 OR playedUpToModified > 0 OR durationModified > 0", values: nil, dbQueue: dbQueue)
     }
 
     func findWhereNotNull(columnName: String, dbQueue: GRDBQueue) -> [UserEpisode] {
@@ -186,16 +173,10 @@ class UserEpisodeDataManager {
         }
     }
 
-    func saveEpisode(playingStatus: PlayingStatus, episode: UserEpisode, updateSyncFlag: Bool, dbQueue: GRDBQueue) {
+    func saveEpisode(playingStatus: PlayingStatus, episode: UserEpisode, dbQueue: GRDBQueue) {
         episode.playingStatus = playingStatus.rawValue
-        var fields = ["playingStatus"]
+        let fields = ["playingStatus"]
         var values = [episode.playingStatus] as [Any]
-
-        if updateSyncFlag {
-            episode.playingStatusModified = DBUtils.currentUTCTimeInMillis()
-            fields.append("playingStatusModified")
-            values.append(episode.playingStatusModified)
-        }
         values.append(episode.id)
 
         save(fields: fields, values: values, dbQueue: dbQueue)
@@ -235,34 +216,6 @@ class UserEpisodeDataManager {
         let fields = ["episodeStatus", "downloadTaskId"]
         let values = [episode.episodeStatus, DBUtils.replaceNilWithNull(value: episode.downloadTaskId), episode.id] as [Any]
 
-        save(fields: fields, values: values, dbQueue: dbQueue)
-    }
-
-    func saveEpisode(uploadStatus: UploadStatus, episode: UserEpisode, dbQueue: GRDBQueue) {
-        episode.uploadStatus = uploadStatus.rawValue
-
-        let fields = ["uploadStatus"]
-        let values = [episode.uploadStatus, episode.id] as [Any]
-
-        save(fields: fields, values: values, dbQueue: dbQueue)
-    }
-
-    func saveEpisode(uploadStatus: UploadStatus, uploadTaskId: String?, episode: UserEpisode, dbQueue: GRDBQueue) {
-        episode.uploadStatus = uploadStatus.rawValue
-        episode.downloadTaskId = uploadTaskId
-
-        let fields = ["uploadStatus", "uploadTaskId"]
-        let values = [episode.uploadStatus, DBUtils.replaceNilWithNull(value: episode.uploadTaskId), episode.id] as [Any]
-
-        save(fields: fields, values: values, dbQueue: dbQueue)
-    }
-
-    func saveEpisode(uploadStatus: UploadStatus, uploadError: String?, uploadTaskId: String?, episode: UserEpisode, dbQueue: GRDBQueue) {
-        episode.uploadStatus = uploadStatus.rawValue
-        episode.uploadTaskId = uploadTaskId
-
-        let fields = ["uploadStatus", "uploadTaskId"]
-        let values = [episode.uploadStatus, DBUtils.replaceNilWithNull(value: episode.uploadTaskId), episode.id] as [Any]
         save(fields: fields, values: values, dbQueue: dbQueue)
     }
 
@@ -319,7 +272,7 @@ class UserEpisodeDataManager {
         }
     }
 
-    func bulkMarkAsPlayed(episodes: [UserEpisode], updateSyncFlag: Bool, dbQueue: GRDBQueue) {
+    func bulkMarkAsPlayed(episodes: [UserEpisode], dbQueue: GRDBQueue) {
         if episodes.isEmpty { return }
 
         dbQueue.write { db in
@@ -333,11 +286,6 @@ class UserEpisodeDataManager {
                     fields.append("playingStatus")
                     values.append(PlayingStatus.completed.rawValue)
 
-                    if updateSyncFlag {
-                        fields.append("playingStatusModified")
-                        values.append(DBUtils.currentUTCTimeInMillis())
-                    }
-
                     values.append(episode.uuid)
                     let setStatement = "SET \(fields.joined(separator: " = ?, ")) = ?"
                     try db.executeUpdate("UPDATE \(DataManager.userEpisodeTableName) \(setStatement) WHERE uuid = ?", values: values)
@@ -348,7 +296,7 @@ class UserEpisodeDataManager {
         }
     }
 
-    func bulkMarkAsUnPlayed(episodes: [UserEpisode], updateSyncFlag: Bool, dbQueue: GRDBQueue) {
+    func bulkMarkAsUnPlayed(episodes: [UserEpisode], dbQueue: GRDBQueue) {
         if episodes.isEmpty { return }
 
         dbQueue.write { db in
@@ -363,10 +311,6 @@ class UserEpisodeDataManager {
                     values.append(PlayingStatus.notPlayed.rawValue)
                     fields.append("playedUpTo")
                     values.append(0)
-                    if updateSyncFlag {
-                        fields.append("playingStatusModified")
-                        values.append(DBUtils.currentUTCTimeInMillis())
-                    }
 
                     values.append(episode.uuid)
                     let setStatement = "SET \(fields.joined(separator: " = ?, ")) = ?"
@@ -408,10 +352,6 @@ class UserEpisodeDataManager {
         save(fieldName: "downloadTaskId", value: NSNull(), episodeId: episode.id, dbQueue: dbQueue)
     }
 
-    func clearUploadTaskId(episode: UserEpisode, dbQueue: GRDBQueue) {
-        save(fieldName: "uploadTaskId", value: NSNull(), episodeId: episode.id, dbQueue: dbQueue)
-    }
-
     func delete(userEpisodeUuid: String, dbQueue: GRDBQueue) {
         dbQueue.write { db in
             do {
@@ -437,27 +377,11 @@ class UserEpisodeDataManager {
         save(fieldName: "cachedFrameCount", value: frameCount, episodeId: episodeId, dbQueue: dbQueue)
     }
 
-    func saveEpisode(playedUpTo: Double, episode: UserEpisode, updateSyncFlag: Bool, dbQueue: GRDBQueue) {
+    func saveEpisode(playedUpTo: Double, episode: UserEpisode, dbQueue: GRDBQueue) {
         episode.playedUpTo = playedUpTo
-        var fields = ["playedUpTo"]
+        let fields = ["playedUpTo"]
         var values = [episode.playedUpTo] as [Any]
-
-        if updateSyncFlag {
-            episode.playedUpToModified = DBUtils.currentUTCTimeInMillis()
-            fields.append("playedUpToModified")
-            values.append(episode.playedUpToModified)
-        }
         values.append(episode.id)
-
-        save(fields: fields, values: values, dbQueue: dbQueue)
-    }
-
-    func markEpisodeImageUploaded(episode: UserEpisode, dbQueue: GRDBQueue) {
-        episode.imageModified = 0
-        episode.imageUrl = nil
-
-        let fields = ["imageModified", "imageUrl"]
-        let values = [episode.imageModified, DBUtils.replaceNilWithNull(value: episode.imageUrl), episode.id] as [Any]
 
         save(fields: fields, values: values, dbQueue: dbQueue)
     }
@@ -511,8 +435,6 @@ class UserEpisodeDataManager {
         episode.uuid = DBUtils.nonNilStringFromColumn(resultSet: rs, columnName: "uuid")
         episode.playbackErrorDetails = rs.string(forColumn: "playbackErrorDetails")
         episode.cachedFrameCount = rs.longLongInt(forColumn: "cachedFrameCount")
-        episode.uploadStatus = rs.int(forColumn: "uploadStatus")
-        episode.uploadTaskId = rs.string(forColumn: "uploadTaskId")
         episode.imageUrl = rs.string(forColumn: "imageUrl")
         episode.imageModified = rs.longLongInt(forColumn: "imageModified")
         episode.imageColor = rs.int(forColumn: "imageColor")

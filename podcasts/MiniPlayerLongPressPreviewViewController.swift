@@ -36,7 +36,7 @@ final class MiniPlayerLongPressPreviewViewController: UIViewController {
         }
         NSLayoutConstraint.activate([
             imageView.widthAnchor.constraint(equalToConstant: imageSize),
-            imageView.heightAnchor.constraint(equalToConstant: imageSize),
+            imageView.heightAnchor.constraint(equalToConstant: imageSize)
         ])
 
         let dateLabel = UILabel()
@@ -77,7 +77,7 @@ final class MiniPlayerLongPressPreviewViewController: UIViewController {
             mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             mainStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
-            mainStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16),
+            mainStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16)
         ])
 
         let preferredWidth = min(360, availableWidth - 40)

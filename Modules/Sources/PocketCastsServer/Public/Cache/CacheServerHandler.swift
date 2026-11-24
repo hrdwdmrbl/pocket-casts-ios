@@ -10,15 +10,12 @@ public class CacheServerHandler {
 
     private let colorsUrlsCache: URLCache
 
-    private let tokenHelper: TokenHelper
-
-    public convenience init() {
-        self.init(tokenHelper: TokenHelper.shared)
+    public init() {
+        colorsUrlsCache = URLCache(memoryCapacity: 400.kilobytes, diskCapacity: 5.megabytes, diskPath: "colors")
     }
 
-    init(tokenHelper: TokenHelper) {
-        self.tokenHelper = tokenHelper
-        colorsUrlsCache = URLCache(memoryCapacity: 400.kilobytes, diskCapacity: 5.megabytes, diskPath: "colors")
+    public func clearCache() {
+        colorsUrlsCache.removeAllCachedResponses()
     }
 
     // MARK: - Episode Artwork
@@ -72,7 +69,8 @@ public class CacheServerHandler {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: CacheServerHandler.defaultTimeout)
         request.addLocalizationHeaders()
 
-        tokenHelper.callSecureUrl(request: request) { [weak self] response, data, _ in
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+            let response = response as? HTTPURLResponse
             guard let strongSelf = self else { return }
 
             if response?.statusCode == ServerConstants.HttpConstants.ok, let data, let podcastInfo = strongSelf.asJson(data: data) {
@@ -86,7 +84,7 @@ public class CacheServerHandler {
             }
 
             completion(nil, nil)
-        }
+        }.resume()
     }
 
     public func loadPodcastIfModified(podcast: Podcast, completion: @escaping (([String: Any]?, String?) -> Void)) {
@@ -97,7 +95,8 @@ public class CacheServerHandler {
         }
         request.addLocalizationHeaders()
 
-        tokenHelper.callSecureUrl(request: request) { [weak self] response, data, _ in
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+            let response = response as? HTTPURLResponse
             // podcast hasn't changed
             if response?.statusCode == ServerConstants.HttpConstants.notModified {
                 completion(nil, nil)
@@ -115,7 +114,7 @@ public class CacheServerHandler {
             }
 
             completion(nil, nil)
-        }
+        }.resume()
     }
 
     // MARK: - Episode Search
@@ -146,7 +145,8 @@ public class CacheServerHandler {
             return
         }
 
-        tokenHelper.callSecureUrl(request: request) { response, data, _ in
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            let response = response as? HTTPURLResponse
             guard response?.statusCode == ServerConstants.HttpConstants.ok, let data else {
                 completion?(nil)
                 return
@@ -158,38 +158,7 @@ public class CacheServerHandler {
             } catch {
                 completion?(nil)
             }
-        }
-    }
-
-    // MARK: - Bookmark Enrichment
-
-    private struct BookmarkEnrichRequest: Encodable {
-        let transcriptSnippet: String
-
-        enum CodingKeys: String, CodingKey {
-            case transcriptSnippet = "transcript_snippet"
-        }
-    }
-
-    public struct BookmarkEnrichResponse: Decodable {
-        public let title: String?
-        public let summary: String?
-        public let error: String?
-    }
-
-    /// Generates a title and summary for a bookmark from the transcript text surrounding its position.
-    public func enrichBookmark(transcriptSnippet: String) async throws -> BookmarkEnrichResponse {
-        let url = ServerHelper.asUrl(ServerConstants.Urls.cache() + "mobile/bookmark/enrich")
-        guard let request = ServerHelper.createJsonRequest(url: url, params: BookmarkEnrichRequest(transcriptSnippet: transcriptSnippet), timeout: CacheServerHandler.defaultTimeout, cachePolicy: .useProtocolCachePolicy) else {
-            throw APIError.UNKNOWN
-        }
-
-        let (response, data) = try await tokenHelper.callSecureUrl(request: request)
-        guard response?.statusCode == ServerConstants.HttpConstants.ok, let data else {
-            throw APIError.UNKNOWN
-        }
-
-        return try JSONDecoder().decode(BookmarkEnrichResponse.self, from: data)
+        }.resume()
     }
 
     // MARK: - Helper Methods

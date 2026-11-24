@@ -11,14 +11,12 @@ import UIKit
 final class NetworkNavigator: ObservableObject {
     /// The view controller whose navigation controller is pushed onto.
     weak var presenter: UIViewController?
-
-    private let source: AnalyticsSource
     private let serverHandler: DiscoverServerHandling
 
     private var pendingListId: String?
 
-    init(source: AnalyticsSource, serverHandler: DiscoverServerHandling = DiscoverServerHandler.shared) {
-        self.source = source
+    init(serverHandler: DiscoverServerHandling = DiscoverServerHandler.shared) {
+
         self.serverHandler = serverHandler
     }
 
@@ -28,7 +26,7 @@ final class NetworkNavigator: ObservableObject {
         guard pendingListId != listId else { return }
 
         pendingListId = listId
-        serverHandler.discoverPodcastCollection(source: ServerHelper.listUrlString(listId: listId), authenticated: nil) { [weak self] collection in
+        serverHandler.discoverPodcastCollection(source: ServerHelper.listUrlString(listId: listId)) { [weak self] collection in
             DispatchQueue.main.async {
                 guard let self, self.pendingListId == listId else { return }
 
@@ -110,8 +108,6 @@ extension NetworkNavigator: DiscoverDelegate {
         }
 
         HapticsHelper.triggerSubscribedHaptic()
-
-        Analytics.track(.podcastSubscribed, properties: ["source": source, "uuid": podcast.uuid ?? podcast.iTunesId ?? "unknown"])
     }
 
     func replaceRegionCode(string: String?) -> String? { string }

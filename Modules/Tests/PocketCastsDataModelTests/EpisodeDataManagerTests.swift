@@ -189,69 +189,6 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - unsyncedEpisodes Tests
-
-    func testUnsyncedEpisodesReturnsEpisodesWithModifiedFields() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-
-            let episode1 = Episode()
-            episode1.uuid = "unsynced-1"
-            episode1.podcastUuid = podcast.uuid
-            episode1.podcast_id = podcast.id
-            episode1.addedDate = Date()
-            episode1.playingStatusModified = 1
-            dataManager.save(episode: episode1)
-
-            let episode2 = Episode()
-            episode2.uuid = "synced"
-            episode2.podcastUuid = podcast.uuid
-            episode2.podcast_id = podcast.id
-            episode2.addedDate = Date()
-            episode2.playingStatusModified = 0
-            dataManager.save(episode: episode2)
-
-            let unsynced = dataManager.unsyncedEpisodes(limit: 10)
-
-            XCTAssertEqual(unsynced.count, 1, "Should return only unsynced episode")
-            XCTAssertEqual(unsynced.first?.uuid, "unsynced-1", "Should return correct unsynced episode")
-        }
-    }
-
-    func testUnsyncedEpisodesChecksMultipleModifiedFields() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-
-            let episode1 = Episode()
-            episode1.uuid = "modified-played"
-            episode1.podcastUuid = podcast.uuid
-            episode1.podcast_id = podcast.id
-            episode1.addedDate = Date()
-            episode1.playedUpToModified = 1
-            dataManager.save(episode: episode1)
-
-            let episode2 = Episode()
-            episode2.uuid = "modified-duration"
-            episode2.podcastUuid = podcast.uuid
-            episode2.podcast_id = podcast.id
-            episode2.addedDate = Date()
-            episode2.durationModified = 1
-            dataManager.save(episode: episode2)
-
-            let episode3 = Episode()
-            episode3.uuid = "modified-archived"
-            episode3.podcastUuid = podcast.uuid
-            episode3.podcast_id = podcast.id
-            episode3.addedDate = Date()
-            episode3.archivedModified = 1
-            dataManager.save(episode: episode3)
-
-            let unsynced = dataManager.unsyncedEpisodes(limit: 10)
-
-            XCTAssertEqual(unsynced.count, 3, "Should detect all modified fields")
-        }
-    }
-
     // MARK: - delete Tests
 
     func testDeleteRemovesEpisode() throws {
@@ -282,20 +219,6 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
 
             let finalCount = dataManager.allEpisodes(forPodcastId: podcast.id).count
             XCTAssertEqual(finalCount, 0, "Should have 0 episodes after deletion")
-        }
-    }
-
-    // MARK: - markAllEpisodePlaybackHistorySynced Tests
-
-    func testMarkAllEpisodePlaybackHistorySyncedUpdatesSyncStatus() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(podcast: podcast, dataManager: dataManager)
-
-            dataManager.markAllEpisodePlaybackHistorySynced()
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            XCTAssertEqual(found?.lastPlaybackInteractionSyncStatus, SyncStatus.synced.rawValue, "Should mark as synced")
         }
     }
 
@@ -426,7 +349,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
             let episode2 = self.createTestEpisode(uuid: "ep-2", podcast: podcast, playingStatus: PlayingStatus.inProgress.rawValue, dataManager: dataManager)
 
-            dataManager.bulkMarkAsPlayed(episodes: [episode1, episode2], updateSyncFlag: false)
+            dataManager.bulkMarkAsPlayed(episodes: [episode1, episode2])
 
             let found1 = dataManager.findEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findEpisode(uuid: episode2.uuid)
@@ -442,7 +365,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episode = self.createTestEpisode(uuid: "already-played", podcast: podcast, playingStatus: PlayingStatus.completed.rawValue, dataManager: dataManager)
 
             // This should not crash or cause issues
-            dataManager.bulkMarkAsPlayed(episodes: [episode], updateSyncFlag: false)
+            dataManager.bulkMarkAsPlayed(episodes: [episode])
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playingStatus, PlayingStatus.completed.rawValue, "Should still be played")
@@ -457,7 +380,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.completed.rawValue, dataManager: dataManager)
             let episode2 = self.createTestEpisode(uuid: "ep-2", podcast: podcast, playingStatus: PlayingStatus.inProgress.rawValue, dataManager: dataManager)
 
-            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode1, episode2], updateSyncFlag: false)
+            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode1, episode2])
 
             let found1 = dataManager.findEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findEpisode(uuid: episode2.uuid)
@@ -472,7 +395,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.inProgress.rawValue, playedUpTo: 300.0, dataManager: dataManager)
 
-            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode], updateSyncFlag: false)
+            dataManager.bulkMarkAsUnPlayed(baseEpisodes: [episode])
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playedUpTo, 0, "playedUpTo should be reset to 0")
@@ -487,7 +410,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestEpisode(uuid: "ep-1", podcast: podcast, dataManager: dataManager)
             let episode2 = self.createTestEpisode(uuid: "ep-2", podcast: podcast, dataManager: dataManager)
 
-            dataManager.bulkArchive(episodes: [episode1, episode2], markAsNotDownloaded: false, markAsPlayed: false, updateSyncFlag: false)
+            dataManager.bulkArchive(episodes: [episode1, episode2], markAsNotDownloaded: false, markAsPlayed: false)
 
             let found1 = dataManager.findEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findEpisode(uuid: episode2.uuid)
@@ -502,7 +425,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, episodeStatus: DownloadStatus.downloaded.rawValue, dataManager: dataManager)
 
-            dataManager.bulkArchive(episodes: [episode], markAsNotDownloaded: true, markAsPlayed: false, updateSyncFlag: false)
+            dataManager.bulkArchive(episodes: [episode], markAsNotDownloaded: true, markAsPlayed: false)
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.episodeStatus, DownloadStatus.notDownloaded.rawValue, "Should mark as not downloaded")
@@ -514,7 +437,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
 
-            dataManager.bulkArchive(episodes: [episode], markAsNotDownloaded: false, markAsPlayed: true, updateSyncFlag: false)
+            dataManager.bulkArchive(episodes: [episode], markAsNotDownloaded: false, markAsPlayed: true)
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playingStatus, PlayingStatus.completed.rawValue, "Should mark as played")
@@ -529,7 +452,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestEpisode(uuid: "ep-1", podcast: podcast, archived: true, dataManager: dataManager)
             let episode2 = self.createTestEpisode(uuid: "ep-2", podcast: podcast, archived: true, dataManager: dataManager)
 
-            dataManager.bulkUnarchive(episodes: [episode1, episode2], updateSyncFlag: false)
+            dataManager.bulkUnarchive(episodes: [episode1, episode2])
 
             let found1 = dataManager.findEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findEpisode(uuid: episode2.uuid)
@@ -620,23 +543,10 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
 
-            dataManager.saveEpisode(playingStatus: .completed, episode: episode, updateSyncFlag: false)
+            dataManager.saveEpisode(playingStatus: .completed, episode: episode)
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playingStatus, PlayingStatus.completed.rawValue, "Playing status should be updated")
-        }
-    }
-
-    func testSaveEpisodePlayingStatusUpdatesSyncFlag() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
-
-            dataManager.saveEpisode(playingStatus: .completed, episode: episode, updateSyncFlag: true)
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            // playingStatusModified stores a timestamp when modified, not just a flag
-            XCTAssertNotEqual(found?.playingStatusModified, 0, "Modified timestamp should be set")
         }
     }
 
@@ -647,23 +557,10 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, archived: false, dataManager: dataManager)
 
-            dataManager.saveEpisode(archived: true, episode: episode, updateSyncFlag: false)
+            dataManager.saveEpisode(archived: true, episode: episode)
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertTrue(found?.archived ?? false, "Archived status should be updated")
-        }
-    }
-
-    func testSaveEpisodeArchivedUpdatesSyncFlag() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, archived: false, dataManager: dataManager)
-
-            dataManager.saveEpisode(archived: true, episode: episode, updateSyncFlag: true)
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            // archivedModified stores a timestamp when modified, not just a flag
-            XCTAssertNotEqual(found?.archivedModified, 0, "Modified timestamp should be set")
         }
     }
 
@@ -674,23 +571,10 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playedUpTo: 0, dataManager: dataManager)
 
-            dataManager.saveEpisode(playedUpTo: 300.5, episode: episode, updateSyncFlag: false)
+            dataManager.saveEpisode(playedUpTo: 300.5, episode: episode)
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertEqual(found?.playedUpTo ?? 0, 300.5, accuracy: 0.01, "PlayedUpTo should be updated")
-        }
-    }
-
-    func testSaveEpisodePlayedUpToUpdatesSyncFlag() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playedUpTo: 0, dataManager: dataManager)
-
-            dataManager.saveEpisode(playedUpTo: 300.5, episode: episode, updateSyncFlag: true)
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            // playedUpToModified stores a timestamp when modified, not just a flag
-            XCTAssertNotEqual(found?.playedUpToModified, 0, "Modified timestamp should be set")
         }
     }
 
@@ -716,7 +600,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episode1 = self.createTestEpisode(uuid: "ep-1", podcast: podcast, dataManager: dataManager)
             let episode2 = self.createTestEpisode(uuid: "ep-2", podcast: podcast, dataManager: dataManager)
 
-            dataManager.bulkSetStarred(starred: true, episodes: [episode1, episode2], updateSyncStatus: false)
+            dataManager.bulkSetStarred(starred: true, episodes: [episode1, episode2])
 
             let found1 = dataManager.findEpisode(uuid: episode1.uuid)
             let found2 = dataManager.findEpisode(uuid: episode2.uuid)
@@ -731,7 +615,7 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let podcast = self.createTestPodcast(dataManager: dataManager)
             let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, keepEpisode: true, dataManager: dataManager)
 
-            dataManager.bulkSetStarred(starred: false, episodes: [episode], updateSyncStatus: false)
+            dataManager.bulkSetStarred(starred: false, episodes: [episode])
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertFalse(found?.keepEpisode ?? true, "Episode should be unstarred")
@@ -788,44 +672,6 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
 
             let found = dataManager.findEpisode(uuid: episode.uuid)
             XCTAssertNotNil(found?.lastPlaybackInteractionDate, "Interaction date should be set")
-        }
-    }
-
-    // MARK: - saveIfNotModified Tests
-
-    func testSaveIfNotModifiedStarredUpdatesWhenNotModified() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, keepEpisode: false, dataManager: dataManager)
-
-            _ = dataManager.saveIfNotModified(starred: true, episodeUuid: episode.uuid)
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            XCTAssertTrue(found?.keepEpisode ?? false, "Starred should be updated when not modified")
-        }
-    }
-
-    func testSaveIfNotModifiedArchivedUpdatesWhenNotModified() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, archived: false, dataManager: dataManager)
-
-            _ = dataManager.saveIfNotModified(archived: true, episodeUuid: episode.uuid)
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            XCTAssertTrue(found?.archived ?? false, "Archived should be updated when not modified")
-        }
-    }
-
-    func testSaveIfNotModifiedPlayingStatusUpdatesWhenNotModified() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            let episode = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
-
-            _ = dataManager.saveIfNotModified(playingStatus: .completed, episodeUuid: episode.uuid)
-
-            let found = dataManager.findEpisode(uuid: episode.uuid)
-            XCTAssertEqual(found?.playingStatus, PlayingStatus.completed.rawValue, "Playing status should be updated when not modified")
         }
     }
 
@@ -1027,82 +873,6 @@ final class EpisodeDataManagerTests: DataManagerTestCase {
             let episodes = dataManager.findPlaylistEpisodesWhere(query: "SELECT * FROM \(DataManager.episodeTableName) WHERE archived = 0", arguments: nil)
 
             XCTAssertGreaterThanOrEqual(episodes.count, 1, "Should return non-archived episodes")
-        }
-    }
-
-    // MARK: - saveBulkEpisodeSyncInfo Tests
-
-    func testSaveBulkEpisodeSyncInfoUpdatesMultipleEpisodes() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            _ = self.createTestEpisode(uuid: "ep-1", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
-            _ = self.createTestEpisode(uuid: "ep-2", podcast: podcast, playingStatus: PlayingStatus.notPlayed.rawValue, dataManager: dataManager)
-
-            var syncInfo1 = EpisodeBasicData()
-            syncInfo1.uuid = "ep-1"
-            syncInfo1.playingStatus = Int(PlayingStatus.completed.rawValue)
-            syncInfo1.playedUpTo = 300
-
-            var syncInfo2 = EpisodeBasicData()
-            syncInfo2.uuid = "ep-2"
-            syncInfo2.playingStatus = Int(PlayingStatus.inProgress.rawValue)
-            syncInfo2.playedUpTo = 150
-
-            dataManager.saveBulkEpisodeSyncInfo(episodes: [syncInfo1, syncInfo2])
-
-            let found1 = dataManager.findEpisode(uuid: "ep-1")
-            let found2 = dataManager.findEpisode(uuid: "ep-2")
-
-            XCTAssertEqual(found1?.playingStatus, PlayingStatus.completed.rawValue, "Episode 1 playing status should be updated")
-            XCTAssertEqual(found2?.playingStatus, PlayingStatus.inProgress.rawValue, "Episode 2 playing status should be updated")
-        }
-    }
-
-    func testSaveBulkEpisodeSyncInfoHandlesArchiveStatus() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            _ = self.createTestEpisode(uuid: "ep-1", podcast: podcast, archived: false, dataManager: dataManager)
-
-            var syncInfo = EpisodeBasicData()
-            syncInfo.uuid = "ep-1"
-            syncInfo.isArchived = true
-
-            dataManager.saveBulkEpisodeSyncInfo(episodes: [syncInfo])
-
-            let found = dataManager.findEpisode(uuid: "ep-1")
-            XCTAssertTrue(found?.archived ?? false, "Episode should be archived")
-        }
-    }
-
-    func testSaveBulkEpisodeSyncInfoHandlesStarredStatus() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            _ = self.createTestEpisode(uuid: "ep-1", podcast: podcast, dataManager: dataManager)
-
-            var syncInfo = EpisodeBasicData()
-            syncInfo.uuid = "ep-1"
-            syncInfo.starred = true
-
-            dataManager.saveBulkEpisodeSyncInfo(episodes: [syncInfo])
-
-            let found = dataManager.findEpisode(uuid: "ep-1")
-            XCTAssertTrue(found?.keepEpisode ?? false, "Episode should be starred")
-        }
-    }
-
-    func testSaveBulkEpisodeSyncInfoHandlesDuration() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(dataManager: dataManager)
-            _ = self.createTestEpisode(uuid: "ep-1", podcast: podcast, dataManager: dataManager)
-
-            var syncInfo = EpisodeBasicData()
-            syncInfo.uuid = "ep-1"
-            syncInfo.duration = 3600
-
-            dataManager.saveBulkEpisodeSyncInfo(episodes: [syncInfo])
-
-            let found = dataManager.findEpisode(uuid: "ep-1")
-            XCTAssertEqual(found?.duration, 3600, "Episode duration should be updated")
         }
     }
 

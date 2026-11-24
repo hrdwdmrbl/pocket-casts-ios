@@ -50,13 +50,11 @@ final class UserEpisodeColumnConsistencyTests: DataManagerTestCase {
             XCTAssertEqual(loaded.playedUpTo, original.playedUpTo, "playedUpTo should match")
             XCTAssertEqual(loaded.playingStatus, original.playingStatus, "playingStatus should match")
             XCTAssertEqual(loaded.episodeStatus, original.episodeStatus, "episodeStatus should match")
-            XCTAssertEqual(loaded.uploadStatus, original.uploadStatus, "uploadStatus should match")
             XCTAssertEqual(loaded.autoDownloadStatus, original.autoDownloadStatus, "autoDownloadStatus should match")
             XCTAssertEqual(loaded.sizeInBytes, original.sizeInBytes, "sizeInBytes should match")
             XCTAssertEqual(loaded.fileType, original.fileType, "fileType should match")
             XCTAssertEqual(loaded.downloadUrl, original.downloadUrl, "downloadUrl should match")
             XCTAssertEqual(loaded.downloadTaskId, original.downloadTaskId, "downloadTaskId should match")
-            XCTAssertEqual(loaded.uploadTaskId, original.uploadTaskId, "uploadTaskId should match")
             XCTAssertEqual(loaded.imageUrl, original.imageUrl, "imageUrl should match")
             XCTAssertEqual(loaded.imageColor, original.imageColor, "imageColor should match")
             XCTAssertEqual(loaded.hasCustomImage, original.hasCustomImage, "hasCustomImage should match")
@@ -188,8 +186,6 @@ final class UserEpisodeColumnConsistencyTests: DataManagerTestCase {
         let episode = createFullyPopulatedUserEpisode()
         episode.contentType = "audio/mpeg"
         episode.hasOnlyUuid = true
-        episode.deselectedChapters = "1,3,5"
-        episode.deselectedChaptersModified = 777
         episode.archived = true
         episode.keepEpisode = true
         episode.wasDeleted = true
@@ -197,7 +193,7 @@ final class UserEpisodeColumnConsistencyTests: DataManagerTestCase {
         let encoded = try episode.databaseDictionary
 
         for name in [
-            "contentType", "hasOnlyUuid", "deselectedChapters", "deselectedChaptersModified",
+            "contentType", "hasOnlyUuid",
             "archived", "keepEpisode", "wasDeleted"
         ] {
             XCTAssertNil(encoded[name], "\(name) should not be encoded")
@@ -247,13 +243,11 @@ final class UserEpisodeColumnConsistencyTests: DataManagerTestCase {
         XCTAssertEqual(loaded.playedUpTo, original.playedUpTo, "\(context): playedUpTo should match")
         XCTAssertEqual(loaded.playingStatus, original.playingStatus, "\(context): playingStatus should match")
         XCTAssertEqual(loaded.episodeStatus, original.episodeStatus, "\(context): episodeStatus should match")
-        XCTAssertEqual(loaded.uploadStatus, original.uploadStatus, "\(context): uploadStatus should match")
         XCTAssertEqual(loaded.autoDownloadStatus, original.autoDownloadStatus, "\(context): autoDownloadStatus should match")
         XCTAssertEqual(loaded.sizeInBytes, original.sizeInBytes, "\(context): sizeInBytes should match")
         XCTAssertEqual(loaded.fileType, original.fileType, "\(context): fileType should match")
         XCTAssertEqual(loaded.downloadUrl, original.downloadUrl, "\(context): downloadUrl should match")
         XCTAssertEqual(loaded.downloadTaskId, original.downloadTaskId, "\(context): downloadTaskId should match")
-        XCTAssertEqual(loaded.uploadTaskId, original.uploadTaskId, "\(context): uploadTaskId should match")
         XCTAssertEqual(loaded.imageUrl, original.imageUrl, "\(context): imageUrl should match")
         XCTAssertEqual(loaded.imageColor, original.imageColor, "\(context): imageColor should match")
         XCTAssertEqual(loaded.hasCustomImage, original.hasCustomImage, "\(context): hasCustomImage should match")
@@ -291,8 +285,6 @@ final class UserEpisodeColumnConsistencyTests: DataManagerTestCase {
         episode.titleModified = 444
         episode.playbackErrorDetails = "Playback error"
         episode.cachedFrameCount = 100
-        episode.uploadStatus = UploadStatus.uploaded.rawValue
-        episode.uploadTaskId = "upload-task-456"
         episode.imageUrl = "https://example.com/image.jpg"
         episode.imageModified = 555
         episode.imageColor = 5

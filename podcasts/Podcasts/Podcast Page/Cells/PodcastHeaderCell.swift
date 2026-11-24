@@ -69,7 +69,7 @@ class PodcastHeaderCell: UITableViewCell {
             cell.contentView.topAnchor.constraint(equalTo: swiftUICellViewController.view.topAnchor),
             cell.contentView.bottomAnchor.constraint(equalTo: swiftUICellViewController.view.bottomAnchor),
             cell.contentView.leftAnchor.constraint(equalTo: swiftUICellViewController.view.leftAnchor),
-            cell.contentView.rightAnchor.constraint(equalTo: swiftUICellViewController.view.rightAnchor),
+            cell.contentView.rightAnchor.constraint(equalTo: swiftUICellViewController.view.rightAnchor)
         ])
         swiftUICellViewController.didMove(toParent: viewController)
         swiftUICellViewController.view.layoutIfNeeded()

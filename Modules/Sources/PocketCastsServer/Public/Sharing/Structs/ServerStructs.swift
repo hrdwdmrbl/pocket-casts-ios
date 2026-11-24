@@ -38,13 +38,6 @@ public struct ExportPodcastsResponse: Decodable {
     public func success() -> Bool {
         status == "ok"
     }
-
-    public static func failedResponse() -> ExportPodcastsResponse {
-        var failed = ExportPodcastsResponse()
-        failed.status = "failed"
-
-        return failed
-    }
 }
 
 public struct ShareListResponse: Decodable {
@@ -198,7 +191,7 @@ public struct PodcastInfo: Codable {
 
     public init() {}
 
-    public init(from searchResult: PodcastFolderSearchResult) {
+    public init(from searchResult: PodcastSearchResult) {
         author = searchResult.author
         title = searchResult.title
         uuid = searchResult.uuid
@@ -227,35 +220,6 @@ public struct PodcastInfo: Codable {
     public func iTunesOnly() -> Bool {
         uuid == nil && iTunesId != nil
     }
-}
-
-public struct EpisodeSyncInfo {
-    public var uuid: String?
-    public var duration: Int?
-    public var playingStatus: Int?
-    public var playedUpTo: Int?
-    public var isArchived: Bool?
-    public var starred: Bool?
-    public var deselectedChapters: String?
-}
-
-public struct PodcastSyncInfo {
-    var uuid: String?
-    var autoStartFrom: Int?
-    var autoSkipLast: Int?
-    var dateAdded: Date?
-    var sortPosition: Int32?
-    var folderUuid: String?
-    var settings: PodcastSettings?
-}
-
-public struct FolderSyncInfo {
-    var uuid: String
-    var name: String
-    var color: Int32
-    var sortOrder: Int32
-    var sortType: Int32
-    var addedDate: Date
 }
 
 /// The whole Discover page as sent by the server: an ordered list of ``DiscoverItem``
@@ -351,9 +315,6 @@ public struct DiscoverItem: Decodable, Equatable {
     /// `DiscoverServerHandler.checkSourceAuthentication(for:)`.
     public var authenticated: Bool?
 
-    /// Paid placements spliced into a carousel at fixed positions, each with its own source.
-    public var sponsoredPodcasts: [CarouselSponsoredPodcast]?
-
     /// Label the server suggests for the first item of the expanded list.
     public var expandedTopItemLabel: String?
 
@@ -376,9 +337,6 @@ public struct DiscoverItem: Decodable, Equatable {
     /// When the list was generated on the server. Reported with list analytics events.
     public var dateTime: String?
 
-    /// IDs of categories that are paid placements in the pills selector.
-    public var sponsoredCategoryIDs: [Int]?
-
     /// Local only: the region code that was substituted into `source`.
     public var sourceRegion: String?
 
@@ -386,11 +344,9 @@ public struct DiscoverItem: Decodable, Equatable {
         case summaryStyle = "summary_style"
         case expandedStyle = "expanded_style"
         case isSponsored = "sponsored"
-        case sponsoredPodcasts = "sponsored_podcasts"
         case expandedTopItemLabel = "expanded_top_item_label"
         case categoryID = "category_id"
         case dateTime = "datetime"
-        case sponsoredCategoryIDs = "sponsored_ids"
         case sourceType = "source_type"
         case type, title, source, regions, curated, uuid, popular, id, authenticated
     }
@@ -405,15 +361,13 @@ public struct DiscoverItem: Decodable, Equatable {
         expandedStyle: String? = nil,
         source: String? = nil,
         sourceType: String? = nil,
-        sponsoredPodcasts: [CarouselSponsoredPodcast]? = nil,
         expandedTopItemLabel: String? = nil,
         curated: Bool? = nil,
         regions: [String],
         isSponsored: Bool? = nil,
         popular: [Int]? = nil,
         categoryID: Int? = nil,
-        authenticated: Bool? = nil,
-        sponsoredCategoryIDs: [Int]? = nil
+        authenticated: Bool? = nil
     ) {
         self.id = id
         self.uuid = uuid
@@ -424,7 +378,6 @@ public struct DiscoverItem: Decodable, Equatable {
         self.expandedStyle = expandedStyle
         self.source = source
         self.sourceType = sourceType
-        self.sponsoredPodcasts = sponsoredPodcasts
         self.expandedTopItemLabel = expandedTopItemLabel
         self.curated = curated
         self.regions = regions
@@ -432,7 +385,6 @@ public struct DiscoverItem: Decodable, Equatable {
         self.popular = popular
         self.categoryID = categoryID
         self.authenticated = authenticated
-        self.sponsoredCategoryIDs = sponsoredCategoryIDs
     }
 
     /// Non-optional form of `authenticated`, treating a missing value as `false`.
@@ -446,11 +398,6 @@ extension DiscoverItem: Hashable {
         hasher.combine(id)
         hasher.combine(uuid)
     }
-}
-
-public struct CarouselSponsoredPodcast: Decodable, Equatable {
-    public var position: Int?
-    public var source: String?
 }
 
 public struct PodcastList: Decodable {
@@ -574,7 +521,6 @@ public struct DiscoverCategory: Decodable, Equatable, Sendable, Hashable {
     public var source: String?
     public var icon: String?
     public var popularity: Int?
-    public var sourceOnboarding: String?
 
     public init(id: Int?, name: String?) {
         self.id = id
@@ -587,7 +533,6 @@ public struct DiscoverCategory: Decodable, Equatable, Sendable, Hashable {
         case source
         case icon
         case popularity
-        case sourceOnboarding = "source_onboarding"
     }
 }
 
@@ -595,23 +540,6 @@ public struct DiscoverCategoryDetails: Decodable {
     public var title: String?
     public var description: String?
     public var podcasts: [DiscoverPodcast]?
-    public var promotion: DiscoverCategoryPromotion?
-}
-
-public struct DiscoverCategoryPromotion: Decodable {
-    public var promotion_uuid: String?
-    public var podcast_uuid: String?
-    public var title: String?
-    public var description: String?
-}
-
-public struct RemoteStats {
-    public var silenceRemovalTime: Int64
-    public var totalListenTime: Int64
-    public var autoSkipTime: Int64
-    public var variableSpeedTime: Int64
-    public var skipTime: Int64
-    public var startedStatsAt: Int64
 }
 
 public struct PodcastCollectionColors: Codable {

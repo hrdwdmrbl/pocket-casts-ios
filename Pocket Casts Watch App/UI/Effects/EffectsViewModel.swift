@@ -5,7 +5,7 @@ import PocketCastsUtils
 import WatchKit
 
 class EffectsViewModel: ObservableObject {
-    private var playSource = PlaySourceHelper.playSourceViewModel
+    private var playSource = PhoneSourceViewModel()
 
     var playbackSpeed: Double {
         playSource.playbackSpeed

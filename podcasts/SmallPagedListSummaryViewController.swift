@@ -151,10 +151,6 @@ class SmallPagedListSummaryViewController: DiscoverPeekViewController, GridLayou
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        if let listId = item?.uuid {
-            let categoryId = category?.id.map(String.init)
-            AnalyticsHelper.listImpression(listId: listId, category: categoryId)
-        }
         NotificationCenter.default.addObserver(self, selector: #selector(podcastStatusChanged), name: Constants.Notifications.podcastAdded, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(podcastStatusChanged), name: Constants.Notifications.podcastDeleted, object: nil)
     }
@@ -182,10 +178,7 @@ class SmallPagedListSummaryViewController: DiscoverPeekViewController, GridLayou
         let thisPodcast = podcasts[indexPath.row]
         if let delegate {
             cell.populateFrom(thisPodcast, isSubscribed: delegate.isSubscribed(podcast: thisPodcast))
-            cell.onSubscribe = { [weak self] in
-                if let listId = self?.item?.uuid, let podcastUuid = thisPodcast.uuid {
-                    AnalyticsHelper.podcastSubscribedFromList(listId: listId, podcastUuid: podcastUuid)
-                }
+            cell.onSubscribe = {
                 delegate.subscribe(podcast: thisPodcast)
             }
         }
@@ -200,10 +193,6 @@ class SmallPagedListSummaryViewController: DiscoverPeekViewController, GridLayou
         delegate?.show(discoverPodcast: podcast, placeholderImage: nil, isFeatured: false, listUuid: item.uuid)
 
         collectionView.deselectItem(at: indexPath, animated: true)
-
-        if let listId = item.uuid, let podcastUuid = podcast.uuid {
-            AnalyticsHelper.podcastTappedFromList(listId: listId, podcastUuid: podcastUuid)
-        }
     }
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -234,7 +223,7 @@ class SmallPagedListSummaryViewController: DiscoverPeekViewController, GridLayou
         self.category = category
         titleLabel.text = delegate?.replaceRegionName(string: title)
 
-        serverHandler.discoverPodcastList(source: source, authenticated: item.authenticated, completion: { [weak self] podcastList in
+        serverHandler.discoverPodcastList(source: source, completion: { [weak self] podcastList in
             guard let strongSelf = self, let discoverPodcast = podcastList?.podcasts else { return }
             for podcast in discoverPodcast {
                 strongSelf.podcasts.append(podcast)
@@ -246,8 +235,6 @@ class SmallPagedListSummaryViewController: DiscoverPeekViewController, GridLayou
             }
         })
     }
-
-    // MARK: - TinyPageControl delegate
 
     func pageDidChange(_ newPage: Int) {
         let offset = CGFloat(newPage) * pageStride
@@ -270,16 +257,6 @@ class SmallPagedListSummaryViewController: DiscoverPeekViewController, GridLayou
         pageControl.currentPage = currentPage
 
         pageDidChange(to: currentPage, totalPages: pageControl.numberOfPages)
-    }
-
-    override func pageDidChange(to currentPage: Int, totalPages: Int) {
-        guard let item else {
-            return
-        }
-
-        Analytics.track(.discoverSmallListPageChanged, properties: ["current_page": currentPage + 1,
-                                                                    "total_pages": totalPages,
-                                                                    "list_id": item.inferredListId])
     }
 
     func registerDiscoverDelegate(_ delegate: DiscoverDelegate) {

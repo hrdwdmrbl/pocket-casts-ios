@@ -5,9 +5,6 @@ import PocketCastsUtils
 
 class PodcastRatingViewModel: ObservableObject {
     @Published var rating: PodcastRating? = nil
-    @Published var presentingGiveRatings = false
-
-    var presentLogin: ((PodcastRatingViewModel) -> Void)? = nil
 
     var hasRatings: Bool {
         guard let rating else {
@@ -55,27 +52,5 @@ class PodcastRatingViewModel: ObservableObject {
 
     private enum LoadingState {
         case waiting, loading, done
-    }
-
-    enum RatingSource: String {
-        case button
-        case stars
-    }
-}
-
-// MARK: - View Interactions
-extension PodcastRatingViewModel {
-    func didTapRating(source: RatingSource = .button) {
-        Analytics.track(.ratingStarsTapped, properties: [
-            "uuid": uuid ?? "unknown",
-            "source": source.rawValue
-        ])
-        if SyncManager.isUserLoggedIn() {
-            presentingGiveRatings = true
-        } else {
-            DispatchQueue.main.async {
-                self.presentLogin?(self)
-            }
-        }
     }
 }

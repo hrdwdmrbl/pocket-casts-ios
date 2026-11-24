@@ -79,10 +79,7 @@ final class EpisodeColumnConsistencyTests: DataManagerTestCase {
             XCTAssertEqual(loaded.archived, original.archived, "archived should match")
             XCTAssertEqual(loaded.archivedModified, original.archivedModified, "archivedModified should match")
             XCTAssertEqual(loaded.excludeFromEpisodeLimit, original.excludeFromEpisodeLimit, "excludeFromEpisodeLimit should match")
-            XCTAssertEqual(loaded.deselectedChapters, original.deselectedChapters, "deselectedChapters should match")
-            XCTAssertEqual(loaded.deselectedChaptersModified, original.deselectedChaptersModified, "deselectedChaptersModified should match")
             XCTAssertEqual(loaded.wasDeleted, original.wasDeleted, "wasDeleted should match")
-            XCTAssertEqual(loaded.hasGeneratedTranscript, original.hasGeneratedTranscript, "hasGeneratedTranscript should match")
             XCTAssertEqual(loaded.podcast_id, original.podcast_id, "podcast_id should match")
             self.assertDatesEqual(loaded.addedDate, original.addedDate, "addedDate should match")
             self.assertDatesEqual(loaded.publishedDate, original.publishedDate, "publishedDate should match")
@@ -296,13 +293,10 @@ final class EpisodeColumnConsistencyTests: DataManagerTestCase {
         episode.archived = true
         episode.archivedModified = 666
         episode.excludeFromEpisodeLimit = true
-        episode.deselectedChapters = "1,3,5"
-        episode.deselectedChaptersModified = 777
         episode.wasDeleted = false
         episode.lastPlaybackInteractionDate = Date(timeIntervalSince1970: 1700000200)
         episode.lastPlaybackInteractionSyncStatus = SyncStatus.notSynced.rawValue
         episode.lastArchiveInteractionDate = Date(timeIntervalSince1970: 1700000300)
-        episode.hasGeneratedTranscript = true
         return episode
     }
 }

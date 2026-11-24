@@ -8,7 +8,6 @@ class TopLevelSettingsCell: ThemeableCell {
             settingsLabel.adjustsFontForContentSizeCategory = true
         }
     }
-    @IBOutlet var plusIndicator: UIImageView!
 
     private var disclosureImageView: TintableImageView?
 
@@ -55,8 +54,6 @@ class TopLevelSettingsCell: ThemeableCell {
 
         let iconSize = max(baseSettingsImageSize, metric.scaledValue(for: baseSettingsImageSize))
         settingsImage.updateSizeConstraints(to: iconSize)
-
-        plusIndicator.updateSizeConstraints(to: iconSize)
 
         let disclosureSize = max(baseDisclosureSize, metric.scaledValue(for: baseDisclosureSize))
         disclosureImageView?.frame.size = CGSize(width: disclosureSize, height: disclosureSize)

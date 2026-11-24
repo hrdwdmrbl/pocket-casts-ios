@@ -43,7 +43,6 @@ class DownloadsViewController: PCViewController {
             downloadsTable.endUpdates()
 
             if isMultiSelectEnabled {
-                Analytics.track(.downloadsMultiSelectEntered)
                 multiSelectFooter.setSelectedCount(count: selectedEpisodes.count)
                 multiSelectFooterBottomConstraint.constant = Constants.effectiveFooterViewPadding
                 if let selectedIndexPath = longPressMultiSelectIndexPath {
@@ -51,7 +50,6 @@ class DownloadsViewController: PCViewController {
                     longPressMultiSelectIndexPath = nil
                 }
             } else {
-                Analytics.track(.downloadsMultiSelectExited)
                 selectedEpisodes.removeAll()
             }
         }
@@ -93,8 +91,6 @@ class DownloadsViewController: PCViewController {
         view.backgroundColor = ThemeColor.primaryUi02()
 
         showManageDownloadsBanner()
-
-        Analytics.track(.downloadsShown)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -128,7 +124,6 @@ class DownloadsViewController: PCViewController {
         }
         if firstShowOfBanner {
             firstShowOfBanner = false
-            Analytics.track(.freeUpSpaceBannerShown)
         }
         downloadsTable.tableHeaderView = makeBannerView()
     }
@@ -136,14 +131,12 @@ class DownloadsViewController: PCViewController {
     private func makeBannerView() -> UIView {
         let model = ManageDownloadsModel(initialSize: "",
                                          onManageTap: { [weak self] in
-            Analytics.track(.freeUpSpaceManageDownloadsTapped, properties: ["source": "downloads"])
-            self?.navigationController?.pushViewController(DownloadedFilesViewController(), animated: true)
-        }, onNotNowTap: { [weak self] in
-            Analytics.track(.freeUpSpaceMaybeLaterTapped, properties: ["source": "downloads"])
-            Settings.manageDownloadsLastCheckDate = Date.now
-            self?.showManageDownloadsBanner()
-            self?.downloadsTable.reloadData()
-        })
+                                            self?.navigationController?.pushViewController(DownloadedFilesViewController(), animated: true)
+                                         }, onNotNowTap: { [weak self] in
+                                            Settings.manageDownloadsLastCheckDate = Date.now
+                                            self?.showManageDownloadsBanner()
+                                            self?.downloadsTable.reloadData()
+                                         })
         let banner = ManageDownloadsBannerView(dataModel: model).themedUIView
         banner.translatesAutoresizingMaskIntoConstraints = false
         let largeCategories = Set<UIContentSizeCategory>([.accessibilityExtraLarge, .accessibilityExtraExtraLarge, .accessibilityExtraExtraExtraLarge])
@@ -156,7 +149,7 @@ class DownloadsViewController: PCViewController {
             banner.leadingAnchor.constraint(equalTo: wrapperView.leadingAnchor, constant: 16),
             banner.trailingAnchor.constraint(equalTo: wrapperView.trailingAnchor, constant: -16),
             banner.topAnchor.constraint(equalTo: wrapperView.topAnchor, constant: 16),
-            banner.bottomAnchor.constraint(equalTo: wrapperView.bottomAnchor, constant: 0),
+            banner.bottomAnchor.constraint(equalTo: wrapperView.bottomAnchor, constant: 0)
         ])
         return wrapperView
     }
@@ -236,25 +229,21 @@ class DownloadsViewController: PCViewController {
     }
 
     @objc private func menuTapped(_ sender: UIBarButtonItem) {
-        Analytics.track(.downloadsOptionsButtonTapped)
 
         let optionsPicker = OptionsPicker(title: nil)
 
         let MultiSelectAction = OptionAction(label: L10n.selectEpisodes, icon: "option-multiselect") { [weak self] in
-            Analytics.track(.downloadsOptionsModalOptionTapped, properties: ["option": "select_episodes"])
             self?.isMultiSelectEnabled = true
         }
         optionsPicker.addAction(action: MultiSelectAction)
 
         let settingsAction = OptionAction(label: L10n.downloadsAutoDownload, icon: "podcast-settings") { [weak self] in
-            Analytics.track(.downloadsOptionsModalOptionTapped, properties: ["option": "auto_download_settings"])
             self?.navigationController?.pushViewController(DownloadSettingsViewController(), animated: true)
         }
         optionsPicker.addAction(action: settingsAction)
 
         if !failedEpisodes().isEmpty {
             let retryAction = OptionAction(label: L10n.downloadsRetryFailedDownloads, icon: "option-download-retry") { [weak self] in
-                Analytics.track(.downloadsOptionsModalOptionTapped, properties: ["option": "retry_failed_downloads"])
                 self?.retryAllFailed(sender)
             }
             optionsPicker.addAction(action: retryAction)
@@ -262,14 +251,12 @@ class DownloadsViewController: PCViewController {
 
         if !downloadingEpisodes().isEmpty {
             let stopAction = OptionAction(label: L10n.downloadsStopAllDownloads, icon: "option-cross-circle") { [weak self] in
-                Analytics.track(.downloadsOptionsModalOptionTapped, properties: ["option": "stop_all_downloads"])
                 self?.pauseAllDownloads()
             }
             optionsPicker.addAction(action: stopAction)
         }
 
         let cleanupAction = OptionAction(label: L10n.cleanUp, icon: "list_delete") { [weak self] in
-            Analytics.track(.downloadsOptionsModalOptionTapped, properties: ["option": "clean_up"])
             self?.navigationController?.pushViewController(DownloadedFilesViewController(), animated: true)
         }
         optionsPicker.addAction(action: cleanupAction)
@@ -335,13 +322,5 @@ class DownloadsViewController: PCViewController {
 
     private func updateSize() {
         showManageDownloadsBanner()
-    }
-}
-
-// MARK: - Analytics
-
-extension DownloadsViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .downloads
     }
 }

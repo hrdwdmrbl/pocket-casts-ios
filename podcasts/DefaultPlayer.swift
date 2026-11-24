@@ -6,7 +6,7 @@ import PocketCastsDataModel
 import PocketCastsUtils
 import UIKit
 #if !os(watchOS)
-    import VoiceBoostN
+import VoiceBoostN
 #endif
 
 class DefaultPlayer: PlaybackProtocol, Hashable {
@@ -56,17 +56,17 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
     private var episodeUuid: String?
     private var podcastUuid: String?
 
-#if !os(watchOS) && !APPCLIP && !os(tvOS)
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
     private var cellularTracker: StreamingCellularTracker?
-#endif
+    #endif
 
-#if !os(watchOS)
+    #if !os(watchOS)
     @MainActor
     private lazy var episodeArtwork = EpisodeArtwork()
 
     private var backgroundTaskId: UIBackgroundTaskIdentifier
 
-#endif
+    #endif
 
     /// RMS audio level (0...1) computed from the audio processing tap each buffer.
     /// Written from the real-time audio thread, read from the main thread.
@@ -80,10 +80,10 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
     private(set) var currentAudioLevel: Float = 0
 
     init() {
-#if !os(watchOS)
+        #if !os(watchOS)
         backgroundTaskId = .invalid
         NotificationCenter.default.addObserver(self, selector: #selector(didEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
-#endif
+        #endif
     }
 
     func loadEpisode(_ episode: BaseEpisode) {
@@ -125,10 +125,10 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         // MediaExporterResourceLoaderDelegate handles its own tracking for cache+stream,
         // but for direct AVPlayer streaming we use StreamingCellularTracker
         #if !os(watchOS) && !APPCLIP && !os(tvOS)
-        if FeatureFlag.trackNetworkDataUsage.enabled,
-           let urlAsset = playerItem.asset as? AVURLAsset,
-           !urlAsset.url.isFileURL,
-           !(urlAsset.url.scheme?.hasPrefix(MediaExporterResourceLoaderDelegate.schemePrefix) ?? false) {
+        if
+            let urlAsset = playerItem.asset as? AVURLAsset,
+            !urlAsset.url.isFileURL,
+            !(urlAsset.url.scheme?.hasPrefix(MediaExporterResourceLoaderDelegate.schemePrefix) ?? false) {
             cellularTracker = StreamingCellularTracker()
             cellularTracker?.startTracking(
                 playerItem: playerItem,
@@ -172,9 +172,9 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
             DispatchQueue.main.async {
                 guard let self, self.presentationSizeObserver != nil else { return }
                 self.presentationSizeObserver = nil
-#if !os(watchOS)
+                #if !os(watchOS)
                 self.player?.allowsExternalPlayback = true
-#endif
+                #endif
                 PlaybackManager.shared.handleVideoTracksDetected(forEpisode: episodeUuid)
             }
         }
@@ -394,15 +394,15 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         }
 
         #if !os(watchOS)
-            if assetTrack != nil {
-                createAudioMix()
-                playerItem.audioMix = audioMix
-            }
+        if assetTrack != nil {
+            createAudioMix()
+            playerItem.audioMix = audioMix
+        }
         #endif
     }
 
     // MARK: - Audio Mix
-#if !os(watchOS)
+    #if !os(watchOS)
     private class AudioProcessingTapProxy {
         weak var input: DefaultPlayer?
 
@@ -456,299 +456,299 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         return player
     }
 
-        private func createAudioMix() {
-            guard audioMix == nil else { return }
+    private func createAudioMix() {
+        guard audioMix == nil else { return }
 
-            let mutableMix = AVMutableAudioMix()
-            let audioMixInputParameters = AVMutableAudioMixInputParameters(track: assetTrack)
+        let mutableMix = AVMutableAudioMix()
+        let audioMixInputParameters = AVMutableAudioMixInputParameters(track: assetTrack)
 
-            let tapCookie = AudioProcessingTapProxy(input: self)
-            let clientInfo = UnsafeMutableRawPointer(Unmanaged.passRetained(tapCookie).toOpaque())
+        let tapCookie = AudioProcessingTapProxy(input: self)
+        let clientInfo = UnsafeMutableRawPointer(Unmanaged.passRetained(tapCookie).toOpaque())
 
-            var callbacks = MTAudioProcessingTapCallbacks(
-                version: kMTAudioProcessingTapCallbacksVersion_0,
-                clientInfo: clientInfo,
-                init: tapInit,
-                finalize: tapFinalize,
-                prepare: tapPrepare,
-                unprepare: tapUnprepare,
-                process: tapProcess
-            )
+        var callbacks = MTAudioProcessingTapCallbacks(
+            version: kMTAudioProcessingTapCallbacksVersion_0,
+            clientInfo: clientInfo,
+            init: tapInit,
+            finalize: tapFinalize,
+            prepare: tapPrepare,
+            unprepare: tapUnprepare,
+            process: tapProcess
+        )
 
-#if compiler(>=6.2)
-            var audioProcessingTap: MTAudioProcessingTap?
-            if noErr == MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PreEffects, &audioProcessingTap) {
-                audioMixInputParameters.audioTapProcessor = audioProcessingTap
-                mutableMix.inputParameters = [audioMixInputParameters]
-                audioMix = mutableMix
-            }
-#else
-            var audioProcessingTap: Unmanaged<MTAudioProcessingTap>?
-            if noErr == MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PreEffects, &audioProcessingTap) {
-                audioMixInputParameters.audioTapProcessor = audioProcessingTap?.takeRetainedValue()
-                mutableMix.inputParameters = [audioMixInputParameters]
-                audioMix = mutableMix
-            }
-#endif
+        #if compiler(>=6.2)
+        var audioProcessingTap: MTAudioProcessingTap?
+        if noErr == MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PreEffects, &audioProcessingTap) {
+            audioMixInputParameters.audioTapProcessor = audioProcessingTap
+            mutableMix.inputParameters = [audioMixInputParameters]
+            audioMix = mutableMix
+        }
+        #else
+        var audioProcessingTap: Unmanaged<MTAudioProcessingTap>?
+        if noErr == MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PreEffects, &audioProcessingTap) {
+            audioMixInputParameters.audioTapProcessor = audioProcessingTap?.takeRetainedValue()
+            mutableMix.inputParameters = [audioMixInputParameters]
+            audioMix = mutableMix
+        }
+        #endif
+    }
+
+    // MARK: - Tap Callbacks
+
+    let tapInit: MTAudioProcessingTapInitCallback = { tap, clientInfo, tapStorageOut in
+        tapStorageOut.pointee = clientInfo
+
+        guard let referenceToSelf = DefaultPlayer.unretainedDefaultPlayer(for: tap) else {
+            return
         }
 
-        // MARK: - Tap Callbacks
+        referenceToSelf.currentAudioLevel = 0
+    }
 
-        let tapInit: MTAudioProcessingTapInitCallback = { tap, clientInfo, tapStorageOut in
-            tapStorageOut.pointee = clientInfo
+    let tapFinalize: MTAudioProcessingTapFinalizeCallback = { tap in
+        FileLog.shared.console("[AudioProcessingTapProxy] Finalize tap: \(tap)\n")
+        Unmanaged<AudioProcessingTapProxy>.fromOpaque(MTAudioProcessingTapGetStorage(tap)).release()
+    }
 
-            guard let referenceToSelf = DefaultPlayer.unretainedDefaultPlayer(for: tap) else {
-                return
-            }
-
-            referenceToSelf.currentAudioLevel = 0
+    let tapPrepare: MTAudioProcessingTapPrepareCallback = { tap, maxFrames, processingFormat in
+        let proxy = DefaultPlayer.tapProxy(for: tap)
+        guard let referenceToSelf = proxy.input else {
+            return
         }
 
-        let tapFinalize: MTAudioProcessingTapFinalizeCallback = { tap in
-            FileLog.shared.console("[AudioProcessingTapProxy] Finalize tap: \(tap)\n")
-            Unmanaged<AudioProcessingTapProxy>.fromOpaque(MTAudioProcessingTapGetStorage(tap)).release()
+        guard let filter = referenceToSelf.createHighPassFilter(maxFrames: maxFrames, processingFormat: processingFormat.pointee, tap: tap) else {
+            referenceToSelf.handlePlaybackError("Setup high pass filter failed")
+            return
+        }
+        proxy.highPassFilter = filter
+
+        guard let limiter = referenceToSelf.createPeakLimiter(maxFrames: maxFrames, processingFormat: processingFormat.pointee, tap: tap) else {
+            referenceToSelf.handlePlaybackError("Setup peak limiter failed")
+            return
+        }
+        proxy.peakLimiter = limiter
+
+        // Store sample rate for dynamic VoiceBoostN creation
+        proxy.cachedSampleRate = Double(processingFormat.pointee.mSampleRate)
+    }
+
+    let tapUnprepare: MTAudioProcessingTapUnprepareCallback = { tap in
+        DefaultPlayer.tapProxy(for: tap).disposeResources()
+    }
+
+    let tapProcess: MTAudioProcessingTapProcessCallback = { tap, numberFrames, _, bufferListInOut, numberFramesOut, flagsOut in
+        let proxy = DefaultPlayer.tapProxy(for: tap)
+        guard let referenceToSelf = proxy.input else {
+            return
         }
 
-        let tapPrepare: MTAudioProcessingTapPrepareCallback = { tap, maxFrames, processingFormat in
-            let proxy = DefaultPlayer.tapProxy(for: tap)
-            guard let referenceToSelf = proxy.input else {
+        let currentSampleCount = proxy.sampleCount
+        proxy.sampleCount += Float64(numberFrames)
+        guard referenceToSelf.volumeBoostEnabled, let highPassFilter = proxy.highPassFilter, proxy.peakLimiter != nil else {
+            // no effects enabled, so just play normally
+            guard MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, nil, numberFramesOut) == noErr else {
+                referenceToSelf.handlePlaybackError("MTAudioProcessingTapGetSourceAudio failed")
                 return
             }
-
-            guard let filter = referenceToSelf.createHighPassFilter(maxFrames: maxFrames, processingFormat: processingFormat.pointee, tap: tap) else {
-                referenceToSelf.handlePlaybackError("Setup high pass filter failed")
-                return
-            }
-            proxy.highPassFilter = filter
-
-            guard let limiter = referenceToSelf.createPeakLimiter(maxFrames: maxFrames, processingFormat: processingFormat.pointee, tap: tap) else {
-                referenceToSelf.handlePlaybackError("Setup peak limiter failed")
-                return
-            }
-            proxy.peakLimiter = limiter
-
-            // Store sample rate for dynamic VoiceBoostN creation
-            proxy.cachedSampleRate = Double(processingFormat.pointee.mSampleRate)
-        }
-
-        let tapUnprepare: MTAudioProcessingTapUnprepareCallback = { tap in
-            DefaultPlayer.tapProxy(for: tap).disposeResources()
-        }
-
-        let tapProcess: MTAudioProcessingTapProcessCallback = { tap, numberFrames, _, bufferListInOut, numberFramesOut, flagsOut in
-            let proxy = DefaultPlayer.tapProxy(for: tap)
-            guard let referenceToSelf = proxy.input else {
-                return
-            }
-
-            let currentSampleCount = proxy.sampleCount
-            proxy.sampleCount += Float64(numberFrames)
-            guard referenceToSelf.volumeBoostEnabled, let highPassFilter = proxy.highPassFilter, proxy.peakLimiter != nil else {
-                // no effects enabled, so just play normally
-                guard MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, nil, numberFramesOut) == noErr else {
-                    referenceToSelf.handlePlaybackError("MTAudioProcessingTapGetSourceAudio failed")
-                    return
-                }
-#if os(tvOS)
-                referenceToSelf.updateAudioLevel(from: bufferListInOut, frameCount: Int(numberFrames))
-#endif
-                return
-            }
-
-            let shouldUseVoiceBoostN = Settings.isVoiceBoostNEnabled
-
-            // Handle dynamic state creation/destruction
-            if shouldUseVoiceBoostN && proxy.voiceBoostNState == nil {
-                let isInitial = proxy.sampleCount == Float64(numberFrames) // First buffer
-                proxy.voiceBoostNState = VBN_Create(proxy.cachedSampleRate)
-                if isInitial {
-                    FileLog.shared.addMessage("[DefaultPlayer] VoiceBoostN enabled - created state at \(proxy.cachedSampleRate) Hz")
-                } else {
-                    FileLog.shared.addMessage("[DefaultPlayer] VoiceBoostN enabled mid-playback - created state at \(proxy.cachedSampleRate) Hz")
-                }
-            } else if !shouldUseVoiceBoostN && proxy.voiceBoostNState != nil {
-                VBN_Destroy(proxy.voiceBoostNState)
-                proxy.voiceBoostNState = nil
-                FileLog.shared.addMessage("[DefaultPlayer] VoiceBoostN disabled mid-playback - switching to previous voice boost")
-            }
-
-            if let vbnState = proxy.voiceBoostNState {
-                // Use VoiceBoostN processing
-                guard MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, nil, numberFramesOut) == noErr else {
-                    referenceToSelf.handlePlaybackError("MTAudioProcessingTapGetSourceAudio failed")
-                    return
-                }
-
-                // Process through VoiceBoostN
-                let bufferList = UnsafeMutableAudioBufferListPointer(bufferListInOut)
-                let channelCount = Int32(bufferList.count)
-
-                var channelPointers: [UnsafeMutablePointer<Float>?] = bufferList.compactMap { buffer in
-                    buffer.mData?.assumingMemoryBound(to: Float.self)
-                }
-
-                channelPointers.withUnsafeMutableBufferPointer { ptr in
-                    VBN_Process(vbnState, ptr.baseAddress, Int32(numberFrames), channelCount)
-                }
-
-                numberFramesOut.pointee = numberFrames
-            } else {
-                // Use previous voice boost (AudioUnit chain)
-                var audioTimeStamp = AudioTimeStamp()
-                audioTimeStamp.mSampleTime = currentSampleCount
-                audioTimeStamp.mFlags = AudioTimeStampFlags.sampleTimeValid
-                guard AudioUnitRender(highPassFilter, nil, &audioTimeStamp, 0, UInt32(numberFrames), bufferListInOut) == noErr else {
-                    referenceToSelf.handlePlaybackError("AudioUnitRender failed")
-                    return
-                }
-
-                numberFramesOut.pointee = numberFrames
-            }
-
             #if os(tvOS)
             referenceToSelf.updateAudioLevel(from: bufferListInOut, frameCount: Int(numberFrames))
             #endif
+            return
         }
 
-        // MARK: - Audio Level Metering
+        let shouldUseVoiceBoostN = Settings.isVoiceBoostNEnabled
 
-        /// Compute RMS audio level from the buffer and store it for UI consumption.
-        /// Called from the real-time audio thread — must be lock-free.
-        ///
-        /// Reads only the first buffer, which is channel 0 in the tap's canonical
-        /// non-interleaved float format. This is sufficient for a visual meter.
-        private func updateAudioLevel(from bufferList: UnsafeMutablePointer<AudioBufferList>, frameCount: Int) {
-            let list = UnsafeMutableAudioBufferListPointer(bufferList)
-            guard let firstBuffer = list.first, let data = firstBuffer.mData else {
-                currentAudioLevel = 0
+        // Handle dynamic state creation/destruction
+        if shouldUseVoiceBoostN && proxy.voiceBoostNState == nil {
+            let isInitial = proxy.sampleCount == Float64(numberFrames) // First buffer
+            proxy.voiceBoostNState = VBN_Create(proxy.cachedSampleRate)
+            if isInitial {
+                FileLog.shared.addMessage("[DefaultPlayer] VoiceBoostN enabled - created state at \(proxy.cachedSampleRate) Hz")
+            } else {
+                FileLog.shared.addMessage("[DefaultPlayer] VoiceBoostN enabled mid-playback - created state at \(proxy.cachedSampleRate) Hz")
+            }
+        } else if !shouldUseVoiceBoostN && proxy.voiceBoostNState != nil {
+            VBN_Destroy(proxy.voiceBoostNState)
+            proxy.voiceBoostNState = nil
+            FileLog.shared.addMessage("[DefaultPlayer] VoiceBoostN disabled mid-playback - switching to previous voice boost")
+        }
+
+        if let vbnState = proxy.voiceBoostNState {
+            // Use VoiceBoostN processing
+            guard MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, nil, numberFramesOut) == noErr else {
+                referenceToSelf.handlePlaybackError("MTAudioProcessingTapGetSourceAudio failed")
                 return
             }
-            // Guard against reading past the buffer's actual data size
-            let availableFrames = min(frameCount, Int(firstBuffer.mDataByteSize) / MemoryLayout<Float>.size)
-            guard availableFrames > 0 else {
-                currentAudioLevel = 0
+
+            // Process through VoiceBoostN
+            let bufferList = UnsafeMutableAudioBufferListPointer(bufferListInOut)
+            let channelCount = Int32(bufferList.count)
+
+            var channelPointers: [UnsafeMutablePointer<Float>?] = bufferList.compactMap { buffer in
+                buffer.mData?.assumingMemoryBound(to: Float.self)
+            }
+
+            channelPointers.withUnsafeMutableBufferPointer { ptr in
+                VBN_Process(vbnState, ptr.baseAddress, Int32(numberFrames), channelCount)
+            }
+
+            numberFramesOut.pointee = numberFrames
+        } else {
+            // Use previous voice boost (AudioUnit chain)
+            var audioTimeStamp = AudioTimeStamp()
+            audioTimeStamp.mSampleTime = currentSampleCount
+            audioTimeStamp.mFlags = AudioTimeStampFlags.sampleTimeValid
+            guard AudioUnitRender(highPassFilter, nil, &audioTimeStamp, 0, UInt32(numberFrames), bufferListInOut) == noErr else {
+                referenceToSelf.handlePlaybackError("AudioUnitRender failed")
                 return
             }
-            let samples = data.assumingMemoryBound(to: Float.self)
-            var rms: Float = 0
-            vDSP_rmsqv(samples, 1, &rms, vDSP_Length(availableFrames))
-            // Clamp to 0...1 and apply light smoothing to avoid jitter
-            let smoothed = currentAudioLevel * 0.3 + min(rms * 3.0, 1.0) * 0.7
-            currentAudioLevel = smoothed
+
+            numberFramesOut.pointee = numberFrames
         }
 
-        // MARK: - Peak Limter
+        #if os(tvOS)
+        referenceToSelf.updateAudioLevel(from: bufferListInOut, frameCount: Int(numberFrames))
+        #endif
+    }
 
-        func createPeakLimiter(maxFrames: CMItemCount, processingFormat: AudioStreamBasicDescription, tap: MTAudioProcessingTap) -> AudioUnit? {
-            guard let referenceToSelf = DefaultPlayer.unretainedDefaultPlayer(for: tap) else {
-                return nil
-            }
-            var componentDescription = AudioComponentDescription(componentType: kAudioUnitType_Effect,
-                                                                 componentSubType: kAudioUnitSubType_PeakLimiter,
-                                                                 componentManufacturer: kAudioUnitManufacturer_Apple,
-                                                                 componentFlags: 0,
-                                                                 componentFlagsMask: 0)
+    // MARK: - Audio Level Metering
 
-            var unit: AudioUnit?
-            guard let audioComponent = AudioComponentFindNext(nil, &componentDescription) else { return nil }
-            guard AudioComponentInstanceNew(audioComponent, &unit) == noErr, let createdUnit = unit else { return nil }
+    /// Compute RMS audio level from the buffer and store it for UI consumption.
+    /// Called from the real-time audio thread — must be lock-free.
+    ///
+    /// Reads only the first buffer, which is channel 0 in the tap's canonical
+    /// non-interleaved float format. This is sufficient for a visual meter.
+    private func updateAudioLevel(from bufferList: UnsafeMutablePointer<AudioBufferList>, frameCount: Int) {
+        let list = UnsafeMutableAudioBufferListPointer(bufferList)
+        guard let firstBuffer = list.first, let data = firstBuffer.mData else {
+            currentAudioLevel = 0
+            return
+        }
+        // Guard against reading past the buffer's actual data size
+        let availableFrames = min(frameCount, Int(firstBuffer.mDataByteSize) / MemoryLayout<Float>.size)
+        guard availableFrames > 0 else {
+            currentAudioLevel = 0
+            return
+        }
+        let samples = data.assumingMemoryBound(to: Float.self)
+        var rms: Float = 0
+        vDSP_rmsqv(samples, 1, &rms, vDSP_Length(availableFrames))
+        // Clamp to 0...1 and apply light smoothing to avoid jitter
+        let smoothed = currentAudioLevel * 0.3 + min(rms * 3.0, 1.0) * 0.7
+        currentAudioLevel = smoothed
+    }
 
-            // Set audio unit input/output stream format to processing format
-            var format = processingFormat
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
+    // MARK: - Peak Limter
 
-            // Set audio unit render callback
-            let inputProcRefCon = Unmanaged.passUnretained(tap)
-            var renderCallback = AURenderCallbackStruct(inputProc: referenceToSelf.peakLimiterRenderCallback, inputProcRefCon: inputProcRefCon.toOpaque())
+    func createPeakLimiter(maxFrames: CMItemCount, processingFormat: AudioStreamBasicDescription, tap: MTAudioProcessingTap) -> AudioUnit? {
+        guard let referenceToSelf = DefaultPlayer.unretainedDefaultPlayer(for: tap) else {
+            return nil
+        }
+        var componentDescription = AudioComponentDescription(componentType: kAudioUnitType_Effect,
+                                                             componentSubType: kAudioUnitSubType_PeakLimiter,
+                                                             componentManufacturer: kAudioUnitManufacturer_Apple,
+                                                             componentFlags: 0,
+                                                             componentFlagsMask: 0)
 
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &renderCallback, UInt32(MemoryLayout<AURenderCallbackStruct>.stride)) == noErr else { return nil }
+        var unit: AudioUnit?
+        guard let audioComponent = AudioComponentFindNext(nil, &componentDescription) else { return nil }
+        guard AudioComponentInstanceNew(audioComponent, &unit) == noErr, let createdUnit = unit else { return nil }
 
-            // Set audio unit maximum frames per slice to max frames
-            var maximumFramesPerSlice = UInt32(maxFrames)
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maximumFramesPerSlice, UInt32(MemoryLayout<UInt32>.stride)) == noErr else { return nil }
+        // Set audio unit input/output stream format to processing format
+        var format = processingFormat
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
 
-            // Initialize audio unit
-            guard AudioUnitInitialize(createdUnit) == noErr else {
-                AudioComponentInstanceDispose(createdUnit)
-                return nil
-            }
+        // Set audio unit render callback
+        let inputProcRefCon = Unmanaged.passUnretained(tap)
+        var renderCallback = AURenderCallbackStruct(inputProc: referenceToSelf.peakLimiterRenderCallback, inputProcRefCon: inputProcRefCon.toOpaque())
 
-            AudioUnitSetParameter(createdUnit, kLimiterParam_AttackTime, kAudioUnitScope_Global, 0, 0.002, 0)
-            AudioUnitSetParameter(createdUnit, kLimiterParam_DecayTime, kAudioUnitScope_Global, 0, 0.005, 0)
-            AudioUnitSetParameter(createdUnit, kLimiterParam_PreGain, kAudioUnitScope_Global, 0, 8, 0)
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &renderCallback, UInt32(MemoryLayout<AURenderCallbackStruct>.stride)) == noErr else { return nil }
 
-            return createdUnit
+        // Set audio unit maximum frames per slice to max frames
+        var maximumFramesPerSlice = UInt32(maxFrames)
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maximumFramesPerSlice, UInt32(MemoryLayout<UInt32>.stride)) == noErr else { return nil }
+
+        // Initialize audio unit
+        guard AudioUnitInitialize(createdUnit) == noErr else {
+            AudioComponentInstanceDispose(createdUnit)
+            return nil
         }
 
-        let peakLimiterRenderCallback: AURenderCallback = { inRefCon, _, _, _, inNumberFrames, ioData -> OSStatus in
-            guard let ioData else {
-                return -1
-            }
+        AudioUnitSetParameter(createdUnit, kLimiterParam_AttackTime, kAudioUnitScope_Global, 0, 0.002, 0)
+        AudioUnitSetParameter(createdUnit, kLimiterParam_DecayTime, kAudioUnitScope_Global, 0, 0.005, 0)
+        AudioUnitSetParameter(createdUnit, kLimiterParam_PreGain, kAudioUnitScope_Global, 0, 8, 0)
 
-            // The peak limiter is at the end of the chain so just grab the processed audio
-            let tap = Unmanaged<MTAudioProcessingTap>.fromOpaque(inRefCon).takeUnretainedValue()
-            return MTAudioProcessingTapGetSourceAudio(tap, CMItemCount(inNumberFrames), ioData, nil, nil, nil)
+        return createdUnit
+    }
+
+    let peakLimiterRenderCallback: AURenderCallback = { inRefCon, _, _, _, inNumberFrames, ioData -> OSStatus in
+        guard let ioData else {
+            return -1
         }
 
-        // MARK: - High Pass Filter
+        // The peak limiter is at the end of the chain so just grab the processed audio
+        let tap = Unmanaged<MTAudioProcessingTap>.fromOpaque(inRefCon).takeUnretainedValue()
+        return MTAudioProcessingTapGetSourceAudio(tap, CMItemCount(inNumberFrames), ioData, nil, nil, nil)
+    }
+
+    // MARK: - High Pass Filter
 
     private func createHighPassFilter(maxFrames: CMItemCount, processingFormat: AudioStreamBasicDescription, tap: MTAudioProcessingTap) -> AudioUnit? {
-            guard let referenceToSelf = DefaultPlayer.unretainedDefaultPlayer(for: tap) else {
-                return nil
-            }
-            var componentDescription = AudioComponentDescription(componentType: kAudioUnitType_Effect,
-                                                                 componentSubType: kAudioUnitSubType_HighPassFilter,
-                                                                 componentManufacturer: kAudioUnitManufacturer_Apple,
-                                                                 componentFlags: 0,
-                                                                 componentFlagsMask: 0)
+        guard let referenceToSelf = DefaultPlayer.unretainedDefaultPlayer(for: tap) else {
+            return nil
+        }
+        var componentDescription = AudioComponentDescription(componentType: kAudioUnitType_Effect,
+                                                             componentSubType: kAudioUnitSubType_HighPassFilter,
+                                                             componentManufacturer: kAudioUnitManufacturer_Apple,
+                                                             componentFlags: 0,
+                                                             componentFlagsMask: 0)
 
-            var unit: AudioUnit?
-            guard let audioComponent = AudioComponentFindNext(nil, &componentDescription) else { return nil }
-            guard AudioComponentInstanceNew(audioComponent, &unit) == noErr, let createdUnit = unit else { return nil }
+        var unit: AudioUnit?
+        guard let audioComponent = AudioComponentFindNext(nil, &componentDescription) else { return nil }
+        guard AudioComponentInstanceNew(audioComponent, &unit) == noErr, let createdUnit = unit else { return nil }
 
-            // Set audio unit input/output stream format to processing format
-            var format = processingFormat
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
+        // Set audio unit input/output stream format to processing format
+        var format = processingFormat
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, UInt32(MemoryLayout<AudioStreamBasicDescription>.stride)) == noErr else { return nil }
 
-            // Set audio unit render callback
-            let inputProcRefCon = Unmanaged<AudioProcessingTapProxy>.fromOpaque(MTAudioProcessingTapGetStorage(tap))
-            var renderCallback = AURenderCallbackStruct(inputProc: referenceToSelf.highPassFilterRenderCallback, inputProcRefCon: inputProcRefCon.toOpaque())
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &renderCallback, UInt32(MemoryLayout<AURenderCallbackStruct>.stride)) == noErr else { return nil }
+        // Set audio unit render callback
+        let inputProcRefCon = Unmanaged<AudioProcessingTapProxy>.fromOpaque(MTAudioProcessingTapGetStorage(tap))
+        var renderCallback = AURenderCallbackStruct(inputProc: referenceToSelf.highPassFilterRenderCallback, inputProcRefCon: inputProcRefCon.toOpaque())
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &renderCallback, UInt32(MemoryLayout<AURenderCallbackStruct>.stride)) == noErr else { return nil }
 
-            // Set audio unit maximum frames per slice to max frames
-            var maximumFramesPerSlice = UInt32(maxFrames)
-            guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maximumFramesPerSlice, UInt32(MemoryLayout<UInt32>.stride)) == noErr else { return nil }
+        // Set audio unit maximum frames per slice to max frames
+        var maximumFramesPerSlice = UInt32(maxFrames)
+        guard AudioUnitSetProperty(createdUnit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maximumFramesPerSlice, UInt32(MemoryLayout<UInt32>.stride)) == noErr else { return nil }
 
-            // Initialize audio unit
-            guard AudioUnitInitialize(createdUnit) == noErr else {
-                AudioComponentInstanceDispose(createdUnit)
-                return nil
-            }
-
-            AudioUnitSetParameter(createdUnit, kHipassParam_CutoffFrequency, kAudioUnitScope_Global, 0, 180, 0)
-            AudioUnitSetParameter(createdUnit, kHipassParam_Resonance, kAudioUnitScope_Global, 0, 0, 0)
-
-            return createdUnit
+        // Initialize audio unit
+        guard AudioUnitInitialize(createdUnit) == noErr else {
+            AudioComponentInstanceDispose(createdUnit)
+            return nil
         }
 
-        let highPassFilterRenderCallback: AURenderCallback = { inRefCon, _, inTimeStamp, _, inNumberFrames, ioData -> OSStatus in
-            guard
-                let peakLimiter = Unmanaged<AudioProcessingTapProxy>.fromOpaque(inRefCon).takeUnretainedValue().peakLimiter,
-                let ioData
-            else {
-                return -1
-            }
+        AudioUnitSetParameter(createdUnit, kHipassParam_CutoffFrequency, kAudioUnitScope_Global, 0, 180, 0)
+        AudioUnitSetParameter(createdUnit, kHipassParam_Resonance, kAudioUnitScope_Global, 0, 0, 0)
 
-            var audioTimeStamp = AudioTimeStamp()
-            audioTimeStamp.mSampleTime = inTimeStamp.pointee.mSampleTime
-            audioTimeStamp.mFlags = AudioTimeStampFlags.sampleTimeValid
+        return createdUnit
+    }
 
-            // The high pass filter calls the peak limiter as the next thing in the chain
-            var actionFlags = AudioUnitRenderActionFlags()
-            return AudioUnitRender(peakLimiter, &actionFlags, &audioTimeStamp, 0, inNumberFrames, ioData)
+    let highPassFilterRenderCallback: AURenderCallback = { inRefCon, _, inTimeStamp, _, inNumberFrames, ioData -> OSStatus in
+        guard
+            let peakLimiter = Unmanaged<AudioProcessingTapProxy>.fromOpaque(inRefCon).takeUnretainedValue().peakLimiter,
+            let ioData
+        else {
+            return -1
         }
+
+        var audioTimeStamp = AudioTimeStamp()
+        audioTimeStamp.mSampleTime = inTimeStamp.pointee.mSampleTime
+        audioTimeStamp.mFlags = AudioTimeStampFlags.sampleTimeValid
+
+        // The high pass filter calls the peak limiter as the next thing in the chain
+        var actionFlags = AudioUnitRenderActionFlags()
+        return AudioUnitRender(peakLimiter, &actionFlags, &audioTimeStamp, 0, inNumberFrames, ioData)
+    }
     #endif
 
     // MARK: - Helpers
@@ -778,36 +778,36 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
 
     private func startBackgroundTask() {
         #if !os(watchOS)
-            guard backgroundTaskId == .invalid else { return } // already started
+        guard backgroundTaskId == .invalid else { return } // already started
 
-            backgroundTaskId = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
-                self?.endBackgroundTask()
-            })
+        backgroundTaskId = UIApplication.shared.beginBackgroundTask(expirationHandler: { [weak self] in
+            self?.endBackgroundTask()
+        })
 
-            // schedule a timer to cancel the background task as soon as bufferring is done or we don't need to play anymore
-            // do this on the main thread because timers require run loops
-            DispatchQueue.main.async { [weak self] in
-                Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
-                    guard let self else {
-                        timer.invalidate()
-                        return
-                    }
+        // schedule a timer to cancel the background task as soon as bufferring is done or we don't need to play anymore
+        // do this on the main thread because timers require run loops
+        DispatchQueue.main.async { [weak self] in
+            Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
 
-                    if !self.buffering() || !self.shouldKeepPlaying {
-                        self.endBackgroundTask()
-                        timer.invalidate()
-                    }
+                if !self.buffering() || !self.shouldKeepPlaying {
+                    self.endBackgroundTask()
+                    timer.invalidate()
                 }
             }
+        }
         #endif
     }
 
     private func endBackgroundTask() {
         #if !os(watchOS)
-            if backgroundTaskId == .invalid { return } // already cancelled
+        if backgroundTaskId == .invalid { return } // already cancelled
 
-            UIApplication.shared.endBackgroundTask(backgroundTaskId)
-            backgroundTaskId = .invalid
+        UIApplication.shared.endBackgroundTask(backgroundTaskId)
+        backgroundTaskId = .invalid
         #endif
     }
 
@@ -825,7 +825,7 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
 
     private func configurePlayer(videoPodcast: Bool) {
         #if !os(watchOS)
-            player?.allowsExternalPlayback = videoPodcast
+        player?.allowsExternalPlayback = videoPodcast
         #endif
 
         durationObserver = player?.currentItem?.observe(\.duration) { _, _ in
@@ -904,10 +904,6 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
         playToEndObserver = nc.addObserver(forName: NSNotification.Name.AVPlayerItemDidPlayToEndTime, object: nil, queue: nil) { [weak self] notification in
             guard let self else { return }
 
-            if !FeatureFlag.checkFinishedTimeBeforeShouldKeepPlaying.enabled {
-                self.shouldKeepPlaying = false
-            }
-
             if let itemThatFinished = notification.object as? AVPlayerItem {
                 let duration = CMTimeGetSeconds(itemThatFinished.duration)
                 let upTo = CMTimeGetSeconds(itemThatFinished.currentTime())
@@ -927,20 +923,14 @@ class DefaultPlayer: PlaybackProtocol, Hashable {
 
                     return
                 }
-
-                if FeatureFlag.checkFinishedTimeBeforeShouldKeepPlaying.enabled {
-                    // Additional safeguard: check if buffer is empty (shouldn't be if truly finished)
-                    // A truly finished item should have reached the end naturally, not due to buffer exhaustion
-                    if itemThatFinished.isPlaybackBufferEmpty && !itemThatFinished.isPlaybackLikelyToKeepUp {
-                        FileLog.shared.addMessage("Item reports finished but buffer is empty and playback unlikely to keep up - ignoring")
-                        return
-                    }
+                // Additional safeguard: check if buffer is empty (shouldn't be if truly finished)
+                // A truly finished item should have reached the end naturally, not due to buffer exhaustion
+                if itemThatFinished.isPlaybackBufferEmpty && !itemThatFinished.isPlaybackLikelyToKeepUp {
+                    FileLog.shared.addMessage("Item reports finished but buffer is empty and playback unlikely to keep up - ignoring")
+                    return
                 }
             }
-
-            if FeatureFlag.checkFinishedTimeBeforeShouldKeepPlaying.enabled {
-                self.shouldKeepPlaying = false
-            }
+            self.shouldKeepPlaying = false
 
             PlaybackManager.shared.playerDidFinishPlayingEpisode()
         }

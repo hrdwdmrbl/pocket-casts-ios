@@ -199,10 +199,6 @@ extension NowPlayingPlayerItemViewController {
     }
 
     @objc func updateError() {
-        guard FeatureFlag.displayErrorsOnPlayer.enabled else {
-            hideError()
-            return
-        }
         guard PlaybackManager.shared.currentEpisode != nil,
               let error = PlaybackManager.shared.activeError else {
             hideError()
@@ -214,7 +210,6 @@ extension NowPlayingPlayerItemViewController {
     }
 
     func showError(_ error: PlaybackManager.PlaybackError, dismissAfter seconds: TimeInterval?) {
-        AnalyticsPlaybackHelper.shared.playbackErrorShown(playerSource: .fullPlayer)
         // Move error container in view
         errorLabel.attributedText = error.shortUserAttributedMessage(mainColor: ThemeColor.playerContrast02(), interactiveColor: ThemeColor.primaryInteractive01())
         errorContainer.layoutIfNeeded()
@@ -253,7 +248,6 @@ extension NowPlayingPlayerItemViewController {
         else {
             return
         }
-        AnalyticsPlaybackHelper.shared.playbackErrorTapped(playerSource: .fullPlayer)
         #if !APPCLIP
         let safariViewController = SFSafariViewController(with: url)
         safariViewController.modalPresentationStyle = .formSheet

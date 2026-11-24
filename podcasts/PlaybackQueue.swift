@@ -38,11 +38,6 @@ class PlaybackQueue: NSObject {
 
         FileLog.shared.addMessage("PlaybackQueue: removing \(episode.title ?? "Untitled") episode")
         DataManager.shared.delete(playlistEpisode: episodeToRemove)
-        if SyncManager.isUserLoggedIn() {
-            DataManager.shared.saveUpNextRemove(episodeUuid: episode.uuid)
-            SyncManager.syncReason = .remove
-            startSyncTimer()
-        }
 
         refreshAppFiring(notificationName: fireNotification ? Constants.Notifications.upNextEpisodeRemoved : nil, notificationObject: episode.uuid)
     }
@@ -52,11 +47,6 @@ class PlaybackQueue: NSObject {
 
         FileLog.shared.addMessage("PlaybackQueue: removing \(episodeToRemove.title) episode")
         DataManager.shared.delete(playlistEpisode: episodeToRemove)
-        if SyncManager.isUserLoggedIn() {
-            DataManager.shared.saveUpNextRemove(episodeUuid: uuid)
-            SyncManager.syncReason = .remove
-            startSyncTimer()
-        }
 
         refreshAppFiring(notificationName: fireNotification ? Constants.Notifications.upNextEpisodeRemoved : nil, notificationObject: uuid)
     }
@@ -80,17 +70,6 @@ class PlaybackQueue: NSObject {
             newEpisode.podcastUuid = episode.parentIdentifier()
 
             DataManager.shared.save(playlistEpisode: newEpisode)
-        }
-
-        if !partOfBulkAdd, SyncManager.isUserLoggedIn() {
-            if toTop {
-                DataManager.shared.saveUpNextAddToTop(episodeUuid: episode.uuid)
-            } else {
-                DataManager.shared.saveUpNextAddToBottom(episodeUuid: episode.uuid)
-            }
-
-            SyncManager.syncReason = .add
-            startSyncTimer()
         }
 
         // don't update until this bulk operation is complete
@@ -167,11 +146,6 @@ class PlaybackQueue: NSObject {
             DataManager.shared.movePlaylistEpisode(from: -1, to: 0)
         }
 
-        if SyncManager.isUserLoggedIn() {
-            DataManager.shared.saveUpNextAddNowPlaying(episodeUuid: episode.uuid)
-            startSyncTimer()
-        }
-
         refreshAppFiring(notificationName: Constants.Notifications.upNextQueueChanged)
     }
 
@@ -246,7 +220,7 @@ class PlaybackQueue: NSObject {
         FileLog.shared.addMessage("PlaybackQueue: overrideAllEpisodesWith with \(episode.title ?? "Untitled")")
 
         let upNext = DataManager.shared.allUpNextEpisodes()
-        let shouldRemoveInsteadOfReplace = FeatureFlag.avoidReplaceOnEpisodeSwap.enabled && upNext.count == 1
+        let shouldRemoveInsteadOfReplace = true && upNext.count == 1
 
         if shouldRemoveInsteadOfReplace {
             if let episode = upNext.first {
@@ -256,11 +230,7 @@ class PlaybackQueue: NSObject {
 
         DataManager.shared.deleteAllUpNextEpisodes()
         if !shouldRemoveInsteadOfReplace {
-            if FeatureFlag.replaceSpecificEpisode.enabled {
-                saveReplaceIfRequired(episodeList: [episode.uuid])
-            } else {
-                saveReplaceIfRequired()
-            }
+            saveReplaceIfRequired(episodeList: [episode.uuid])
         }
 
         pushNewCurrentlyPlaying(episode: episode)
@@ -351,19 +321,7 @@ class PlaybackQueue: NSObject {
         let actualIndex = index + 1 // the rest of the app doesn't treat the current episode as being at position 0
         if actualIndex < 0 { return nil }
 
-        if let episode = DataManager.shared.episodeInUpNextAt(index: actualIndex) {
-            return episode
-        }
-
-        guard let playlistEpisode = DataManager.shared.playlistEpisodeAt(index: actualIndex) else { return nil }
-
-        let missingEpisode = UserEpisode()
-        missingEpisode.title = playlistEpisode.title
-        missingEpisode.uuid = playlistEpisode.episodeUuid
-        missingEpisode.uploadStatus = UploadStatus.missing.rawValue
-        missingEpisode.imageColor = 1
-
-        return missingEpisode
+        return DataManager.shared.episodeInUpNextAt(index: actualIndex)
     }
 
     func upNextTotalDuration(includePlayingEpisode: Bool) -> TimeInterval {
@@ -382,7 +340,7 @@ class PlaybackQueue: NSObject {
 
     func updateUpNextInfo() {
         #if !os(watchOS) && !APPCLIP && !os(tvOS)
-            WidgetHelper.shared.updateSharedUpNext()
+        WidgetHelper.shared.updateSharedUpNext()
         #endif
     }
 
@@ -428,25 +386,7 @@ class PlaybackQueue: NSObject {
         startSyncTimer()
     }
 
-    private func saveReplaceIfRequired(episodeList: [String]? = nil) {
-        if !SyncManager.isUserLoggedIn() { return }
-
-        var episodeUuids = [String]()
-        if let episodeList {
-            episodeUuids = episodeList
-        } else {
-            for playlistEpisode in DataManager.shared.allUpNextPlaylistEpisodes() {
-                episodeUuids.append(playlistEpisode.episodeUuid)
-            }
-        }
-
-        FileLog.shared.addMessage("PlaybackQueue: Saving replace of \(upNextCount()) with \(episodeUuids.count) episodes")
-
-        DataManager.shared.saveReplace(episodeList: episodeUuids)
-
-        SyncManager.syncReason = .replace
-
-        startSyncTimer()
+    private func saveReplaceIfRequired(episodeList: [String]? = nil) {return
     }
 
     // MARK: - Sync Timer
@@ -484,7 +424,5 @@ class PlaybackQueue: NSObject {
             startSyncTimer(after: remainingDelay)
             return
         }
-
-        RefreshManager.shared.syncUpNext()
     }
 }

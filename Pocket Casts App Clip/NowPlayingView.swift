@@ -1,9 +1,7 @@
 import SwiftUI
 import PocketCastsDataModel
 import PocketCastsServer
-import StoreKit
 import PocketCastsUtils
-import UserNotifications
 
 struct NowPlayingView: View {
 
@@ -12,8 +10,6 @@ struct NowPlayingView: View {
         case ready
         case failed
     }
-
-    @State var presentAppStoreOverlay: Bool = false
     @State var state: ScreenState = .loading
 
     var body: some View {
@@ -27,24 +23,12 @@ struct NowPlayingView: View {
                     .tint(UIColor.label.color)
             case .ready:
                 NowPlayingPlayerItemViewControllerRepresentable()
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                            presentAppStoreOverlay = true
-                        }
-                        scheduleNotification()
-                    }
             case .failed:
                 errorView
-                    .onAppear {
-                        presentAppStoreOverlay = true
-                    }
             }
             Spacer()
         }
         .background(state != .ready ? UIColor.systemBackground.color : PlayerColorHelper.playerBackgroundColor01().color)
-        .appStoreOverlay(isPresented: $presentAppStoreOverlay, configuration: {
-            SKOverlay.AppClipConfiguration(position: .bottom)
-        })
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
             handle(userActivity: userActivity)
         }
@@ -125,7 +109,6 @@ struct NowPlayingView: View {
                 FileLog.shared.addMessage("App Clip: Loaded episode: \(episode.title ?? "unknown")")
                 state = .ready
                 PlaybackManager.shared.load(episode: episode, autoPlay: true, overrideUpNext: false)
-                Analytics.track(.playbackPlay, source: AnalyticsSource.handleUserActivity, properties: ["url": incomingURL.absoluteString, "podcast": podcastUUID, "episode": episode.uuid])
             }
         }
     }
@@ -156,29 +139,6 @@ struct NowPlayingView: View {
                 }
             }
         })
-    }
-
-    private func scheduleNotification() {
-        let notificationCenter = UNUserNotificationCenter.current()
-        Task {
-            do {
-                let settings = await notificationCenter.notificationSettings()
-                let granted = settings.authorizationStatus == .ephemeral
-                guard granted else {
-                    let settings = await notificationCenter.notificationSettings()
-                    FileLog.shared.addMessage("App Clip: Notification status: \(settings.authorizationStatus)")
-                    return
-                }
-                let content = UNMutableNotificationContent()
-                content.title = L10n.notificationsAppClipTitle
-                content.body = L10n.notificationsAppClipBody
-                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 4.hours, repeats: false)
-                let request = UNNotificationRequest(identifier: AppClipNotification.appStoreNotificationID, content: content, trigger: trigger)
-                try await notificationCenter.add(request)
-            } catch {
-                FileLog.shared.addMessage("App Clip: Notification Sending Error - \(error)")
-            }
-        }
     }
 }
 

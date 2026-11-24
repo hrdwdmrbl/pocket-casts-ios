@@ -13,7 +13,7 @@ struct PodcastBlurHeaderView: View {
                 Spacer()
                 PodcastImageViewWrapper(podcastUUID: podcastUUID, size: .grid)
                     .frame(width: proxy.size.width, height: proxy.size.height)
-                .blur(radius: 60)
+                    .blur(radius: 60)
                 Spacer()
             }
         }
@@ -53,17 +53,13 @@ struct PodcastHeaderView: View {
                 Spacer().frame(height: itemMargin)
                 podcastCategory
             }
-                .frame(maxHeight: viewModel.isExpanded ? .infinity : 0)
-                .opacity(viewModel.isExpanded ? 1 : 0)
-                .clipped()
+            .frame(maxHeight: viewModel.isExpanded ? .infinity : 0)
+            .opacity(viewModel.isExpanded ? 1 : 0)
+            .clipped()
             Spacer().frame(height: topMarginForTitle)
             podcastTitle
             Spacer().frame(height: titleBottomMargin - bottomMarginAdjustmentForTitle)
-            StarRatingView(viewModel: viewModel.podcastRatingViewModel,
-                           style: .short,
-                           onRate: {
-                viewModel.podcastRatingViewModel.update(podcast: viewModel.podcast, ignoringCache: true)
-            })
+            StarRatingView(viewModel: viewModel.podcastRatingViewModel, style: .short)
             Spacer().frame(height: titleBottomMargin)
             podcastActions
             Spacer().frame(height: itemMargin)
@@ -72,9 +68,9 @@ struct PodcastHeaderView: View {
                 podcastDetails
                 Spacer().frame(height: itemMargin)
             }
-                .frame(maxHeight: viewModel.isExpanded ? .infinity : 0)
-                .opacity(viewModel.isExpanded ? 1 : 0)
-                .clipped()
+            .frame(maxHeight: viewModel.isExpanded ? .infinity : 0)
+            .opacity(viewModel.isExpanded ? 1 : 0)
+            .clipped()
             PodcastDetailsTabView(delegate: viewModel.delegate)
         }
         .padding(.horizontal, 16)
@@ -82,7 +78,7 @@ struct PodcastHeaderView: View {
 
     func makeText() -> Text {
         var output = Text(viewModel.displayCategoryAndAuthor(networkTint: networkTint))
-        if FeatureFlag.showExplicitBadges.enabled, viewModel.podcast.isExplicit {
+        if viewModel.podcast.isExplicit {
             output = output + ExplicitBadgeHelper.inlineTitle(" ·", isExplicit: true, theme: theme.activeTheme)
         }
         return output
@@ -90,16 +86,16 @@ struct PodcastHeaderView: View {
 
     private var podcastCategory: some View {
         VStack {
-                makeText()
+            makeText()
                 .font(.footnote)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(theme.primaryText01)
-            .tint(theme.primaryText01)
-            .environment(\.openURL, OpenURLAction { url in
-                viewModel.headerLinkTapped(url)
-                return .handled
-            })
+                .tint(theme.primaryText01)
+                .environment(\.openURL, OpenURLAction { url in
+                    viewModel.headerLinkTapped(url)
+                    return .handled
+                })
         }
     }
 
@@ -176,9 +172,9 @@ struct PodcastHeaderView: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: viewModel.isSubscribed ? iconRounding : 8)
-                    .inset(by: 0.5)
-                    .stroke(theme.primaryUi05, lineWidth: 1)
-                    .opacity(viewModel.isSubscribed ? 0 : 1)
+                        .inset(by: 0.5)
+                        .stroke(theme.primaryUi05, lineWidth: 1)
+                        .opacity(viewModel.isSubscribed ? 0 : 1)
                 )
                 .clipped()
         }
@@ -186,55 +182,14 @@ struct PodcastHeaderView: View {
         .accessibilityLabel(viewModel.isSubscribed ? L10n.unfollow : L10n.follow)
     }
 
-    private var fundingButton: some View {
-        Button {
-            viewModel.delegate?.fundingTapped()
-        } label: {
-            if !viewModel.isSubscribed {
-                // Unsubscribed state - larger button next to Follow
-                fundingImage(width: iconSize, height: iconSize, padding: 10.0)
-                    .frame(width: iconRounding + 2, height: iconRounding + 2)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .inset(by: 0.5)
-                            .stroke(theme.primaryUi05, lineWidth: 1)
-                    )
-            } else {
-                // Subscribed state - compact button with other actions
-                fundingImage(width: iconSize, height: iconSize, padding: 8.0)
-            }
-        }
-        .accessibilityLabel(L10n.funding)
-        .buttonStyle(.plain)
-    }
-
-    private func fundingImage(width: CGFloat, height: CGFloat, padding: CGFloat) -> some View {
-        return Image("podcast-funding")
-            .renderingMode(.template)
-            .resizable()
-            .frame(width: width, height: height)
-            .padding(padding)
-            .foregroundStyle(theme.primaryIcon03)
-    }
-
     private var podcastActions: some View {
         HStack(spacing: 0) {
             Spacer()
             followButton
-            if !viewModel.isSubscribed, let _ = viewModel.podcast.fundingURL {
-                Spacer().frame(width: 8)
-                fundingButton
-            }
             if viewModel.isSubscribed {
                 Spacer().frame(width: 8)
-                actionButton(title: L10n.folder, imageName: viewModel.folderImage) {
-                    viewModel.delegate?.folderTapped()
-                }
                 actionButton(title: viewModel.podcast.pushEnabled ? L10n.notificationsOn : L10n.notificationsOff, imageName: viewModel.podcast.pushEnabled ? "podcast-notification-on" : "podcast-notification-off") {
                     viewModel.delegate?.notificationTapped()
-                }
-                if let _ = viewModel.podcast.fundingURL {
-                    fundingButton
                 }
                 actionButton(title: L10n.settings, imageName: "podcast-settings") {
                     viewModel.delegate?.settingsTapped()

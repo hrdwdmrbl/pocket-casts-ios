@@ -78,10 +78,6 @@ class SinglePodcastViewController: UIViewController, DiscoverSummaryProtocol {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        guard let listId = item?.uuid else { return }
-
-        let categoryId = category?.id.map(String.init)
-        AnalyticsHelper.listImpression(listId: listId, category: categoryId)
         updateSize()
     }
 
@@ -93,7 +89,7 @@ class SinglePodcastViewController: UIViewController, DiscoverSummaryProtocol {
         self.item = item
         self.region = region
         self.category = category
-        serverHandler.discoverPodcastList(source: source, authenticated: item.authenticated, completion: { [weak self] podcastList in
+        serverHandler.discoverPodcastList(source: source, completion: { [weak self] podcastList in
             guard let discoverPodcast = podcastList?.podcasts else { return }
 
             self?.podcast = discoverPodcast.first
@@ -122,13 +118,8 @@ class SinglePodcastViewController: UIViewController, DiscoverSummaryProtocol {
         if let uuid = podcast.uuid {
             podcastImage?.setPodcast(uuid: uuid, size: .grid)
         }
-        if let isSponsored = item?.isSponsored, isSponsored {
-            typeBadgeLabel.text = L10n.discoverSponsored
-            typeBadgeLabel.style = .primaryText02
-        } else {
-            typeBadgeLabel.text = L10n.discoverFreshPick
-            typeBadgeLabel.style = .support02
-        }
+        typeBadgeLabel.text = L10n.discoverFreshPick
+        typeBadgeLabel.style = .support02
 
         let fontSize: CGFloat = view.bounds.width >= 360 ? 15 : 14
         podcastDescription.font = .font(ofSize: fontSize, weight: .regular, scalingWith: .callout)
@@ -152,11 +143,6 @@ class SinglePodcastViewController: UIViewController, DiscoverSummaryProtocol {
 
         subscribeButton.currentlyOn = true
 
-        if let listId = item?.uuid, let podcastUuid = podcast.uuid {
-            AnalyticsHelper.podcastSubscribedFromList(listId: listId, podcastUuid: podcastUuid)
-        }
-        AnalyticsHelper.adSubscribed(categoryName: self.category?.name ?? "unknown", region: region ?? "unknown", podcastUUID: podcast.uuid ?? "unknown", categoryID: item?.categoryID ?? 0)
-
         delegate?.subscribe(podcast: podcast)
     }
 
@@ -164,16 +150,6 @@ class SinglePodcastViewController: UIViewController, DiscoverSummaryProtocol {
         guard let podcast else { return }
 
         delegate?.show(discoverPodcast: podcast, placeholderImage: nil, isFeatured: true, listUuid: item?.uuid)
-
-        if let item, let podcastUuid = podcast.uuid {
-            if let listId = item.uuid {
-                AnalyticsHelper.podcastTappedFromList(listId: listId, podcastUuid: podcastUuid)
-            }
-
-            if item.isSponsored == true {
-                AnalyticsHelper.adTapped(categoryName: self.category?.name ?? "unknown", region: region ?? "unknown", podcastUUID: podcastUuid, categoryID: item.categoryID ?? 0)
-            }
-        }
     }
 
     // MARK: / Notifications
@@ -187,17 +163,12 @@ class SinglePodcastViewController: UIViewController, DiscoverSummaryProtocol {
     }
 
     private func updateTypeBadgeColors() {
-        if let isSponsored = item?.isSponsored, isSponsored {
-            typeBadgeLabel.style = .secondaryText02
-        } else {
-            typeBadgeLabel.style = .support02
-        }
+        typeBadgeLabel.style = .support02
     }
 
     func updateSize() {
-        let isSponsored = item?.isSponsored ?? false
         podcastTitle.updateNumberOfLines(regular: 2, accessibility: 3)
-        podcastDescription.updateNumberOfLines(regular: isSponsored ? 0 : 4, accessibility: isSponsored ? 0 : 6)
+        podcastDescription.updateNumberOfLines(regular: 4, accessibility: 6)
     }
 }
 
@@ -217,21 +188,6 @@ import SwiftUI
     return DiscoverSectionPreview(
         section: section,
         item: DiscoverPreviewData.item(.singlePodcast, title: "Fresh pick")
-    )
-}
-
-#Preview("Single podcast · sponsored") {
-    let section = SinglePodcastViewController()
-    section.serverHandler = PreviewDiscoverServerHandler(
-        podcastList: DiscoverPreviewData.podcastList(
-            title: "Sponsored",
-            description: "A paid placement, drawn with the sponsored badge instead of the fresh pick one.",
-            podcasts: [DiscoverPreviewData.podcast(at: 3)]
-        )
-    )
-    return DiscoverSectionPreview(
-        section: section,
-        item: DiscoverPreviewData.item(.singlePodcast, title: "Sponsored", isSponsored: true)
     )
 }
 

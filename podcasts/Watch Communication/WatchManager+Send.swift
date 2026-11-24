@@ -50,9 +50,7 @@ extension WatchManager {
 
                     if let logContents = response[WatchConstants.Messages.LogFileRequest.logContents] as? String {
                         await self?.logCache.setCachedLog(logContents)
-                        if FeatureFlag.refreshAndSaveWatchLogsOnSend.enabled {
-                            self?.saveLog(contents: logContents)
-                        }
+                        self?.saveLog(contents: logContents)
                         await completionHandler.callCompletionIfNeeded(with: logContents)
                     } else {
                         let cachedLog = await self?.logCache.getCachedLog()

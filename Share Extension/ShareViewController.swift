@@ -1,6 +1,5 @@
 import UIKit
 import UniformTypeIdentifiers
-import Social
 
 class ShareViewController: UIViewController {
 
@@ -38,30 +37,34 @@ class ShareViewController: UIViewController {
     }
 
     private func loadFile(from attachment: NSItemProvider, identifier: String) {
-        attachment.loadItem(forTypeIdentifier: identifier, options: nil) { [weak self] data, _ in
-            guard let url = data as? URL else {
-                return
+        attachment.loadItem(forTypeIdentifier: identifier, options: nil) { [weak self] data, error in
+            do {
+                if let error { throw error }
+                guard let url = data as? URL else {
+                    throw CocoaError(.fileReadUnknown)
+                }
+
+                let fileManager = FileManager.default
+                guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.GroupUserDefaults.groupContainerId) else {
+                    throw CocoaError(.fileNoSuchFile)
+                }
+
+                let filename = identifier == UTType.data.identifier ? "opml.opml" : url.lastPathComponent
+                let destination = container.appendingPathComponent(filename)
+                if fileManager.fileExists(atPath: destination.path) {
+                    try fileManager.removeItem(at: destination)
+                }
+                try fileManager.copyItem(at: url, to: destination)
+
+                DispatchQueue.main.async {
+                    self?.close()
+                    self?.redirectToHostApp(destination.absoluteString)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.extensionContext?.cancelRequest(withError: error)
+                }
             }
-
-            // Save the file to the shared group directory
-            let fileManager = FileManager.default
-            guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.GroupUserDefaults.groupContainerId) else {
-                return
-            }
-
-            let destURL: URL
-            if identifier == UTType.data.identifier {
-                destURL = container.appendingPathComponent("opml.opml")
-            } else {
-                destURL = container.appendingPathComponent(url.lastPathComponent)
-            }
-
-            do { try FileManager.default.copyItem(at: url, to: destURL) } catch { }
-
-            self?.close()
-
-            // Redirect to Pocket Casts to handle the file
-            self?.redirectToHostApp(destURL.absoluteString)
         }
     }
 

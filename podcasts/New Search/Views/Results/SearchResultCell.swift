@@ -5,7 +5,6 @@ import PocketCastsUtils
 
 struct SearchResultCell: View {
     @EnvironmentObject var theme: Theme
-    @EnvironmentObject var searchAnalyticsHelper: SearchAnalyticsHelper
     @EnvironmentObject var searchHistory: SearchHistoryModel
 
     @StateObject var model: SearchResultCellModel
@@ -19,7 +18,7 @@ struct SearchResultCell: View {
     let cellStyle: ListCellButtonStyle
     let action: (() -> Void)?
 
-    init(episode: EpisodeSearchResult?, result: PodcastFolderSearchResult?, played: Bool = false, showDivider: Bool = true, showPodcastSubscribeButton: Bool = true, showEpisodeAddButton: Bool = false, episodeAddAction: (() -> Void)? = nil, isSelectionEnabled: Bool = true, cellStyle: ListCellButtonStyle = .init(), action: (() -> Void)? = nil) {
+    init(episode: EpisodeSearchResult?, result: PodcastSearchResult?, played: Bool = false, showDivider: Bool = true, showPodcastSubscribeButton: Bool = true, showEpisodeAddButton: Bool = false, episodeAddAction: (() -> Void)? = nil, isSelectionEnabled: Bool = true, cellStyle: ListCellButtonStyle = .init(), action: (() -> Void)? = nil) {
         self.played = episode != nil && played
         self.showDivider = showDivider
         self.showPodcastSubscribeButton = showPodcastSubscribeButton
@@ -27,7 +26,7 @@ struct SearchResultCell: View {
         self.isSelectionEnabled = isSelectionEnabled
         self.episodeAddAction = episodeAddAction
         self.cellStyle = cellStyle
-        self._model = StateObject<SearchResultCellModel>(wrappedValue: SearchResultCellModel(episode: episode, podcastFolder: result))
+        self._model = StateObject<SearchResultCellModel>(wrappedValue: SearchResultCellModel(episode: episode, podcastResult: result))
         self.action = action
     }
 
@@ -67,11 +66,9 @@ struct SearchResultCell: View {
         if let episode = model.episode {
             NavigationManager.shared.navigateTo(NavigationManager.episodePageKey, data: [NavigationManager.episodeUuidKey: episode.uuid, NavigationManager.podcastKey: episode.podcastUuid])
             searchHistory.add(episode: episode)
-            searchAnalyticsHelper.trackResultTapped(episode)
-        } else if let result = model.podcastFolder {
+        } else if let result = model.podcastResult {
             result.navigateTo()
             searchHistory.add(podcast: result)
-            searchAnalyticsHelper.trackResultTapped(result)
         }
     }
 }
@@ -89,14 +86,7 @@ private extension SearchResultCell {
         AppTheme.colorForStyle(cellStyle.backgroundStyle, themeOverride: theme.activeTheme).color
     }
 
-    func subtitle(for result: PodcastFolderSearchResult) -> String {
-        if result.kind == .folder {
-            guard let folder = DataManager.shared.findFolder(uuid: result.uuid) else {
-                return L10n.folder
-            }
-            let count = DataManager.shared.countOfPodcastsInFolder(folder: folder)
-            return L10n.podcastCount(count)
-        }
+    func subtitle(for result: PodcastSearchResult) -> String {
 
         return result.authorToDisplay
     }
@@ -152,8 +142,8 @@ private extension SearchResultCell {
 
     var rowContent: some View {
         HStack(spacing: 12) {
-            (model.episode?.podcastUuid ?? model.podcastFolder?.uuid).map {
-                SearchEntryImage(uuid: $0, kind: model.podcastFolder?.kind)
+            (model.episode?.podcastUuid ?? model.podcastResult?.uuid).map {
+                SearchEntryImage(uuid: $0, kind: model.podcastResult?.kind)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -179,7 +169,7 @@ private extension SearchResultCell {
                     .font(style: .caption, weight: .semibold)
                     .foregroundColor(AppTheme.color(for: .primaryText02, theme: theme))
                     .lineLimit(1)
-                } else if let result = model.podcastFolder {
+                } else if let result = model.podcastResult {
                     ExplicitBadgeHelper.inlineTitle(result.titleToDisplay, isExplicit: result.kind == .podcast && result.resolvedIsExplicit, theme: theme.activeTheme)
                         .font(style: .subheadline, weight: .medium)
                         .foregroundColor(AppTheme.color(for: .primaryText01, theme: theme))
@@ -224,8 +214,8 @@ private extension SearchResultCell {
                     .foregroundColor(theme.primaryInteractive01)
                     .accessibilityHidden(true)
                 }
-            } else if showPodcastSubscribeButton, let result = model.podcastFolder, result.kind == .podcast {
-                SubscribeButtonView(podcastUuid: result.uuid, source: searchAnalyticsHelper.source)
+            } else if showPodcastSubscribeButton, let result = model.podcastResult, result.kind == .podcast {
+                SubscribeButtonView(podcastUuid: result.uuid)
             }
         }
         .accessibilityElement(children: .combine)
@@ -246,7 +236,7 @@ private extension SearchResultCell {
     }
 }
 
-extension PodcastFolderSearchResult {
+extension PodcastSearchResult {
     var titleToDisplay: String {
         title ?? ""
     }

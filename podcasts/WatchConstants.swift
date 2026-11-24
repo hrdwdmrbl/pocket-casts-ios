@@ -3,8 +3,6 @@ import Foundation
 public enum WatchConstants {
     public enum Keys {
         public static let messageVersion = "id"
-        public static let loginChanged = "loginChanged"
-        public static let featureFlags = "featureFlags"
 
         public static let filters = "filters"
         public static let nowPlayingInfo = "nowPlaying"
@@ -35,7 +33,6 @@ public enum WatchConstants {
 
         public static let podcastSettings = "podcastSettings"
         public static let podcastUuid = "uuid"
-        public static let podcastCustomPosition = "podcastCustomPosition"
         public static let podcastAutoArchivePlayedAfter = "podcastAutoArchivePlayedAfter"
         public static let podcastOverrideGlobalArchive = "podcastOverrideGlobalArchive"
 
@@ -60,17 +57,14 @@ public enum WatchConstants {
         public static let data = "data"
         public static let lastPage = "lastPage_v2"
         public static let lastContext = "lastContext_v2"
-        public static let lastSubscriptionStatusTime = "lastSubscriptionStatusTime"
         public static let lastDataTime = "lastDataTime"
     }
 
     public enum Notifications {
         public static let dataUpdated = NSNotification.Name(rawValue: "dataUpdated")
-        public static let loginStatusUpdated = NSNotification.Name(rawValue: "loginStatusUpdated")
     }
 
     public enum Interface {
-        public static let podcastIconSize: CGFloat = 23
     }
 
     public enum Messages {
@@ -228,16 +222,6 @@ public enum WatchConstants {
         enum VolumeBoostRequest {
             public static let type = "volumeBoostRequest"
             public static let enabled = "enabled"
-        }
-
-        enum LoginDetailsRequest {
-            public static let type = "loginDetailsRequest"
-        }
-
-        enum LoginDetailsResponse {
-            public static let username = "username"
-            public static let password = "password"
-            public static let refreshToken = "refreshToken"
         }
 
         enum StateUpdate {

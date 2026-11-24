@@ -60,16 +60,7 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
         }
     }
 
-    var newFilterTip: UIViewController? = nil
-
     private var firstTimeLoading = true
-
-    lazy var informationalBannerCoordinator: InformationalBannerViewCoordinator = {
-        let invertedColor: Bool? = true
-        let bannerType: InformationalBannerType = .playlists
-        let viewModel = InformationalBannerViewModel(bannerType: bannerType, invertedColor: invertedColor)
-        return InformationalBannerViewCoordinator(viewModel: viewModel)
-    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -90,12 +81,8 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
         loadingIndicator = ThemeLoadingIndicator()
         insetAdjuster.setupInsetAdjustmentsForMiniPlayer(scrollView: filtersTable)
         handleThemeChanged()
-
-        // Start cache invalidation coordinator and subscribe to stale updates
-        if FeatureFlag.playlistCacheInvalidation.enabled {
-            cacheInvalidationCoordinator.startObserving()
-            subscribeToStaleUpdates()
-        }
+        cacheInvalidationCoordinator.startObserving()
+        subscribeToStaleUpdates()
     }
 
     func autoPushPlaylist() {
@@ -113,14 +100,6 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
-        // Invalidate stale playlist metadata cache (>30s) to ensure fresh data on screen entry.
-        // This is lightweight and won't block - just clears dictionaries if threshold exceeded.
-        if !FeatureFlag.playlistCacheInvalidation.enabled {
-            Task {
-                await playlistMetadataLoader.invalidateCacheIfStale()
-            }
-        }
-
         reloadFilters()
     }
 
@@ -129,11 +108,6 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
         updateNavTintColors()
         addCustomObserver(Constants.Notifications.playlistChanged, selector: #selector(filtersUpdated))
         addCustomObserver(Constants.Notifications.tappedOnSelectedTab, selector: #selector(checkForScrollTap(_:)))
-
-        Analytics.track(.filterListShown, properties: ["filter_count": listPlaylistItems.count])
-
-        showPlaylistsTipIfNeeded()
-        showOnboardingScreenIfNeeded()
 
         UserDefaults.standard.set(nil, forKey: Constants.UserDefaults.lastFilterShown)
     }
@@ -162,7 +136,6 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
     }
 
     @IBAction func addNewFilter() {
-        Analytics.track(.filterCreateButtonTapped)
         presentFilterPreview()
     }
 
@@ -249,21 +222,6 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
         }
     }
 
-    private func showOnboardingScreenIfNeeded() {
-        let userIsLoggedIn = SyncManager.isUserLoggedIn()
-        let appInstallStateUpdated = (UIApplication.shared.delegate as? AppDelegate)?.appInstallState == .updated
-        let shouldDisplayOnboarding = appInstallStateUpdated && Settings.shouldShowPlaylistsOnboarding && userIsLoggedIn
-        guard shouldDisplayOnboarding else { return }
-        let vc = ThemedHostingController(
-            rootView: PlaylistsOnboardingView(
-                onClose: { [weak self] in
-                    self?.dismiss(animated: true)
-                }
-            )
-        )
-        present(vc, animated: true)
-    }
-
     private func refreshContentUnavailable() {
         customRightBtn?.isHidden = listPlaylistItems.isEmpty
 
@@ -280,12 +238,12 @@ class PlaylistsViewController: PCViewController, FilterCreatedDelegate {
                     Image("filter_list")
                 },
                 actions: [
-                .init(
-                    title: L10n.playlistsDefaultNewPlaylist,
-                    action: { [weak self] in
-                    self?.addNewFilter()
-                    }
-                )
+                    .init(
+                        title: L10n.playlistsDefaultNewPlaylist,
+                        action: { [weak self] in
+                            self?.addNewFilter()
+                        }
+                    )
                 ])
         }
         set(configuration: config)

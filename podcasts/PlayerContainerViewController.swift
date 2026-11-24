@@ -68,17 +68,6 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         return item
     }()
 
-    lazy var bookmarksItem: BookmarksPlayerTabController = {
-        let playbackManager = PlaybackManager.shared
-        let bookmarkManager = playbackManager.bookmarkManager
-        let item = BookmarksPlayerTabController(bookmarkManager: bookmarkManager,
-                                                playbackManager: playbackManager)
-
-        item.view.translatesAutoresizingMaskIntoConstraints = false
-        item.containerDelegate = self
-        return item
-    }()
-
     lazy var transcriptsItem: TranscriptViewController = {
         let playbackManager = PlaybackManager.shared
         let item = TranscriptViewController(playbackManager: playbackManager)
@@ -86,19 +75,6 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         item.view.translatesAutoresizingMaskIntoConstraints = false
         item.scrollViewHandler = self
         item.containerDelegate = self
-        return item
-    }()
-
-    private lazy var generatedTranscriptsPremiumOverlay: GeneratedTranscriptsPremiumOverlay = {
-        let playbackManager = PlaybackManager.shared
-        let item = GeneratedTranscriptsPremiumOverlay(playbackManager: playbackManager)
-        item.view.translatesAutoresizingMaskIntoConstraints = false
-        item.dismissTranscript = { [weak self] in
-            self?.dismissGeneratedTranscriptsPremiumOverlay(dismissTranscript: true)
-        }
-        item.purchaseSuccessfull = { [weak self] in
-            self?.dismissGeneratedTranscriptsPremiumOverlay(dismissTranscript: false)
-        }
         return item
     }()
 
@@ -121,7 +97,6 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
 
     var showingChapters = false
     var showingNotes = false
-    var showingBookmarks = false
 
     var finalScrollViewConstraint: NSLayoutConstraint?
 
@@ -147,22 +122,10 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         #endif
     }
 
-
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-#if !APPCLIP
-        showNotesItem.updateScrollSize()
-#endif
-    }
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-
         #if !APPCLIP
-        if nowPlayingItem.displayTranscript {
-            transcriptsItem.didDisappear()
-            generatedTranscriptsPremiumOverlay.didDisappear()
-        }
+        showNotesItem.updateScrollSize()
         #endif
     }
 
@@ -220,10 +183,6 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
 
     func scrollToNowPlaying() {
         scroll(to: .nowPlaying)
-    }
-
-    func scrollToBookmarks() {
-        scroll(to: .bookmarks)
     }
 
     func navigateToPodcast() {
@@ -361,32 +320,6 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         transcriptsItem.didMove(toParent: self)
         transcriptsItem.willBeAddedToPlayer()
         transcriptsItem.themeDidChange()
-        transcriptsItem.showGeneratedTranscriptsPremiumOverlay = { [weak self] in
-            UIView.animate(withDuration: 0.25) {
-                self?.showGeneratedTranscriptsPremiumOverlay()
-            }
-        }
-    }
-
-    private func showGeneratedTranscriptsPremiumOverlay() {
-        generatedTranscriptsPremiumOverlay.didAppear()
-        addChild(generatedTranscriptsPremiumOverlay)
-        view.addSubview(generatedTranscriptsPremiumOverlay.view)
-        generatedTranscriptsPremiumOverlay.view.anchorToAllSidesOf(view: view)
-        generatedTranscriptsPremiumOverlay.didMove(toParent: self)
-    }
-
-    private func dismissGeneratedTranscriptsPremiumOverlay(dismissTranscript: Bool) {
-        UIView.animate(withDuration: 0.25) { [weak self] in
-            self?.generatedTranscriptsPremiumOverlay.didDisappear()
-            self?.generatedTranscriptsPremiumOverlay.willMove(toParent: nil)
-            self?.generatedTranscriptsPremiumOverlay.removeFromParent()
-            self?.generatedTranscriptsPremiumOverlay.view.removeFromSuperview()
-        } completion: { [weak self] _ in
-            if dismissTranscript {
-                self?.dismissTranscript()
-            }
-        }
     }
 
     func hideTranscript() {
@@ -394,7 +327,6 @@ class PlayerContainerViewController: SimpleNotificationsViewController, PlayerTa
         transcriptsItem.willMove(toParent: nil)
         transcriptsItem.removeFromParent()
         transcriptsItem.view.removeFromSuperview()
-        transcriptsItem.didDisappear()
     }
 
     private func configureTranscriptView() {
@@ -429,11 +361,5 @@ private extension PlayerContainerViewController {
         UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 1.0, initialSpringVelocity: 0, options: [.allowUserInteraction]) {
             self.mainScrollView.setContentOffset(.init(x: offset, y: 0), animated: false)
         }
-    }
-}
-
-extension PlayerContainerViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .player
     }
 }

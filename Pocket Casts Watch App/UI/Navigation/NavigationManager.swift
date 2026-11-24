@@ -12,7 +12,7 @@ class NavigationManager: ObservableObject {
         let interfaceType = WatchInterfaceType(rawValue: name)
 
         if interfaceType == .nowPlaying {
-            navigateToNowPlaying(source: SourceManager.shared.currentSource(), fromLaunchEvent: true)
+            navigateToNowPlaying()
         } else if let interfaceType {
             navigateTo(interfaceType, context: context)
         }
@@ -27,15 +27,7 @@ class NavigationManager: ObservableObject {
         }
     }
 
-    private var navigatingToNowPlaying = false
-    func navigateToNowPlaying(source: Source, fromLaunchEvent: Bool) {
-        if navigatingToNowPlaying { return }
-        navigatingToNowPlaying = true
-
-        if source != SourceManager.shared.currentSource() {
-            SourceManager.shared.setSource(newSource: source)
-        }
+    func navigateToNowPlaying() {
         navigateTo(.nowPlaying, context: nil)
-        navigatingToNowPlaying = false
     }
 }

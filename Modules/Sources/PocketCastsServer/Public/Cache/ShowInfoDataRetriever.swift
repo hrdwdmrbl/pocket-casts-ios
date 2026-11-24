@@ -7,6 +7,14 @@ public actor ShowInfoDataRetriever {
 
     private let cache: URLCache
 
+    public func clearCache() async {
+        let requests = Array(dataRequestMap.values)
+        for task in requests { task.cancel() }
+        for task in requests { _ = await task.result }
+        dataRequestMap.removeAll()
+        cache.removeAllCachedResponses()
+    }
+
     public init() {
         cache = URLCache(memoryCapacity: 1.megabytes, diskCapacity: 100.megabytes, diskPath: "show_notes")
     }

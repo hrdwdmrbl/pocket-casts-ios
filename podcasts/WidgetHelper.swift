@@ -7,7 +7,7 @@ import WidgetKit
 
 class WidgetHelper {
     static let shared = WidgetHelper()
-    static let appGroupId = "group.au.com.shiftyjelly.pocketcasts"
+    static let appGroupId = "group.com.marcbeaupre.podcasta"
     static let maxUpNextToPublish = 10
     static let maxFilterToPublish = 5
     init() {
@@ -30,9 +30,6 @@ class WidgetHelper {
         WidgetCenter.shared.getCurrentConfigurations { result in
             guard case .success = result, let widgets = try? result.get(), !widgets.isEmpty else { return }
 
-            if widgets.contains(where: { $0.kind == "Now_Playing_Widget" }) {
-                self.publishAppIcon()
-            }
             if widgets.contains(where: { $0.kind == "Up_Next_Widget" }), PlaybackManager.shared.currentEpisode == nil, PlaybackManager.shared.queue.upNextCount() == 0 {
                 self.publishTopFilterInfo()
             }
@@ -46,19 +43,9 @@ class WidgetHelper {
 
     func updateSharedUpNext() {
         #if !os(watchOS)
-            publishUpNextInfo()
-            updateAllWidgets()
+        publishUpNextInfo()
+        updateAllWidgets()
         #endif
-    }
-
-    func updateWidgetAppIcon() {
-        WidgetCenter.shared.getCurrentConfigurations { result in
-            guard case .success = result, let widgets = try? result.get() else { return }
-            if widgets.contains(where: { $0.kind == "Now_Playing_Widget" }) {
-                self.publishAppIcon()
-                WidgetCenter.shared.reloadTimelines(ofKind: "Now_Playing_Widget")
-            }
-        }
     }
 
     @objc func handleFilterChanged() {
@@ -145,18 +132,6 @@ class WidgetHelper {
         }
 
         return CommonUpNextItem(episodeUuid: episode.uuid, imageUrl: imageUrl, episodeTitle: episodeTitle, podcastName: episode.subTitle(), podcastColor: podcastColor.hexString(), duration: duration, isPlaying: isPlaying)
-    }
-
-    func publishAppIcon() {
-        guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId) else { return }
-        let sharedAppIcon = sharedDefaults.object(forKey: SharedConstants.GroupUserDefaults.appIcon) as? String
-        DispatchQueue.main.async {
-            let currentAppIcon = UIApplication.shared.alternateIconName
-
-            if currentAppIcon != sharedAppIcon {
-                sharedDefaults.set(currentAppIcon, forKey: SharedConstants.GroupUserDefaults.appIcon)
-            }
-        }
     }
 
     func updateCustomImage(userEpisode: UserEpisode) {

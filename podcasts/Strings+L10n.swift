@@ -6,8 +6,8 @@ extension L10n {
 
     /// These strings are proper nouns and shouldn't be localized
     static let appleWatch = "Apple Watch"
-    static let pocketCasts = "Pocket Casts"
-    static let pocketCastsShort = "Casts"
+    static let pocketCasts = "Podcasta"
+    static let pocketCastsShort = "Podcasta"
     static let xCom = "X"
     static let instagram = "Instagram"
     static let bluesky = "Bluesky"
@@ -127,9 +127,9 @@ extension L10n {
 
     static let bulkDownloadMax: String = {
         #if os(watchOS)
-            return L10n.bulkDownloadMaxFormat(100.localized())
+        return L10n.bulkDownloadMaxFormat(100.localized())
         #else
-            return L10n.bulkDownloadMaxFormat(Constants.Limits.maxBulkDownloads.localized())
+        return L10n.bulkDownloadMaxFormat(Constants.Limits.maxBulkDownloads.localized())
         #endif
     }()
 
@@ -143,11 +143,6 @@ extension L10n {
         } else {
             return L10n.episodeShorthandFormat(episodeNumber.localized())
         }
-    }
-
-    /// `1 bookmark` or `N bookmarks`
-    static func bookmarkCount(_ count: Int) -> String {
-        count == 1 ? L10n.bookmarksCountSingular : L10n.bookmarksCountPlural(count)
     }
 }
 
@@ -168,9 +163,9 @@ extension L10n {
 private final class BundleToken {
     static let bundle: Bundle = {
         #if SWIFT_PACKAGE
-            return Bundle.module
+        return Bundle.module
         #else
-            return Bundle(for: BundleToken.self)
+        return Bundle(for: BundleToken.self)
         #endif
     }()
 

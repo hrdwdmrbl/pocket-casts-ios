@@ -175,12 +175,6 @@ class EffectsViewController: SimpleNotificationsViewController {
         }
     }
 
-    private let analyticsPlaybackHelper = AnalyticsPlaybackHelper.shared
-
-    private var analyticsSource: AnalyticsSource {
-        .playerPlaybackEffects
-    }
-
     private var didChangePlaybackSpeed: Bool = false
 
     private var playbackSpeedDebouncer: Debounce = .init(delay: 1)
@@ -239,11 +233,6 @@ class EffectsViewController: SimpleNotificationsViewController {
         addCustomObserver(Constants.Notifications.playbackTrackChanged, selector: #selector(updateControls))
         addCustomObserver(Constants.Notifications.playbackEffectsChanged, selector: #selector(updateControls))
         addCustomObserver(Constants.Notifications.themeChanged, selector: #selector(updateColors))
-
-        if isCustomPlaybackSettingsEnabled {
-            analyticsPlaybackHelper.currentSource = analyticsSource
-            analyticsPlaybackHelper.viewDidAppear(currentSettings: currentPlaybackSettings())
-        }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -263,29 +252,16 @@ class EffectsViewController: SimpleNotificationsViewController {
         guard didChangePlaybackSpeed else {
             return
         }
-
-        analyticsPlaybackHelper.currentSource = analyticsSource
-
-        let speed = PlaybackManager.shared.effects.playbackSpeed
-        analyticsPlaybackHelper.playbackSpeedChanged(to: speed)
     }
 
     @IBAction func minusTapped(_ sender: Any) {
         didChangePlaybackSpeed = true
         PlaybackManager.shared.decreasePlaybackSpeed()
-
-        if isCustomPlaybackSettingsEnabled {
-            trackPlaybackSpeedChanged()
-        }
     }
 
     @IBAction func plusTapped(_ sender: Any) {
         didChangePlaybackSpeed = true
         PlaybackManager.shared.increasePlaybackSpeed()
-
-        if isCustomPlaybackSettingsEnabled {
-            trackPlaybackSpeedChanged()
-        }
     }
 
     @IBAction func trimSilenceChanged(_ sender: UISwitch) {
@@ -297,13 +273,6 @@ class EffectsViewController: SimpleNotificationsViewController {
         }
 
         PlaybackManager.shared.changeEffects(effects)
-
-        analyticsPlaybackHelper.currentSource = analyticsSource
-        if isCustomPlaybackSettingsEnabled {
-            analyticsPlaybackHelper.trimSilenceToggled(enabled: sender.isOn, currentSettings: currentPlaybackSettings())
-        } else {
-            analyticsPlaybackHelper.trimSilenceToggled(enabled: sender.isOn)
-        }
     }
 
     @objc private func trimSilenceAmountChanged() {
@@ -312,21 +281,12 @@ class EffectsViewController: SimpleNotificationsViewController {
         effects.trimSilence = amount
 
         PlaybackManager.shared.changeEffects(effects)
-
-        analyticsPlaybackHelper.currentSource = analyticsSource
-        if isCustomPlaybackSettingsEnabled {
-            analyticsPlaybackHelper.trimSilenceAmountChanged(amount: amount, currentSettings: currentPlaybackSettings())
-        } else {
-            analyticsPlaybackHelper.trimSilenceAmountChanged(amount: amount)
-        }
     }
 
     @objc private func playbackSettingsDestinationChanged() {
         let applyLocalSettings = playbackSettingsSegmentedControl.selectedSegmentIndex == 1
         PlaybackManager.shared.overrideEffectsToggled(applyLocalSettings: applyLocalSettings)
         updateControls()
-        analyticsPlaybackHelper.currentSource = analyticsSource
-        analyticsPlaybackHelper.effectSettingsChanged(currentSettings: currentPlaybackSettings())
     }
 
     @IBAction func volumeBoostChanged(_ sender: UISwitch) {
@@ -334,13 +294,6 @@ class EffectsViewController: SimpleNotificationsViewController {
         effects.volumeBoost = sender.isOn
 
         PlaybackManager.shared.changeEffects(effects)
-
-        analyticsPlaybackHelper.currentSource = analyticsSource
-        if isCustomPlaybackSettingsEnabled {
-            analyticsPlaybackHelper.volumeBoostToggled(enabled: sender.isOn, currentSettings: currentPlaybackSettings())
-        } else {
-            analyticsPlaybackHelper.volumeBoostToggled(enabled: sender.isOn)
-        }
     }
 
     @IBAction func clearForPodcastTapped(_ sender: Any) {
@@ -350,15 +303,6 @@ class EffectsViewController: SimpleNotificationsViewController {
         DataManager.shared.save(podcast: podcast)
         PlaybackManager.shared.effectsChangedExternally()
         updateClearView()
-    }
-
-    private func trackPlaybackSpeedChanged() {
-        playbackSpeedDebouncer.call { [weak self] in
-            guard let self else { return }
-            analyticsPlaybackHelper.currentSource = analyticsSource
-            let speed = PlaybackManager.shared.effects.playbackSpeed
-            analyticsPlaybackHelper.playbackSpeedChanged(to: speed, currentSettings: currentPlaybackSettings())
-        }
     }
 
     @objc private func updateControls() {
@@ -416,7 +360,7 @@ class EffectsViewController: SimpleNotificationsViewController {
             UIAccessibility.post(notification: .layoutChanged, argument: trimSilenceAmountControl)
         }
 
-        let timeSaved = StatsManager.shared.timeSavedDynamicSpeedInclusive()
+        let timeSaved = StatsManager.shared.timeSavedDynamicSpeed()
         if timeSaved < 60 {
             trimSilenceDescription.text = L10n.playerEffectsTrimSilenceDetails
         } else {
@@ -428,10 +372,6 @@ class EffectsViewController: SimpleNotificationsViewController {
     private func speedTapped() {
         didChangePlaybackSpeed = true
         PlaybackManager.shared.toggleDefinedPlaybackSpeed()
-
-        if isCustomPlaybackSettingsEnabled {
-            trackPlaybackSpeedChanged()
-        }
     }
 
     private func updateSpeedBtn() {

@@ -46,19 +46,7 @@ public class Episode: NSObject, BaseEpisode {
     @objc public var lastArchiveInteractionDate: Date?
     @objc public var excludeFromEpisodeLimit = false
     @objc public var hasOnlyUuid = false
-    @objc public var deselectedChapters: String?
-    @objc public var deselectedChaptersModified = 0 as Int64
     @objc public var wasDeleted = false
-    public var hasGeneratedTranscript: Bool? = nil
-
-    public var hasBookmarks: Bool {
-        // This wil cause a regression in which the bookmarks won't be displayed
-        // for episodes with bookmarks.
-        // However, this call is happening on the main thread and can block the whole app.
-        // We will re-add this again in a way that's not a blocker
-        //DataManager.shared.bookmarks.bookmarkCount(forEpisode: uuid) > 0
-        false
-    }
 
     public var isUserEpisode: Bool {
         false
@@ -170,10 +158,10 @@ public class Episode: NSObject, BaseEpisode {
         guard let fileType else { return false }
 
         return (fileType.caseInsensitiveCompare("audio/x-m4a") == .orderedSame ||
-            fileType.caseInsensitiveCompare("audio/x-m4b") == .orderedSame ||
-            fileType.caseInsensitiveCompare("audio/mp4") == .orderedSame ||
-            fileType.caseInsensitiveCompare("audio/mp3") == .orderedSame ||
-            fileType.caseInsensitiveCompare("audio/mpeg") == .orderedSame)
+                    fileType.caseInsensitiveCompare("audio/x-m4b") == .orderedSame ||
+                    fileType.caseInsensitiveCompare("audio/mp4") == .orderedSame ||
+                    fileType.caseInsensitiveCompare("audio/mp3") == .orderedSame ||
+                    fileType.caseInsensitiveCompare("audio/mpeg") == .orderedSame)
     }
 
     public func parentPodcast(dataManager: DataManager = .shared) -> Podcast? {
@@ -272,10 +260,7 @@ public class Episode: NSObject, BaseEpisode {
         case archivedModified
         case lastArchiveInteractionDate
         case excludeFromEpisodeLimit
-        case deselectedChapters
-        case deselectedChaptersModified
         case wasDeleted
-        case hasGeneratedTranscript
     }
 
     public required init(from decoder: Decoder) throws {
@@ -320,10 +305,7 @@ public class Episode: NSObject, BaseEpisode {
         archivedModified = try container.decodeIfPresent(Int64.self, forKey: .archivedModified) ?? 0
         lastArchiveInteractionDate = try container.decodeIfPresent(Date.self, forKey: .lastArchiveInteractionDate)
         excludeFromEpisodeLimit = try container.decodeIfPresent(Bool.self, forKey: .excludeFromEpisodeLimit) ?? false
-        deselectedChapters = try container.decodeIfPresent(String.self, forKey: .deselectedChapters)
-        deselectedChaptersModified = try container.decodeIfPresent(Int64.self, forKey: .deselectedChaptersModified) ?? 0
         wasDeleted = try container.decodeIfPresent(Bool.self, forKey: .wasDeleted) ?? false
-        hasGeneratedTranscript = try container.decodeIfPresent(Bool.self, forKey: .hasGeneratedTranscript)
     }
 
     public func encode(to container: inout PersistenceContainer) {
@@ -366,10 +348,7 @@ public class Episode: NSObject, BaseEpisode {
         container["archivedModified"] = archivedModified
         container["lastArchiveInteractionDate"] = (lastArchiveInteractionDate ?? Date(timeIntervalSince1970: 0)).timeIntervalSince1970
         container["excludeFromEpisodeLimit"] = excludeFromEpisodeLimit
-        container["deselectedChapters"] = deselectedChapters
-        container["deselectedChaptersModified"] = deselectedChaptersModified
         container["wasDeleted"] = wasDeleted
-        container["hasGeneratedTranscript"] = hasGeneratedTranscript
     }
 
     public enum Columns {
@@ -412,10 +391,7 @@ public class Episode: NSObject, BaseEpisode {
         public static let archivedModified = Column(CodingKeys.archivedModified)
         public static let lastArchiveInteractionDate = Column(CodingKeys.lastArchiveInteractionDate)
         public static let excludeFromEpisodeLimit = Column(CodingKeys.excludeFromEpisodeLimit)
-        public static let deselectedChapters = Column(CodingKeys.deselectedChapters)
-        public static let deselectedChaptersModified = Column(CodingKeys.deselectedChaptersModified)
         public static let wasDeleted = Column(CodingKeys.wasDeleted)
-        public static let hasGeneratedTranscript = Column(CodingKeys.hasGeneratedTranscript)
     }
 }
 

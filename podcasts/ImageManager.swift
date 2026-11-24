@@ -421,12 +421,15 @@ class ImageManager {
 
     // MARK: - Cleanup
 
-    /// Clears every image cache, memory and disk. Used by tvOS logout.
-    func clearAllImageCaches() {
+    func clearAllImageCaches() async {
+        failedEmbeddedLookups.removeAll()
+        ImageDownloader.default.cancelAll()
         let caches = [searchImageCache, subscribedPodcastsCache, userEpisodeCache, discoverCache, discoverVideoThumbnailCache]
         for cache in caches {
             cache.clearMemoryCache()
-            cache.clearDiskCache()
+            await withCheckedContinuation { continuation in
+                cache.clearDiskCache { continuation.resume() }
+            }
         }
     }
 

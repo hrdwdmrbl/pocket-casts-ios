@@ -26,7 +26,7 @@ struct ComposeFilter: TranscriptFilter {
         RegexFilter.carriageReturnFilter,
         RegexFilter.emptySpacesAtEndOfLinesFilter,
         RegexFilter.doubleOrMoreSpacesFilter,
-        RegexFilter.doubleOrMoreEmptyLinesFilter,
+        RegexFilter.doubleOrMoreEmptyLinesFilter
     ])
 
     static let htmlFilter = ComposeFilter(filters: [
@@ -38,7 +38,7 @@ struct ComposeFilter: TranscriptFilter {
         RegexFilter.htmlSpeakerFilter,
         RegexFilter.emptySpacesAtEndOfLinesFilter,
         RegexFilter.doubleOrMoreSpacesFilter,
-        RegexFilter.doubleOrMoreEmptyLinesFilter,
+        RegexFilter.doubleOrMoreEmptyLinesFilter
     ])
 }
 

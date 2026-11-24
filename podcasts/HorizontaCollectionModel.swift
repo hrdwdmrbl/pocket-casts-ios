@@ -52,7 +52,7 @@ class HorizontalCollectionModel: ObservableObject {
 
         self.item = item
         self.category = category
-        serverHandler.discoverPodcastCollection(source: source, authenticated: item.authenticated, completion: { [weak self] podcastCollection in
+        serverHandler.discoverPodcastCollection(source: source, completion: { [weak self] podcastCollection in
             guard podcastCollection?.podcasts != nil || podcastCollection?.episodes != nil else { return }
 
             DispatchQueue.main.async {
@@ -82,9 +82,6 @@ class HorizontalCollectionModel: ObservableObject {
     }
 
     func subscribePodcast(_ podcast: DiscoverPodcast) {
-        if let listId = item?.uuid, let podcastUuid = podcast.uuid {
-            AnalyticsHelper.podcastSubscribedFromList(listId: listId, podcastUuid: podcastUuid)
-        }
         delegate?.subscribe(podcast: podcast)
     }
 }

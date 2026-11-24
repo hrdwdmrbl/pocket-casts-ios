@@ -64,8 +64,6 @@ class DiscoverNetworksGridViewController: ThemedHostingController<DiscoverNetwor
 
     @objc private func handleShare() {
         guard let source = item.source, let url = URL(string: source)?.deletingPathExtension() else { return }
-
-        Analytics.track(.discoverListShareTapped)
         present(UIActivityViewController(activityItems: [url], applicationActivities: nil), animated: true)
     }
 }

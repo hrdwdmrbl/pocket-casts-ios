@@ -39,7 +39,6 @@ class DataManagerTestCase: XCTestCase {
         title: String = "Test Podcast",
         subscribed: Int32 = 1,
         sortOrder: Int32 = 0,
-        folderUuid: String? = nil,
         dataManager: DataManager
     ) -> Podcast {
         let podcast = Podcast()
@@ -47,7 +46,6 @@ class DataManagerTestCase: XCTestCase {
         podcast.title = title
         podcast.subscribed = subscribed
         podcast.sortOrder = sortOrder
-        podcast.folderUuid = folderUuid
         podcast.addedDate = Date()
         dataManager.save(podcast: podcast)
         return podcast
@@ -113,7 +111,6 @@ class DataManagerTestCase: XCTestCase {
         uuid: String = UUID().uuidString,
         title: String = "Test User Episode",
         episodeStatus: Int32 = DownloadStatus.notDownloaded.rawValue,
-        uploadStatus: Int32 = UploadStatus.notUploaded.rawValue,
         addedDate: Date = Date(),
         duration: Double = 3600,
         dataManager: DataManager
@@ -122,29 +119,10 @@ class DataManagerTestCase: XCTestCase {
         episode.uuid = uuid
         episode.title = title
         episode.episodeStatus = episodeStatus
-        episode.uploadStatus = uploadStatus
         episode.addedDate = addedDate
         episode.duration = duration
         dataManager.save(episode: episode)
         return episode
-    }
-
-    /// Creates a test folder with the given properties
-    func createTestFolder(
-        uuid: String = UUID().uuidString,
-        name: String = "Test Folder",
-        color: Int32 = 0,
-        sortOrder: Int32 = 0,
-        dataManager: DataManager
-    ) -> Folder {
-        let folder = Folder()
-        folder.uuid = uuid
-        folder.name = name
-        folder.color = color
-        folder.sortOrder = sortOrder
-        folder.addedDate = Date()
-        dataManager.save(folder: folder)
-        return folder
     }
 
     /// Adds an episode to the Up Next playlist at the bottom

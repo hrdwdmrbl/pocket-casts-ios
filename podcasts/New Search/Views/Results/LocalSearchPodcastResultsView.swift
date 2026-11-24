@@ -7,13 +7,10 @@ struct LocalSearchPodcastResultsView: View {
     @EnvironmentObject private var theme: Theme
 
     let listMode: PodcastListMode
-    let selectedFolder: Folder?
     let searchText: String
-    let defaultLibraryItems: [PodcastFolderSearchResult]
-    let folderResults: [PodcastFolderSearchResult]
-    let hasAnyPodcastsInFolder: Bool
-    let searchResults: [PodcastFolderSearchResult]
-    let onSelectResult: (PodcastFolderSearchResult) -> Void
+    let defaultLibraryItems: [PodcastSearchResult]
+    let searchResults: [PodcastSearchResult]
+    let onSelectResult: (PodcastSearchResult) -> Void
     let disableLibraryAnimation: Bool
     let isLoading: Bool
 
@@ -45,12 +42,12 @@ struct LocalSearchPodcastResultsView: View {
                         showPodcastSubscribeButton: false,
                         cellStyle: ListCellButtonStyle(backgroundStyle: .primaryUi01),
                         action: {
-                        onSelectResult(result)
-                    })
-                    .listRowBackground(theme.primaryUi01)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in
-                        return 0
-                    }
+                            onSelectResult(result)
+                        })
+                        .listRowBackground(theme.primaryUi01)
+                        .alignmentGuide(.listRowSeparatorLeading) { _ in
+                            return 0
+                        }
                 }
             }
         }
@@ -79,20 +76,6 @@ struct LocalSearchPodcastResultsView: View {
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             switch emptyStateContent {
-            case .folder(let hasAnyPodcasts):
-                if hasAnyPodcasts {
-                    EmptyStateView(
-                        title: L10n.discoverNoPodcastsFound,
-                        message: L10n.discoverNoPodcastsFoundMsg,
-                        icon: { Image(systemName: "info.circle") }
-                    )
-                } else {
-                    EmptyStateView(
-                        title: L10n.folderEmptyTitle,
-                        message: L10n.folderEmptyDescription,
-                        icon: { Image(systemName: "folder") }
-                    )
-                }
             case .search(let trimmedSearch):
                 if trimmedSearch.isEmpty {
                     Text(L10n.localizedFormat("user_episodes_search_podcasts_title", "Localizable", "Your Podcasts"))
@@ -116,12 +99,10 @@ struct LocalSearchPodcastResultsView: View {
         .padding(.top, 48)
     }
 
-    private var currentResults: [PodcastFolderSearchResult] {
+    private var currentResults: [PodcastSearchResult] {
         switch listMode {
         case .library:
             return defaultLibraryItems
-        case .folder:
-            return folderResults
         case .search:
             return searchResults
         }
@@ -129,8 +110,6 @@ struct LocalSearchPodcastResultsView: View {
 
     private var emptyStateContent: EmptyStateContent {
         switch listMode {
-        case .folder:
-            return .folder(hasAnyPodcastsInFolder)
         case .library, .search:
             let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             return .search(trimmed)
@@ -138,7 +117,6 @@ struct LocalSearchPodcastResultsView: View {
     }
 
     private enum EmptyStateContent {
-        case folder(Bool)
         case search(String)
     }
 }

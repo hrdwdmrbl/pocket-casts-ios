@@ -24,8 +24,7 @@ extension PodcastViewController {
 
     func checkIfPodcastNeedsUpdating() {
         guard let podcast else { return }
-        let addMissingEpisodes = Settings.addMissingEpisodes
-        ServerPodcastManager.shared.updatePodcastIfRequired(podcast: podcast, addMissingEpisodes: addMissingEpisodes) { [weak self] updated in
+        ServerPodcastManager.shared.updatePodcastIfRequired(podcast: podcast, addMissingEpisodes: true) { [weak self] updated in
             if updated {
                 self?.loadLocalEpisodes(podcast: podcast, animated: true)
             }
@@ -41,14 +40,6 @@ extension PodcastViewController {
 
         self.podcast = podcast
         summaryExpanded = !podcast.isSubscribed()
-
-        forceCollapsingHeaderIfNeeded()
-
-        if SyncManager.isUserLoggedIn() {
-            guard let episodes = ApiServerHandler.shared.retrieveEpisodeTaskSynchronouusly(podcastUuid: uuid) else { return }
-
-            DataManager.shared.saveBulkEpisodeSyncInfo(episodes: DataConverter.convert(syncInfoEpisodes: episodes))
-        }
         loadLocalEpisodes(podcast: podcast, animated: false)
 
         loadingEnded(successfully: true)
@@ -84,10 +75,6 @@ extension PodcastViewController {
             UIView.animate(withDuration: 0.5) {
                 self.episodesTable.alpha = 1
             } completion: { _ in
-                if FeatureFlag.podcastFeedUpdate.enabled {
-                    self.showPodcastFeedReloadTipIfNeeded()
-                }
-                self.showViewChangesTipIfNeeded()
             }
         }
     }

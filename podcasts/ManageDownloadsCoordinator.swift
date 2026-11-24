@@ -13,7 +13,7 @@ class ManageDownloadsCoordinator {
         }
         if let lastCheckDate = Settings.manageDownloadsLastCheckDate,
            fabs(lastCheckDate.timeIntervalSince(Date.now)) < 14.days {
-           return false
+            return false
         }
         return percentage < 0.1
     }
@@ -22,14 +22,11 @@ class ManageDownloadsCoordinator {
         guard Self.shouldShowBanner else {
             return
         }
-        Analytics.track(.freeUpSpaceModalShown, properties: ["source": source])
         let dataModel = ManageDownloadsModel(initialSize: "", onManageTap: { [weak presentationVC] in
-            Analytics.track(.freeUpSpaceManageDownloadsTapped, properties: ["source": source])
             presentationVC?.dismiss(animated: true, completion: {
                 presentationVC?.navigationController?.pushViewController(DownloadedFilesViewController(), animated: true)
             })
         }, onNotNowTap: { [weak presentationVC] in
-            Analytics.track(.freeUpSpaceMaybeLaterTapped, properties: ["source": source])
             Settings.manageDownloadsLastCheckDate = Date.now
             presentationVC?.dismiss(animated: true)
         })
@@ -38,8 +35,8 @@ class ManageDownloadsCoordinator {
             autoSize: true,
             showingGrabber: true,
             in: presentationVC) {
-                Settings.manageDownloadsLastCheckDate = Date.now
-            }
+            Settings.manageDownloadsLastCheckDate = Date.now
+        }
         return
     }
 }

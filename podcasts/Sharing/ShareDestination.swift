@@ -2,7 +2,6 @@ import SwiftUI
 import PocketCastsDataModel
 import Combine
 import PocketCastsUtils
-import EndOfYear
 import CoreMedia
 import UniformTypeIdentifiers
 
@@ -27,7 +26,7 @@ enum ShareDestination: Hashable {
         case .instagram:
             Image("instagram")
         case .copyLink:
-            Image("pocketcasts")
+            Image(systemName: "link")
         case .systemSheet:
             Image(systemName: "ellipsis")
         }
@@ -43,11 +42,11 @@ enum ShareDestination: Hashable {
                clipTime: ClipTime,
                clipUUID: String,
                progress: Binding<Float?>,
-               presentFrom rect: CurrentValueSubject<CGRect, Never>,
-               source: AnalyticsSource) async throws {
+               presentFrom rect: CurrentValueSubject<CGRect, Never>) async throws {
+        let url = try await option.shareURL
         switch self {
         case .instagram:
-            let item = try await option.shareData(style: style, destination: self, clipUUID: clipUUID, progress: progress).mapFirst { shareItem -> (Data, UTType)? in
+            let item = try await option.shareData(url: url, style: style, destination: self, clipUUID: clipUUID, progress: progress).mapFirst { shareItem -> (Data, UTType)? in
                 if let data = shareItem.item as? Data {
                     return (data, .mpeg4Movie)
                 } else if let image = shareItem.item as? UIImage, let data = image.pngData() {
@@ -61,16 +60,12 @@ enum ShareDestination: Hashable {
                 throw ShareError.noMatchingItemIdentifier
             }
 
-            instagramShare(data: item.0, type: item.1, url: option.shareURL)
-            ShareDestination.logClipShared(option: option, style: style, clipUUID: clipUUID, source: source)
-            ShareDestination.logPodcastShared(style: style, option: option, destination: self, source: source)
+            instagramShare(data: item.0, type: item.1, url: url.absoluteString)
         case .copyLink:
-            UIPasteboard.general.string = option.shareURL
+            UIPasteboard.general.string = url.absoluteString
             Toast.show(L10n.shareCopiedToClipboard)
-            ShareDestination.logClipShared(option: option, style: style, clipUUID: clipUUID, source: source)
-            ShareDestination.logPodcastShared(style: style, option: option, destination: self, source: source)
         case .systemSheet(let vc):
-            let data = try await option.shareData(style: style, destination: self, clipUUID: clipUUID, progress: progress)
+            let data = try await option.shareData(url: url, style: style, destination: self, clipUUID: clipUUID, progress: progress)
             let activityViewController = UIActivityViewController(activityItems: data, applicationActivities: nil)
             activityViewController.popoverPresentationController?.sourceView = vc.view
             activityViewController.popoverPresentationController?.sourceRect = rect.value
@@ -81,8 +76,6 @@ enum ShareDestination: Hashable {
                 receiver.cancel()
             }
             vc.presentedViewController?.present(activityViewController, animated: true, completion: {
-                ShareDestination.logClipShared(option: option, style: style, clipUUID: clipUUID, source: source)
-                ShareDestination.logPodcastShared(style: style, option: option, destination: self, source: source)
             })
         }
     }
@@ -93,7 +86,7 @@ enum ShareDestination: Hashable {
         let appID = ApiCredentials.instagramAppID
 
         guard let urlScheme = URL(string: "instagram-stories://share?source_application=\(appID)"),
-            UIApplication.shared.canOpenURL(urlScheme) else {
+              UIApplication.shared.canOpenURL(urlScheme) else {
             return
         }
 
@@ -125,17 +118,6 @@ enum ShareDestination: Hashable {
         }
     }
 
-    var analyticsDescription: String {
-        switch self {
-        case .instagram:
-            "ig_story"
-        case .copyLink:
-            "url"
-        case .systemSheet:
-            "system_sheet"
-        }
-    }
-
     enum Constants {
         static let displayedAppsCount = 3
     }
@@ -158,88 +140,6 @@ enum ShareDestination: Hashable {
             guard destination.isIncluded else { return nil }
             return destination
         })
-    }
-}
-
-// MARK: Analytics
-
-extension ShareDestination {
-    private static func logClipShared(option: SharingModal.Option, style: ShareImageStyle, clipUUID: String, source: AnalyticsSource) {
-        // This event is specifically for clip shares and not other shares. These are handled by `podcastShared`
-        guard case let .clipShare(episode, clipTime, _) = option else {
-            return
-        }
-
-        var properties: Dictionary<String, Any> = [:]
-
-        properties["episode_uuid"] = episode.uuid
-        properties["podcast_uuid"] = episode.parentPodcast()?.uuid ?? "unknown"
-        properties["start"] = Int(clipTime.start)
-        properties["end"] = Int(clipTime.end)
-        properties["start_modified"] = clipTime.startChanged
-        properties["end_modified"] = clipTime.endChanged
-        properties["clip_uuid"] = clipUUID
-        properties["type"] = shareType(style: style, option: option)
-        properties["card_type"] = cardType(style: style)
-
-        Analytics.track(.shareScreenClipShared, source: source, properties: properties)
-    }
-
-    private static func cardType(style: ShareImageStyle) -> String {
-        switch style {
-        case .large:
-            "vertical"
-        case .medium:
-            "square"
-        case .small:
-            "horizontal"
-        case .audio:
-            "audio"
-        }
-    }
-
-    private static func shareType(style: ShareImageStyle, option: SharingModal.Option) -> String {
-        switch (style, option) {
-        case (.audio, _):
-            "audio"
-        case (_, .clip), (_, .clipShare):
-            "video"
-        default:
-            "link"
-        }
-    }
-
-    private static func type(style: ShareImageStyle, option: SharingModal.Option, destination: Self) -> String {
-        switch (style, option) {
-        case (_, .podcast):
-            return "podcast"
-        case (_, .episode):
-            return "episode"
-        case (_, .currentPosition):
-            return "current_time"
-        case (_, .bookmark):
-            return "bookmark_time"
-        case (.audio, _):
-            return "clip_audio"
-        case (_, .clip), (_, .clipShare):
-            if case .copyLink = destination {
-                return "clip_link"
-            } else {
-                return "clip_video"
-            }
-        default:
-            return "unknown"
-        }
-    }
-
-    private static func logPodcastShared(style: ShareImageStyle, option: SharingModal.Option, destination: Self, source: AnalyticsSource) {
-        let properties: [String: Any] = [
-            "type": type(style: style, option: option, destination: destination),
-            "action": destination.analyticsDescription,
-            "card_type": cardType(style: style)
-        ]
-
-        Analytics.track(.podcastShared, source: source, properties: properties)
     }
 }
 

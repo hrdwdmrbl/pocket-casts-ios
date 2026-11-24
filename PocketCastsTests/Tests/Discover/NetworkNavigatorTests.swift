@@ -45,7 +45,7 @@ final class NetworkNavigatorTests: XCTestCase {
         XCTAssertNotNil(presenter.viewIfLoaded?.window, "The screen has to start on screen for any of this to be about the navigator")
 
         serverHandler = MockDiscoverServerHandler()
-        navigator = NetworkNavigator(source: .discover, serverHandler: serverHandler)
+        navigator = NetworkNavigator(serverHandler: serverHandler)
         navigator.presenter = presenter
     }
 
@@ -186,28 +186,28 @@ private final class MockDiscoverServerHandler: DiscoverServerHandling {
         completions[index](collection)
     }
 
-    func discoverPodcastCollection(source: String, authenticated: Bool?, completion: @escaping (PodcastCollection?) -> Void) {
+    func discoverPodcastCollection(source: String, completion: @escaping (PodcastCollection?) -> Void) {
         requestedSources.append(source)
         completions.append(completion)
     }
 
-    func discoverPodcastList(source: String, authenticated: Bool?, completion: @escaping (PodcastList?) -> Void) {
+    func discoverPodcastList(source: String, completion: @escaping (PodcastList?) -> Void) {
         completion(nil)
     }
 
-    func discoverCategories(source: String, authenticated: Bool?) async -> [DiscoverCategory] {
+    func discoverCategories(source: String) async -> [DiscoverCategory] {
         []
     }
 
-    func discoverCategories(source: String, authenticated: Bool?, completion: @escaping ([DiscoverCategory]?) -> Void) {
+    func discoverCategories(source: String, completion: @escaping ([DiscoverCategory]?) -> Void) {
         completion(nil)
     }
 
-    func discoverCategoryDetails(source: String, authenticated: Bool?, completion: @escaping (DiscoverCategoryDetails?) -> Void) {
+    func discoverCategoryDetails(source: String, completion: @escaping (DiscoverCategoryDetails?) -> Void) {
         completion(nil)
     }
 
-    func discoverItem<T>(_ source: String?, authenticated: Bool, type: T.Type) -> AnyPublisher<T, Error> where T: Decodable {
+    func discoverItem<T>(_ source: String?, type: T.Type) -> AnyPublisher<T, Error> where T: Decodable {
         Empty().eraseToAnyPublisher()
     }
 }

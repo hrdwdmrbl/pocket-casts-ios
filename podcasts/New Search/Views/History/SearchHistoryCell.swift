@@ -5,7 +5,6 @@ import PocketCastsUtils
 
 struct SearchHistoryCell: View {
     @EnvironmentObject var theme: Theme
-    @EnvironmentObject var searchAnalyticsHelper: SearchAnalyticsHelper
     @EnvironmentObject var searchHistory: SearchHistoryModel
     @EnvironmentObject var searchResults: SearchResultsModel
     @EnvironmentObject var displaySearch: SearchVisibilityModel
@@ -17,8 +16,6 @@ struct SearchHistoryCell: View {
             return "\(L10n.episode) • \(TimeFormatter.shared.multipleUnitFormattedShortTime(time: TimeInterval(episode.duration ?? 0))) • \(episode.podcastTitle)"
         } else if let podcast = entry.podcast {
             switch podcast.kind {
-            case .folder:
-                return L10n.folder
             case .podcast:
                 return [L10n.podcastSingular, podcast.author].compactMap { $0 }.joined(separator: " • ")
             }
@@ -42,7 +39,6 @@ struct SearchHistoryCell: View {
                     searchResults.search(term: searchTerm)
                     NotificationCenter.postOnMainThread(notification: Constants.Notifications.podcastSearchRequest, object: searchTerm)
                 }
-                searchAnalyticsHelper.historyItemTapped(entry)
                 searchHistory.moveEntryToTop(entry)
             }) {
                 Rectangle()
@@ -54,7 +50,7 @@ struct SearchHistoryCell: View {
             VStack(spacing: 12) {
                 HStack(spacing: 0) {
                     if let title = entry.podcast?.title ?? entry.episode?.title,
-                        let uuid = entry.podcast?.uuid ?? entry.episode?.podcastUuid {
+                       let uuid = entry.podcast?.uuid ?? entry.episode?.podcastUuid {
                         SearchEntryImage(uuid: uuid, kind: entry.podcast?.kind)
                             .padding(.trailing, 12)
 
@@ -82,7 +78,6 @@ struct SearchHistoryCell: View {
                     Button(action: {
                         withAnimation {
                             searchHistory.remove(entry: entry)
-                            searchAnalyticsHelper.historyItemDeleted(entry)
                         }
                     }) {
                         ZStack {
@@ -102,7 +97,7 @@ struct SearchHistoryCell: View {
 
 struct SearchEntryImage: View {
     let uuid: String
-    let kind: PodcastFolderSearchResult.Kind?
+    let kind: PodcastSearchResult.Kind?
 
     var body: some View {
         image
@@ -114,10 +109,7 @@ struct SearchEntryImage: View {
 
     @ViewBuilder
     private var image: some View {
-        if kind == .folder {
-            SearchFolderPreviewWrapper(uuid: uuid)
-        } else {
-            PodcastImage(uuid: uuid)
-        }
+
+        PodcastImage(uuid: uuid)
     }
 }

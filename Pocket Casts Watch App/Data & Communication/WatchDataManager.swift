@@ -181,9 +181,7 @@ enum WatchDataManager {
     }
 
     static func updateLastDataTime(to date: Date = Date()) {
-        if FeatureFlag.watchUpNextSyncFix.enabled {
-            UserDefaults.standard.set(date, forKey: WatchConstants.UserDefaults.lastDataTime)
-        }
+        UserDefaults.standard.set(date, forKey: WatchConstants.UserDefaults.lastDataTime)
     }
 
     static func lastDataTime() -> Date {

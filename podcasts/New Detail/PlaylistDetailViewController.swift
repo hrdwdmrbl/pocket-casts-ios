@@ -77,7 +77,6 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
                 if viewModel.isSearching {
                     searchController.searchTextField.resignFirstResponder()
                 }
-                track(.filterMultiSelectEntered)
                 if selectedEpisodes.isEmpty, longPressMultiSelectIndexPath == nil, !multiSelectGestureInProgress {
                     tableView.scrollToRow(at: IndexPath(row: NSNotFound, section: 1), at: .top, animated: true)
                 }
@@ -88,7 +87,6 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
                 }
                 multiSelectFooterBottomConstraint.constant = LiquidGlass.isEnabled ? 17 : Constants.effectiveFooterViewPadding
             } else {
-                track(.filterMultiSelectExited)
                 multiSelectFooter.isHidden = true
                 selectedEpisodes.removeAll()
             }
@@ -173,8 +171,6 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
         if viewModel.firstTimeLoading {
             loadingIndicator.startAnimating()
         }
-
-        track(.filterShown)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -307,7 +303,7 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
             multiSelectFooter.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8.0),
             multiSelectFooter.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8.0),
             multiSelectFooterBottomConstraint,
-            multiSelectFooter.heightAnchor.constraint(equalToConstant: 64),
+            multiSelectFooter.heightAnchor.constraint(equalToConstant: 64)
         ])
     }
 
@@ -416,7 +412,6 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
     }
 
     func editPlaylist() {
-        track(.filterEditRulesTapped)
 
         let vc = PlaylistPreviewViewController(playlist: self.viewModel.playlist) { [weak self] in
             self?.viewModel.reloadPlaylistAndEpisodes()
@@ -428,16 +423,12 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
     func addEpisodes() {
         let isPlaylistFull = viewModel.isPlaylistFull
 
-        track(.filterAddEpisodesTapped, properties: ["is_playlist_full": isPlaylistFull])
-
         if isPlaylistFull {
             let theme: any ToastTheme = ToastIconTheme(iconName: "option-alert", iconColor: Theme.shared.primaryIcon01)
             Toast.show(L10n.playlistManualAddEpisodeFullPlaylistToast, theme: theme)
             return
         }
-
-        let searchAnalyticsHelper = SearchAnalyticsHelper(source: .playlistEditor)
-        let searchResults = SearchResultsModel(analyticsHelper: searchAnalyticsHelper)
+        let searchResults = SearchResultsModel()
         let vc = PCHostingController(rootView: LocalSearchView(
             playlist: viewModel.playlist,
             dismissAction: { [weak self] in
@@ -446,9 +437,8 @@ class PlaylistDetailViewController: PCViewController, UIScrollViewDelegate {
                 }
             }
         )
-            .environmentObject(Theme.shared)
-            .environmentObject(searchAnalyticsHelper)
-            .environmentObject(searchResults)
+        .environmentObject(Theme.shared)
+        .environmentObject(searchResults)
         )
 
         // Disable drag-to-dismiss gesture to ensure viewModel reload is called

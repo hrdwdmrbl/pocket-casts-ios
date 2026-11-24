@@ -9,7 +9,6 @@ struct MediaTrimBar: View {
 
     let episode: Episode
     let clipUUID: String
-    let analyticsSource: AnalyticsSource
     private let playbackManager = ClipPlaybackManager.shared
 
     private enum Constants {
@@ -18,12 +17,11 @@ struct MediaTrimBar: View {
         static var height: CGFloat = 70
     }
 
-    init(clipTime: ClipTime, episode: Episode, clipUUID: String, analyticsSource: AnalyticsSource) {
+    init(clipTime: ClipTime, episode: Episode, clipUUID: String) {
         self.clipTime = clipTime
         self.episode = episode
         self.clipUUID = clipUUID
         self.isPlaying = false
-        self.analyticsSource = analyticsSource
     }
 
     var body: some View {
@@ -41,8 +39,6 @@ struct MediaTrimBar: View {
                     } else {
                         playbackManager.stop()
                     }
-                    let event: AnalyticsEvent = isPlaying ? .shareScreenPlayTapped : .shareScreenPauseTapped
-                    Analytics.track(event, source: analyticsSource, properties: ["podcast_uuid": episode.parentIdentifier(), "episode_uuid": episode.uuid, "clip_uuid": clipUUID])
                 }
                 .onDisappear {
                     playbackManager.stop()

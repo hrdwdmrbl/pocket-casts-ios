@@ -158,27 +158,21 @@ CSV.foreach(ARGV[0], encoding: 'bom|utf-8') do |row|
   extra_dark_hex_value = row[6]
   extra_dark_opacity = row[7]
 
-  classic_light_hex_value = row[8]
-  classic_light_opacity = row[9]
 
   # These are unused but left here for reference and future use
-  # classic_dark_hex_value = row[10]
-  # classic_dark_opacity = row[11]
 
-  electric_hex_value = row[12]
-  electric_opacity = row[13]
 
-  indigo_hex_value = row[14]
-  indigo_opacity = row[15]
+  indigo_hex_value = row[8]
+  indigo_opacity = row[9]
 
-  rosé_hex_value = row[16]
-  rosé_opacity = row[17]
+  rosé_hex_value = row[10]
+  rosé_opacity = row[11]
 
-  high_contrast_light_hex_value = row[18]
-  high_contrast_light_opacity = row[19]
+  high_contrast_light_hex_value = row[12]
+  high_contrast_light_opacity = row[13]
 
-  high_contrast_dark_hex_value = row[20]
-  high_contrast_dark_opacity = row[21]
+  high_contrast_dark_hex_value = row[14]
+  high_contrast_dark_opacity = row[15]
 
   unless token_name.nil? || token_name == ' ' || token_name == 'Token' || light_hex_value.nil? || dark_hex_value.nil?
     token_name = token_name.gsub('$', '').split('-').collect(&:capitalize).join.uncapitalize
@@ -193,8 +187,6 @@ CSV.foreach(ARGV[0], encoding: 'bom|utf-8') do |row|
     write_theme_value(light_hex_value, light_opacity, token_name, file_path_colors, 'Light')
     write_theme_value(dark_hex_value, dark_opacity, token_name, file_path_colors, 'Dark')
     write_theme_value(extra_dark_hex_value, extra_dark_opacity, token_name, file_path_colors, 'ExtraDark')
-    write_theme_value(classic_light_hex_value, classic_light_opacity, token_name, file_path_colors, 'ClassicLight')
-    write_theme_value(electric_hex_value, electric_opacity, token_name, file_path_colors, 'Electric')
     write_theme_value(indigo_hex_value, indigo_opacity, token_name, file_path_colors, 'Indigo')
     write_theme_value(rosé_hex_value, rosé_opacity, token_name, file_path_colors, 'Rosé')
     write_theme_value(high_contrast_light_hex_value, high_contrast_light_opacity, token_name, file_path_colors,
@@ -218,10 +210,6 @@ all_token_names.each do |token|
             return ThemeColor.#{token}Dark(podcastColor: podcastColor)
         case .extraDark:
             return ThemeColor.#{token}ExtraDark(podcastColor: podcastColor)
-        case .electric:
-            return ThemeColor.#{token}Electric(podcastColor: podcastColor)
-        case .classic:
-            return ThemeColor.#{token}ClassicLight(podcastColor: podcastColor)
         case .indigo:
             return ThemeColor.#{token}Indigo(podcastColor: podcastColor)
         case .rosé:
@@ -242,10 +230,6 @@ all_token_names.each do |token|
             return ThemeColor.#{token}Dark(filterColor: filterColor)
         case .extraDark:
             return ThemeColor.#{token}ExtraDark(filterColor: filterColor)
-        case .electric:
-            return ThemeColor.#{token}Electric(filterColor: filterColor)
-        case .classic:
-            return ThemeColor.#{token}ClassicLight(filterColor: filterColor)
         case .indigo:
             return ThemeColor.#{token}Indigo(filterColor: filterColor)
         case .rosé:
@@ -266,10 +250,6 @@ all_token_names.each do |token|
             return ThemeColor.#{token}Dark
         case .extraDark:
             return ThemeColor.#{token}ExtraDark
-        case .electric:
-            return ThemeColor.#{token}Electric
-        case .classic:
-            return ThemeColor.#{token}ClassicLight
         case .indigo:
             return ThemeColor.#{token}Indigo
         case .rosé:

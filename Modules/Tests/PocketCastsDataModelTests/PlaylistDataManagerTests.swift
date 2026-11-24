@@ -166,20 +166,6 @@ final class PlaylistDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - allUnsyncedPlaylists Tests
-
-    func testAllUnsyncedPlaylistsReturnsUnsyncedPlaylists() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestPlaylist(name: "Unsynced 1", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-            _ = self.createTestPlaylist(name: "Unsynced 2", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-            _ = self.createTestPlaylist(name: "Synced", syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            let playlists = dataManager.allUnsyncedPlaylists()
-
-            XCTAssertTrue(playlists.allSatisfy { $0.syncStatus == SyncStatus.notSynced.rawValue }, "Should only return unsynced playlists")
-        }
-    }
-
     // MARK: - playlistContainsEpisode Tests
 
     func testPlaylistContainsEpisodeReturnsTrueWhenContains() throws {
@@ -247,33 +233,6 @@ final class PlaylistDataManagerTests: DataManagerTestCase {
 
             let found = dataManager.findPlaylist(uuid: deleted.uuid)
             XCTAssertNil(found, "Should remove deleted playlist")
-        }
-    }
-
-    // MARK: - markAllPlaylistsSynced Tests
-
-    func testMarkAllPlaylistsSyncedMarksAllAsSynced() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestPlaylist(name: "Playlist 1", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-            _ = self.createTestPlaylist(name: "Playlist 2", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-
-            dataManager.markAllPlaylistsSynced()
-
-            let unsynced = dataManager.allUnsyncedPlaylists()
-            XCTAssertTrue(unsynced.isEmpty, "Should have no unsynced playlists")
-        }
-    }
-
-    // MARK: - markAllPlaylistsUnsynced Tests
-
-    func testMarkAllPlaylistsUnsyncedMarksAllAsUnsynced() throws {
-        try runWithDataManager { dataManager in
-            let playlist = self.createTestPlaylist(name: "Synced Playlist", syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            dataManager.markAllPlaylistsUnsynced()
-
-            let found = dataManager.findPlaylist(uuid: playlist.uuid)
-            XCTAssertEqual(found?.syncStatus, SyncStatus.notSynced.rawValue, "Should mark as unsynced")
         }
     }
 
@@ -346,17 +305,6 @@ final class PlaylistDataManagerTests: DataManagerTestCase {
 
             let found = dataManager.findPlaylist(uuid: playlist.uuid)
             XCTAssertEqual(found?.sortPosition, 10, "Should update position")
-        }
-    }
-
-    func testUpdatePositionMarksAsUnsynced() throws {
-        try runWithDataManager { dataManager in
-            let playlist = self.createTestPlaylist(name: "Test Playlist", syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            dataManager.updatePosition(playlist: playlist, newPosition: 10)
-
-            let found = dataManager.findPlaylist(uuid: playlist.uuid)
-            XCTAssertEqual(found?.syncStatus, SyncStatus.notSynced.rawValue, "Should mark as unsynced")
         }
     }
 

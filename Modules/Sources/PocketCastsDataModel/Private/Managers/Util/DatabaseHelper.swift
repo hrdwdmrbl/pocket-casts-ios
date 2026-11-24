@@ -647,17 +647,6 @@ class DatabaseHelper {
             }
         }
 
-        if schemaVersion < 42 {
-            do {
-                try BookmarkDataManager.createTable(in: db)
-
-                schemaVersion = 42
-            } catch {
-                failedAt(42)
-                return
-            }
-        }
-
         if schemaVersion < 43 {
             do {
                 try db.executeUpdate("ALTER TABLE SJEpisode ADD COLUMN deselectedChapters TEXT;", values: nil)
@@ -926,26 +915,48 @@ class DatabaseHelper {
             }
         }
 
-        if schemaVersion < 76 {
-            do {
-                try db.executeUpdate("ALTER TABLE Bookmark ADD COLUMN passage TEXT;", values: nil)
-                try db.executeUpdate("ALTER TABLE Bookmark ADD COLUMN passage_location INTEGER;", values: nil)
-                try db.executeUpdate("ALTER TABLE Bookmark ADD COLUMN passage_modified_date INTEGER;", values: nil)
-                try db.executeUpdate("ALTER TABLE Bookmark ADD COLUMN reference_time real;", values: nil)
-                try db.executeUpdate("ALTER TABLE Bookmark ADD COLUMN reference_time_modified_date INTEGER;", values: nil)
-                schemaVersion = 76
-            } catch {
-                failedAt(76)
-                return
-            }
-        }
-
         if schemaVersion < 77 {
             do {
                 try db.executeUpdate("ALTER TABLE SJPodcast ADD COLUMN networkListId TEXT;", values: nil)
                 schemaVersion = 77
             } catch {
                 failedAt(77)
+                return
+            }
+        }
+
+        if schemaVersion < 78 {
+            do {
+                try TranscriptDataManager.createTables(in: db)
+                schemaVersion = 78
+            } catch {
+                failedAt(78)
+                return
+            }
+        }
+        if schemaVersion < 79 {
+            do {
+                try db.executeUpdate("DROP TABLE IF EXISTS Bookmark", values: nil)
+                try db.executeUpdate("DROP TABLE IF EXISTS Folder", values: nil)
+                schemaVersion = 79
+            } catch {
+                failedAt(79)
+                return
+            }
+        }
+        if schemaVersion < 80 {
+            do {
+                try db.executeUpdate("ALTER TABLE SJUserEpisode DROP COLUMN uploadStatus", values: nil)
+                try db.executeUpdate("ALTER TABLE SJUserEpisode DROP COLUMN uploadTaskId", values: nil)
+                try db.executeUpdate("ALTER TABLE SJPodcast DROP COLUMN folderUuid", values: nil)
+                try db.executeUpdate("ALTER TABLE SJPodcast DROP COLUMN isPaid", values: nil)
+                try db.executeUpdate("ALTER TABLE SJEpisode DROP COLUMN deselectedChapters", values: nil)
+                try db.executeUpdate("ALTER TABLE SJEpisode DROP COLUMN deselectedChaptersModified", values: nil)
+                try db.executeUpdate("ALTER TABLE SJEpisode DROP COLUMN hasGeneratedTranscript", values: nil)
+                try db.executeUpdate("DROP TABLE IF EXISTS PodcastFoldersHistory", values: nil)
+                schemaVersion = 80
+            } catch {
+                failedAt(80)
                 return
             }
         }

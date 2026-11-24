@@ -5,13 +5,13 @@ struct FilesListView: View {
     var body: some View {
         ItemListContainer(isEmpty: $viewModel.episodes.isEmpty, loading: viewModel.isLoading) {
             List {
-                EpisodeListView(title: L10n.files.prefixSourceUnicode, showArtwork: true, episodes: $viewModel.episodes, playlist: .files)
-                .withOrderPickerToolbar(selectedOption: viewModel.sortOrder, title: L10n.filesSort, supportsToolbar: viewModel.supportsSort) { option in
+                EpisodeListView(title: L10n.files, showArtwork: true, episodes: $viewModel.episodes, playlist: .files)
+                    .withOrderPickerToolbar(selectedOption: viewModel.sortOrder, title: L10n.filesSort, supportsToolbar: viewModel.supportsSort) { option in
                         viewModel.sortOrder = option
                     }
             }
         }
-        .navigationTitle(L10n.files.prefixSourceUnicode)
+        .navigationTitle(L10n.files)
         .restorable(.files)
         .onAppear {
             viewModel.loadUserEpisodes()

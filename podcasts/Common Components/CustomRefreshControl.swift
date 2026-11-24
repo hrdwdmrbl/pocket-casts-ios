@@ -83,7 +83,7 @@ class CustomRefreshControl: UIRefreshControl {
             refreshInnerImage.centerXAnchor.constraint(equalTo: centerXAnchor),
             refreshInnerImage.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             refreshOuterImage.centerXAnchor.constraint(equalTo: centerXAnchor),
-            refreshOuterImage.topAnchor.constraint(equalTo: refreshInnerImage.topAnchor),
+            refreshOuterImage.topAnchor.constraint(equalTo: refreshInnerImage.topAnchor)
         ])
 
         updateTintColor()

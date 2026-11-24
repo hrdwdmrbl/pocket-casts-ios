@@ -22,8 +22,6 @@ class PodcastListCell: ThemeableCollectionCell {
     @IBOutlet var unplayedHeight: NSLayoutConstraint!
     @IBOutlet var contentStackView: UIStackView!
 
-    private var supporterHeart: PodcastHeartView?
-
     private var badgeType: BadgeType = .off
 
     required init?(coder aDecoder: NSCoder) {
@@ -60,29 +58,7 @@ class PodcastListCell: ThemeableCollectionCell {
 
         unplayedBadge.updateColors()
 
-        if podcast.isPaid {
-            let heart = supporterHeart ?? makeSupporterHeart()
-            heart.isHidden = false
-            heart.setPodcastColor(podcast: podcast)
-            heart.isShadowHidden = true
-        } else {
-            supporterHeart?.isHidden = true
-        }
-
         updateSize()
-    }
-
-    private func makeSupporterHeart() -> PodcastHeartView {
-        let heart = PodcastHeartView(frame: CGRect(x: 0, y: 0, width: 28, height: 28))
-        heart.translatesAutoresizingMaskIntoConstraints = false
-        let unplayedIndex = contentStackView.arrangedSubviews.firstIndex(of: unplayedBadge) ?? contentStackView.arrangedSubviews.count
-        contentStackView.insertArrangedSubview(heart, at: unplayedIndex)
-        NSLayoutConstraint.activate([
-            heart.widthAnchor.constraint(equalToConstant: 28),
-            heart.widthAnchor.constraint(equalTo: heart.heightAnchor),
-        ])
-        supporterHeart = heart
-        return heart
     }
 
     private func updateSize() {
@@ -92,12 +68,12 @@ class PodcastListCell: ThemeableCollectionCell {
 
         let badgeMetric = UIFontMetrics(forTextStyle: .largeTitle)
         switch badgeType {
-            case .allUnplayed:
-                unplayedHeight.constant = max(28, badgeMetric.scaledValue(for: 28))
-            case .latestEpisode:
-                unplayedHeight.constant = max(12, badgeMetric.scaledValue(for: 12))
-            case .off:
-                break
+        case .allUnplayed:
+            unplayedHeight.constant = max(28, badgeMetric.scaledValue(for: 28))
+        case .latestEpisode:
+            unplayedHeight.constant = max(12, badgeMetric.scaledValue(for: 12))
+        case .off:
+            break
         }
 
         podcastTitle.updateNumberOfLines(regular: 1, accessibility: 3)

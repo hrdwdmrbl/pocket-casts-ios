@@ -62,7 +62,7 @@ class MultiSelectFooterView: UIView, MultiSelectActionOrderDelegate {
         NSLayoutConstraint.activate(
             [
                 imageView.widthAnchor.constraint(equalToConstant: size),
-                imageView.heightAnchor.constraint(equalToConstant: size),
+                imageView.heightAnchor.constraint(equalToConstant: size)
             ]
         )
         imageView.contentMode = .scaleAspectFit
@@ -185,7 +185,7 @@ class MultiSelectFooterView: UIView, MultiSelectActionOrderDelegate {
                 let maxHeight = context.maximumDetentValue * 0.9
                 let desiredHeight = max(context.maximumDetentValue * 0.25, multiSelectActionController.fittingHeight)
                 return min(desiredHeight, maxHeight)
-            }), ]
+            })]
 
             // The Multiselect Actions VC implements its own grabber UI.
             sheetController.prefersGrabberVisible = false

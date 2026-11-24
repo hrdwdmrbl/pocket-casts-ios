@@ -1,10 +1,9 @@
 import Foundation
 import PocketCastsDataModel
 #if !os(tvOS)
-import Sentry
 #endif
 
-enum TranscriptError: Error {
+enum TranscriptError: LocalizedError {
     case notAvailable
     case failedToLoad
     case notSupported(format: String)
@@ -25,6 +24,8 @@ enum TranscriptError: Error {
             return L10n.transcriptErrorEmpty
         }
     }
+
+    var errorDescription: String? { localizedDescription }
 }
 
 class TranscriptManager {
@@ -37,9 +38,6 @@ class TranscriptManager {
 
     let showCoordinator: ShowInfoCoordinating
 
-    private(set) var hasGeneratedTranscripts: Bool = false
-    private(set) var isDisplayingGeneratedTranscript: Bool = false
-
     init(episodeUUID: String, podcastUUID: String, showCoordinator: ShowInfoCoordinating = ShowInfoCoordinator.shared) {
         self.episodeUUID = episodeUUID
         self.podcastUUID = podcastUUID
@@ -47,14 +45,11 @@ class TranscriptManager {
     }
 
     public func loadTranscript() async throws -> TranscriptModel {
-        guard
-            let metadata = try? await showCoordinator.loadTranscriptsMetadata(podcastUuid: podcastUUID, episodeUuid: episodeUUID),
-            !metadata.transcripts.isEmpty else {
+        let metadata = try await showCoordinator.loadTranscriptsMetadata(podcastUuid: podcastUUID, episodeUuid: episodeUUID)
+        guard !metadata.isEmpty else {
             throw TranscriptError.notAvailable
         }
-        var transcriptsAvailable = metadata.transcripts
-        hasGeneratedTranscripts = metadata.hasGeneratedTranscripts
-        isDisplayingGeneratedTranscript = metadata.isDisplayingGeneratedTranscript
+        var transcriptsAvailable = metadata
         while let transcript = TranscriptFormat.bestTranscript(from: transcriptsAvailable) {
             do {
                 let model = try await loadTranscript(transcript)
@@ -82,15 +77,6 @@ class TranscriptManager {
             throw TranscriptError.failedToLoad
         }
 
-        #if !os(tvOS)
-        await MainActor.run {
-            let crumb = Breadcrumb()
-            crumb.level = SentryLevel.info
-            crumb.category = "transcript"
-            crumb.message = "Transcript file \(transcriptURL)"
-            SentrySDK.addBreadcrumb(crumb)
-        }
-        #endif
         guard let model = TranscriptModel.makeModel(from: transcriptText, format: transcriptFormat) else {
             throw TranscriptError.failedToParse
         }
@@ -102,7 +88,5 @@ class TranscriptManager {
         return model
     }
 
-    private lazy var dataRetriever: TranscriptsDataRetriever = {
-        return TranscriptsDataRetriever()
-    }()
+    private let dataRetriever = TranscriptsDataRetriever.shared
 }

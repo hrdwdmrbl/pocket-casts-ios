@@ -84,12 +84,6 @@ extension PodcastEpisodeSortOrder {
     }
 }
 
-extension LibrarySort.Old: AnalyticsDescribable {
-    var analyticsDescription: String {
-        return LibrarySort(old: self).analyticsDescription
-    }
-}
-
 extension LibrarySort {
     enum Old: Int {
         case dateAddedNewestToOldest = 1, titleAtoZ = 2, episodeDateNewestToOldest = 5, custom = 6, recentlyPlayed = 7
@@ -165,7 +159,7 @@ extension PlayerAction {
     static var defaultActions: [PlayerAction] {
         [
             .effects, .sleepTimer, .routePicker, .shareEpisode, .addToPlaylist, .download,
-            .transcript, .goToPodcast, .addBookmark, .markPlayed,
+            .transcript, .goToPodcast, .markPlayed,
             .starEpisode, .chromecast, .archive, .videoToggle
         ]
     }
@@ -190,8 +184,6 @@ extension PlayerAction {
             self = .markPlayed
         case 9:
             self = .archive
-        case 10:
-            self = .addBookmark
         case 11:
             self = .transcript
         case 12:
@@ -225,8 +217,6 @@ extension PlayerAction {
             return 8
         case .archive:
             return 9
-        case .addBookmark:
-            return 10
         case .transcript:
             return 11
         case .download:
@@ -271,9 +261,6 @@ extension PlayerAction {
             } else {
                 return L10n.archive
             }
-
-        case .addBookmark:
-            return L10n.addBookmark
         case .transcript:
             return L10n.transcript
         case .download:
@@ -319,8 +306,6 @@ extension PlayerAction {
             return "episode-markasplayed"
         case .archive:
             return episode is UserEpisode ? "delete-red" : "episode-archive"
-        case .addBookmark:
-            return "bookmarks-shelf-overflow-icon"
         case .transcript:
             return "transcript"
         case .download:
@@ -355,8 +340,6 @@ extension PlayerAction {
             return "shelf_played"
         case .archive:
             return episode is UserEpisode ? "shelf_delete" : "shelf_archive"
-        case .addBookmark:
-            return "bookmarks-shelf-icon"
         case .transcript:
             return "transcript"
         case .download:
@@ -389,7 +372,7 @@ extension PlayerAction {
     }
 }
 
-enum MultiSelectAction: Int32, CaseIterable, AnalyticsDescribable {
+enum MultiSelectAction: Int32, CaseIterable {
     case playLast = 1, playNext, download, archive, markAsPlayed, star, moveToTop, moveToBottom, removeFromUpNext, unstar, unarchive, removeDownload, markAsUnplayed, delete, share, removeListeningHistory, addToPlaylist
 
     func title(isUpNextContext: Bool = false) -> String {
@@ -472,45 +455,6 @@ enum MultiSelectAction: Int32, CaseIterable, AnalyticsDescribable {
         }
     }
 
-    var analyticsDescription: String {
-        switch self {
-        case .playLast:
-            return "play_last"
-        case .playNext:
-            return "play_next"
-        case .download:
-            return "download"
-        case .archive:
-            return "archive"
-        case .markAsPlayed:
-            return "mark_as_played"
-        case .star:
-            return "star"
-        case .moveToTop:
-            return "up_next_move_up"
-        case .moveToBottom:
-            return "up_next_move_bottom"
-        case .removeFromUpNext:
-            return "up_next_remove"
-        case .unstar:
-            return "unstar"
-        case .unarchive:
-            return "unarchive"
-        case .markAsUnplayed:
-            return "mark_unplayed"
-        case .removeDownload:
-            return "remove_download"
-        case .delete:
-            return "delete"
-        case .share:
-            return "share"
-        case .removeListeningHistory:
-            return "listening_history_remove_episode"
-        case .addToPlaylist:
-            return "add_to_playlist"
-        }
-    }
-
     func isVisible(with episodes: [BaseEpisode]) -> Bool {
         switch self {
         case .share:
@@ -526,30 +470,6 @@ enum MultiSelectAction: Int32, CaseIterable, AnalyticsDescribable {
 
         default:
             return true
-        }
-    }
-}
-
-extension BookmarksSort {
-    func option(lastOption: BookmarkSortOption) -> BookmarkSortOption {
-        switch self {
-        case .newestToOldest:
-            return .newestToOldest
-        case .oldestToNewest:
-            return .oldestToNewest
-        case .timestamp:
-            return lastOption
-        }
-    }
-
-    init(option: BookmarkSortOption) {
-        switch option {
-        case .newestToOldest:
-            self = .newestToOldest
-        case .oldestToNewest:
-            self = .oldestToNewest
-        case .timestamp, .episode, .podcastAndEpisode:
-            self = .timestamp
         }
     }
 }

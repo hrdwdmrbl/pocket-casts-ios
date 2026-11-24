@@ -49,14 +49,14 @@ class MultipleActionView: UIView {
                 imageView.widthAnchor.constraint(equalToConstant: 24),
                 label.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 20),
                 label.topAnchor.constraint(equalTo: topAnchor),
-                label.bottomAnchor.constraint(equalTo: bottomAnchor),
+                label.bottomAnchor.constraint(equalTo: bottomAnchor)
             ])
             self.imageView = imageView
         } else {
             NSLayoutConstraint.activate([
                 label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
                 label.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor),
-                label.bottomAnchor.constraint(equalTo: layoutMarginsGuide.bottomAnchor),
+                label.bottomAnchor.constraint(equalTo: layoutMarginsGuide.bottomAnchor)
             ])
         }
 

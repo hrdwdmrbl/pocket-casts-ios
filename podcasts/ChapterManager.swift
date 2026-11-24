@@ -6,24 +6,8 @@ import CoreMedia
 enum ChapterOrigin {
     case podcastIndex
     case nativeMedia
-    case generated
     case showNotes
     case unknown
-
-    var analyticsDescription: String {
-        switch self {
-        case .generated:
-            "generated"
-        case .nativeMedia:
-            "native_media"
-        case .showNotes:
-            "show_notes"
-        case .podcastIndex:
-            "podcast_index"
-        case .unknown:
-            "unknown"
-        }
-    }
 }
 
 class ChapterManager {
@@ -43,7 +27,7 @@ class ChapterManager {
     var chaptersOrigin: ChapterOrigin = .unknown
 
     private var playableChapters: [ChapterInfo] {
-        visibleChapters.filter { $0.isPlayable() }
+        visibleChapters
     }
 
     init(
@@ -72,7 +56,7 @@ class ChapterManager {
         let previousChapter: ChapterInfo?
 
         if let index = visibleChapters.firstIndex(of: visibleChapter) {
-            previousChapter = visibleChapters.enumerated().filter { $0.offset < index && $0.element.isPlayable() }.map { $0.element }.last
+            previousChapter = visibleChapters.enumerated().filter { $0.offset < index }.map { $0.element }.last
         } else {
             previousChapter = nil
         }
@@ -86,7 +70,7 @@ class ChapterManager {
         let nextChapter: ChapterInfo?
 
         if let index = visibleChapters.firstIndex(of: visibleChapter) {
-            nextChapter = visibleChapters.enumerated().first { $0.offset > index && $0.element.isPlayable() }.map { $0.element }
+            nextChapter = visibleChapters.enumerated().first { $0.offset > index }.map { $0.element }
         } else {
             nextChapter = nil
         }
@@ -102,7 +86,7 @@ class ChapterManager {
     }
 
     func playableChapterAt(index: Int) -> ChapterInfo? {
-        visibleChapters.filter({ $0.isPlayable() })[safe: index]
+        visibleChapters[safe: index]
     }
 
     func index(for chapter: Chapters) -> Int? {
@@ -144,13 +128,13 @@ class ChapterManager {
         // Parse chapters from the file and request external chapters
         async let fileChaptersAsync = loadChapters(for: episode, duration: duration)
 
-        async let (podloveChaptersAsync, podcastIndexChaptersAsync, generatedChaptersAsync) = await
-        showInfoCoordinator.loadChapters(podcastUuid: episode.parentIdentifier(), episodeUuid: episode.uuid)
+        async let (podloveChaptersAsync, podcastIndexChaptersAsync) = await
+            showInfoCoordinator.loadChapters(podcastUuid: episode.parentIdentifier(), episodeUuid: episode.uuid)
 
         var chapters: [ChapterInfo]
 
         do {
-            let (fileChapters, podloveChapters, podcastIndexChapters, generatedChapters) = try await (fileChaptersAsync, podloveChaptersAsync, podcastIndexChaptersAsync, generatedChaptersAsync)
+            let (fileChapters, podloveChapters, podcastIndexChapters) = try await (fileChaptersAsync, podloveChaptersAsync, podcastIndexChaptersAsync)
 
             // Prioritize embedded chapters, given for some shows it will take
             // into account dynamic ads
@@ -158,7 +142,7 @@ class ChapterManager {
                 chapters = fileChapters
                 FileLog.shared.addMessage("ChapterManager: using file chapters")
                 chaptersOrigin = .nativeMedia
-            } else if let externalChapters = parseExternalChapters(podlove: podloveChapters, podcastIndex: podcastIndexChapters, generated: generatedChapters, duration: duration) {
+            } else if let externalChapters = parseExternalChapters(podlove: podloveChapters, podcastIndex: podcastIndexChapters, duration: duration) {
                 chapters = externalChapters
                 FileLog.shared.addMessage("ChapterManager: using external chapters")
             } else {
@@ -185,7 +169,7 @@ class ChapterManager {
         return []
     }
 
-    private func parseExternalChapters(podlove: [Episode.Metadata.EpisodeChapter]?, podcastIndex: [PodcastIndexChapter]?, generated: [GeneratedChapter]?, duration: TimeInterval) -> [ChapterInfo]? {
+    private func parseExternalChapters(podlove: [Episode.Metadata.EpisodeChapter]?, podcastIndex: [PodcastIndexChapter]?, duration: TimeInterval) -> [ChapterInfo]? {
         if let podcastIndex {
             chaptersOrigin = .podcastIndex
             return chapterParser.parsePodcastIndexChapters(podcastIndex, episodeDuration: duration)
@@ -194,11 +178,6 @@ class ChapterManager {
         if let podlove {
             chaptersOrigin = .showNotes
             return chapterParser.parsePodloveChapters(podlove, episodeDuration: duration)
-        }
-
-        if let generated {
-            chaptersOrigin = .generated
-            return chapterParser.parseGeneratedChapters(generated, episodeDuration: duration)
         }
 
         chaptersOrigin = .unknown
@@ -217,17 +196,8 @@ class ChapterManager {
         Chapters(chapters: chapters.filter { $0.startTime.seconds <= time && ($0.startTime.seconds + $0.duration) > time })
     }
 
-    var chaptersAnalyticsProperties: [String: Any] {
-        return ["origin": chaptersOrigin.analyticsDescription]
-    }
-
     private func handleChaptersLoaded(_ chapters: [ChapterInfo], for episode: BaseEpisode) {
         self.chapters = chapters
-
-        episode.deselectedChapters?
-            .split(separator: ",")
-            .compactMap { Int($0) }
-            .forEach { self.chapters[safe: $0]?.shouldPlay = false }
 
         updateCurrentChapter(time: PlaybackManager.shared.currentTime())
 

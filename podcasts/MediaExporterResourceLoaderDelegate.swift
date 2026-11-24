@@ -33,6 +33,10 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
     private var fileHandle: MediaFileHandle
 
     private var session: URLSession?
+    private var cancelled = false
+    private var cancellation: (session: URLSession, continuation: CheckedContinuation<Void, Never>)?
+
+    private var isCancelled: Bool { lock.withLock { cancelled } }
     var response: URLResponse?
     private var pendingRequests = Set<AVAssetResourceLoadingRequest>()
     private var isDownloadComplete = false
@@ -48,11 +52,7 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
 
     private lazy var callbackQueue: DispatchQueue = {
         let queue: DispatchQueue
-        if FeatureFlag.useBackgroundQueueForStreamingCallback.enabled {
-            queue = DispatchQueue(label: "com.pocketcasts.MediaExporterResourceLoaderDelegate.callback", qos: .default, attributes: [])
-        } else {
-            queue = DispatchQueue.main
-        }
+        queue = DispatchQueue(label: "com.pocketcasts.MediaExporterResourceLoaderDelegate.callback", qos: .default, attributes: [])
         return queue
     }()
 
@@ -109,7 +109,7 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
     // MARK: AVAssetResourceLoaderDelegate
 
     func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
-        guard let url = loadingRequest.request.url,
+        guard !isCancelled, let url = loadingRequest.request.url,
               let originalURL = Self.resolveOriginalURL(from: url)
         else {
             return false
@@ -154,6 +154,7 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard !isCancelled else { return }
         if let error {
             downloadFailed(with: error)
             return
@@ -175,7 +176,6 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
-        guard FeatureFlag.trackNetworkDataUsage.enabled else { return }
 
         let bytesReceived = task.countOfBytesReceived
         let connectionType = NetworkDataUsageManager.connectionType(from: metrics)
@@ -192,6 +192,33 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
         )
     }
 
+    func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
+        let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            guard cancellation?.session === session else { return nil }
+            defer { cancellation = nil }
+            return cancellation?.continuation
+        }
+        continuation?.resume()
+    }
+
+    func cancelDownload() async {
+        lock.withLock { cancelled = true }
+        if let session {
+            await withCheckedContinuation { continuation in
+                lock.withLock { cancellation = (session, continuation) }
+                session.invalidateAndCancel()
+            }
+        }
+        let error = URLError(.cancelled)
+        invalidateAndCancelSession(error: error)
+        await withCheckedContinuation { continuation in
+            callbackQueue.async {
+                self.callback?(.failed(error), nil, 0, 0)
+                continuation.resume()
+            }
+        }
+    }
+
     // MARK: Internal methods
 
     func startDataRequest(with url: URL) {
@@ -200,20 +227,18 @@ class MediaExporterResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelega
 
     @objc func startDataRequest(with url: URL, retryWithoutUserAgent: Bool) {
         FileLog.shared.addMessage("MediaExporterResourceLoaderDelegate: Start data request for \(url)")
-        guard session == nil else { return }
+        guard !isCancelled, session == nil else { return }
 
         let configuration = URLSessionConfiguration.default
         configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        if FeatureFlag.streamingCustomSessionConfiguration.enabled {
-            configuration.networkServiceType = .avStreaming
-            configuration.allowsCellularAccess = true
-            configuration.timeoutIntervalForRequest = 60 // seconds
-            configuration.timeoutIntervalForResource = 3600 * 2 // seconds
-#if !APPCLIP
-            configuration.waitsForConnectivity = false
-            configuration.multipathServiceType = .handover // allows switching between celular/wifi
-#endif
-        }
+        configuration.networkServiceType = .avStreaming
+        configuration.allowsCellularAccess = true
+        configuration.timeoutIntervalForRequest = 60 // seconds
+        configuration.timeoutIntervalForResource = 3600 * 2 // seconds
+        #if !APPCLIP
+        configuration.waitsForConnectivity = false
+        configuration.multipathServiceType = .handover // allows switching between celular/wifi
+        #endif
 
         var urlRequest = URLRequest(url: url)
         if !retryWithoutUserAgent {

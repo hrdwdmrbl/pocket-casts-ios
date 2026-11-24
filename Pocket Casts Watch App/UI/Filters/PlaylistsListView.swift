@@ -14,7 +14,7 @@ struct PlaylistsListView: View {
                 }
             }
         }
-        .navigationTitle(L10n.playlists.prefixSourceUnicode)
+        .navigationTitle(L10n.playlists)
         .restorable(.filterList)
         .onAppear {
             viewModel.loadData()

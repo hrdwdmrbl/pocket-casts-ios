@@ -11,8 +11,6 @@ class FeaturedSummaryViewController: SimpleNotificationsViewController, GridLayo
     }
 
     private var podcasts = [DiscoverPodcast]()
-    private var sponsoredPodcasts = [DiscoverPodcast]()
-    private var lists: [PodcastCollection] = []
 
     private static let cellId = "FeaturedCollectionViewCell"
 
@@ -24,8 +22,6 @@ class FeaturedSummaryViewController: SimpleNotificationsViewController, GridLayo
     private var listType: String = ""
     private var lastLayedOutWidth = 0 as CGFloat
     private let maxFeaturedItems = 5
-
-    private var listIdImpressionTracked: [String] = []
 
     private weak var delegate: DiscoverDelegate?
     private var category: DiscoverCategory?
@@ -126,11 +122,8 @@ class FeaturedSummaryViewController: SimpleNotificationsViewController, GridLayo
 
         let podcast = podcasts[indexPath.row]
         if let delegate {
-            cell.populateFrom(podcast, isSubscribed: delegate.isSubscribed(podcast: podcast), listName: listType, isSponsored: sponsoredPodcasts.contains(podcast))
-            cell.featuredView.onSubscribe = { [weak self] in
-                if let listId = self?.listId(for: podcast), let podcastUuid = podcast.uuid {
-                    AnalyticsHelper.podcastSubscribedFromList(listId: listId, podcastUuid: podcastUuid)
-                }
+            cell.populateFrom(podcast, isSubscribed: delegate.isSubscribed(podcast: podcast), listName: listType)
+            cell.featuredView.onSubscribe = {
                 delegate.subscribe(podcast: podcast)
             }
         }
@@ -149,28 +142,11 @@ class FeaturedSummaryViewController: SimpleNotificationsViewController, GridLayo
         guard let delegate else { return }
 
         let podcast = podcasts[indexPath.row]
-        let listId = listId(for: podcast)
-        delegate.show(discoverPodcast: podcast, placeholderImage: nil, isFeatured: true, listUuid: listId)
-
-        if let listId, let podcastUuid = podcast.uuid {
-            AnalyticsHelper.podcastTappedFromList(listId: listId, podcastUuid: podcastUuid)
-        }
+        delegate.show(discoverPodcast: podcast, placeholderImage: nil, isFeatured: true, listUuid: nil)
     }
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         podcasts.count
-    }
-
-    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
-        guard let podcast = podcasts[safe: indexPath.row],
-              let listId = listId(for: podcast),
-              !listIdImpressionTracked.contains(listId) else {
-            return
-        }
-
-        let categoryId = category?.id.map(String.init)
-        AnalyticsHelper.listImpression(listId: listId, category: categoryId)
-        listIdImpressionTracked.append(listId)
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -200,55 +176,13 @@ class FeaturedSummaryViewController: SimpleNotificationsViewController, GridLayo
 
         self.category = category
 
-        let dispatchGroup = DispatchGroup()
-
-        var podcastsToShow: [DiscoverPodcast] = []
-
-        var sponsoredPodcastsToAdd: [Int: DiscoverPodcast] = [:]
-
-        dispatchGroup.enter()
-        serverHandler.discoverPodcastList(source: source, authenticated: item.authenticated, completion: { podcastList in
-            guard let discoverPodcast = podcastList?.podcasts else { return }
-
-            podcastsToShow = discoverPodcast
-
-            dispatchGroup.leave()
-        })
-
-        if let sponsoredPodcasts = item.sponsoredPodcasts {
-            for sponsored in sponsoredPodcasts {
-                if let source = sponsored.source, let position = sponsored.position {
-                    dispatchGroup.enter()
-                    serverHandler.discoverPodcastCollection(source: source, authenticated: item.authenticated, completion: { [weak self] podcastList in
-                        guard let podcastList, let discoverPodcast = podcastList.podcasts?.first else { return }
-
-                        sponsoredPodcastsToAdd[position] = discoverPodcast
-
-                        self?.lists.append(podcastList)
-
-                        dispatchGroup.leave()
-                    })
-                }
+        serverHandler.discoverPodcastList(source: source) { [weak self] podcastList in
+            DispatchQueue.main.async {
+                guard let self, let podcasts = podcastList?.podcasts else { return }
+                self.podcasts = Array(podcasts.prefix(self.maxFeaturedItems))
+                self.updatePageCount()
+                self.featuredCollectionView.reloadData()
             }
-        }
-
-        dispatchGroup.notify(queue: DispatchQueue.main) { [weak self] in
-            guard let self else {
-                return
-            }
-
-            // Add featured podcasts
-            self.podcasts = Array(podcastsToShow.prefix(self.maxFeaturedItems))
-
-            // Add sponsored podcasts - note that these must be ordered to end up at the proper positions
-            for sponsoredPodcastToAdd in sponsoredPodcastsToAdd.sorted(by: { $0.key < $1.key }) {
-                self.podcasts.insert(sponsoredPodcastToAdd.value, safelyAt: sponsoredPodcastToAdd.key)
-            }
-            self.sponsoredPodcasts = sponsoredPodcastsToAdd.map { $0.value }
-
-            // Update and reload
-            self.updatePageCount()
-            self.featuredCollectionView.reloadData()
         }
     }
 
@@ -277,14 +211,6 @@ class FeaturedSummaryViewController: SimpleNotificationsViewController, GridLayo
 
         if currentPage == pageControl.currentPage { return }
         pageControl.currentPage = currentPage
-
-        Analytics.track(.discoverFeaturedPageChanged, properties: ["current_page": currentPage + 1, "total_pages": pageControl.numberOfPages])
-    }
-
-    // MARK: - Sponsored Podcast methods
-
-    func listId(for podcast: DiscoverPodcast) -> String? {
-        lists.first(where: { $0.podcasts?.contains(podcast) ?? false })?.listId
     }
 
     // MARK: - Dynamic Type support
@@ -307,28 +233,6 @@ import SwiftUI
     return DiscoverSectionPreview(
         section: section,
         item: DiscoverPreviewData.item(.featuredSummary, title: "Featured")
-    )
-}
-
-#Preview("Featured carousel · sponsored slot") {
-    let sponsoredSource = "https://lists.pocketcasts.com/preview-sponsored.json"
-    let section = FeaturedSummaryViewController()
-    section.serverHandler = PreviewDiscoverServerHandler(
-        podcastList: DiscoverPreviewData.podcastList(title: "Featured", podcasts: DiscoverPreviewData.podcasts(5)),
-        collectionsBySource: [
-            sponsoredSource: DiscoverPreviewData.podcastCollection(
-                title: "Paid placement",
-                podcasts: [DiscoverPreviewData.podcast(at: 9)]
-            )
-        ]
-    )
-    return DiscoverSectionPreview(
-        section: section,
-        item: DiscoverPreviewData.item(
-            .featuredSummary,
-            title: "Featured",
-            sponsoredPodcasts: [DiscoverPreviewData.sponsoredPodcast(position: 1, source: sponsoredSource)]
-        )
     )
 }
 

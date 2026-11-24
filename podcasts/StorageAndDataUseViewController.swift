@@ -6,6 +6,7 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
         didSet {
             settingsTable.register(UINib(nibName: "SwitchCell", bundle: nil), forCellReuseIdentifier: switchCellId)
             settingsTable.register(UINib(nibName: "DisclosureCell", bundle: nil), forCellReuseIdentifier: disclosureCellId)
+            settingsTable.register(UINib(nibName: "DestructiveButtonCell", bundle: nil), forCellReuseIdentifier: resetCellId)
 
             settingsTable.rowHeight = UITableView.automaticDimension
             settingsTable.estimatedRowHeight = UITableView.automaticDimension
@@ -17,14 +18,15 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
     }
 
     private let usageSection = 0
+    private let resetSection = 2
     private let switchCellId = "SwitchCell"
     private let disclosureCellId = "DisclosureCell"
+    private let resetCellId = "ResetCell"
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         title = L10n.settingsStorage
-        Analytics.track(.settingsStorageShown)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -44,7 +46,7 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
     }
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        2
+        3
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -52,6 +54,7 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        guard section != resetSection else { return nil }
         let headerFrame = CGRect(x: 0, y: 0, width: 0, height: Constants.Values.tableSectionHeaderHeight)
 
         if section == usageSection {
@@ -83,6 +86,13 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if indexPath.section == resetSection {
+            let cell = tableView.dequeueReusableCell(withIdentifier: resetCellId, for: indexPath) as! DestructiveButtonCell
+            cell.buttonTitle.text = L10n.settingsResetApp
+            cell.accessibilityIdentifier = "resetApp"
+            cell.accessibilityTraits.insert(.button)
+            return cell
+        }
         if indexPath.section == usageSection {
             let cell = tableView.dequeueReusableCell(withIdentifier: disclosureCellId, for: indexPath) as! DisclosureCell
 
@@ -108,6 +118,10 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        if indexPath.section == resetSection {
+            confirmReset()
+            return
+        }
         if indexPath.section == usageSection {
             if indexPath.row == 0 {
                 navigationController?.pushViewController(DownloadedFilesViewController(), animated: true)
@@ -117,5 +131,29 @@ class StorageAndDataUseViewController: PCViewController, UITableViewDelegate, UI
 
     @objc private func warnWhenNotOnWifiToggled(_ sender: UISwitch) {
         Settings.setMobileDataAllowed(!sender.isOn, userInitiated: true)
+    }
+
+    private func confirmReset() {
+        let alert = UIAlertController(title: L10n.settingsResetApp, message: L10n.settingsResetAppConfirmation, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L10n.cancel, style: .cancel))
+        alert.addAction(UIAlertAction(title: L10n.settingsResetApp, style: .destructive) { [weak self] _ in
+            self?.resetApp()
+        })
+        present(alert, animated: true)
+    }
+
+    private func resetApp() {
+        let progress = ShiftyLoadingAlert(title: L10n.settingsResetAppProgress)
+        progress.showAlert(self, hasProgress: false) {
+            Task { @MainActor in
+                do {
+                    try await (UIApplication.shared.delegate as! AppDelegate).resetApp()
+                } catch {
+                    progress.hideAlert(true) {
+                        SJUIUtils.showAlert(title: L10n.settingsResetAppFailed, message: error.localizedDescription, from: self)
+                    }
+                }
+            }
+        }
     }
 }

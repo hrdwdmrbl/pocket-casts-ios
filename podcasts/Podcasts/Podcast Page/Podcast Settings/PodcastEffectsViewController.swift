@@ -74,9 +74,3 @@ class PodcastEffectsViewController: PCViewController {
         AppTheme.defaultStatusBarStyle()
     }
 }
-
-extension PodcastEffectsViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .podcastSettings
-    }
-}

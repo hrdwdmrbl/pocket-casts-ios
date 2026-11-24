@@ -48,10 +48,9 @@ public class PlaylistQueryBuilder {
         if playlist.manual {
             switch clause {
             case .episode:
-                if FeatureFlag.optimizeManualPlaylistQueries.enabled {
-                    let archivedPreference = shouldShowArchived ? "1" : "0"
-                    let manualCTE =
-                        """
+                let archivedPreference = shouldShowArchived ? "1" : "0"
+                let manualCTE =
+                    """
                         WITH playlist AS (
                           SELECT episodeUuid, MIN(episodePosition) AS pos
                           FROM \(DataManager.playlistEpisodeTableName)
@@ -73,8 +72,8 @@ public class PlaylistQueryBuilder {
                           WHERE episode.uuid IN (SELECT episodeUuid FROM playlist)
                         )
                         """
-                    let manualJoin =
-                        """
+                let manualJoin =
+                    """
                         FROM playlist p
                         JOIN deduped_episode episode
                           ON episode.uuid = p.episodeUuid
@@ -82,57 +81,17 @@ public class PlaylistQueryBuilder {
                         LEFT JOIN \(DataManager.podcastTableName) podcast
                           ON episode.podcast_id = podcast.id
                         """
-                    queryString =
-                        """
+                queryString =
+                    """
                         \(manualCTE)
                         SELECT episode.*
                         \(manualJoin)
                         \(shouldShowArchived ? "" : "WHERE episode.archived = 0")
                         """
-                    mainQueryHasWhere = !shouldShowArchived
-                } else {
-                    // Original query without optimization
-                    let manualCTE =
-                        """
-                        WITH playlist AS (
-                          SELECT episodeUuid, MIN(episodePosition) AS pos
-                          FROM \(DataManager.playlistEpisodeTableName)
-                          WHERE playlist_uuid = '\(playlist.uuid)'
-                          GROUP BY episodeUuid
-                        ),
-                        deduped_episode AS (
-                          SELECT episode.*,
-                                 ROW_NUMBER() OVER (
-                                   PARTITION BY episode.uuid
-                                   ORDER BY
-                                     CASE WHEN episode.episodeStatus = 1 THEN 0 ELSE 1 END,
-                                     episode.id ASC
-                                 ) AS rn
-                          FROM \(DataManager.episodeTableName) episode
-                        )
-                        """
-                    let manualJoin =
-                        """
-                        FROM playlist p
-                        JOIN deduped_episode episode
-                          ON episode.uuid = p.episodeUuid
-                          AND episode.rn = 1
-                        LEFT JOIN \(DataManager.podcastTableName) podcast
-                          ON episode.podcast_id = podcast.id
-                        """
-                    queryString =
-                        """
-                        \(manualCTE)
-                        SELECT episode.*
-                        \(manualJoin)
-                        \(shouldShowArchived ? "" : "WHERE episode.archived = 0")
-                        """
-                    mainQueryHasWhere = !shouldShowArchived
-                }
+                mainQueryHasWhere = !shouldShowArchived
             case .episodeCount:
-                if FeatureFlag.optimizeManualPlaylistQueries.enabled {
-                    let manualCTE =
-                        """
+                let manualCTE =
+                    """
                         WITH playlist AS (
                           SELECT episodeUuid, MIN(episodePosition) AS pos
                           FROM \(DataManager.playlistEpisodeTableName)
@@ -151,8 +110,8 @@ public class PlaylistQueryBuilder {
                           WHERE episode.uuid IN (SELECT episodeUuid FROM playlist)
                         )
                         """
-                    let manualJoin =
-                        """
+                let manualJoin =
+                    """
                         FROM playlist p
                         JOIN deduped_episode episode
                           ON episode.uuid = p.episodeUuid
@@ -160,24 +119,16 @@ public class PlaylistQueryBuilder {
                         LEFT JOIN \(DataManager.podcastTableName) podcast
                           ON episode.podcast_id = podcast.id
                         """
-                    queryString =
-                        """
+                queryString =
+                    """
                         \(manualCTE)
                         SELECT COUNT(*)
                         \(manualJoin)
                         WHERE episode.archived = \(shouldShowArchived ? "1" : "0")
                         """
-                } else {
-                    return manualPlaylistEpisodesCount(
-                        playlistUUID: playlist.uuid,
-                        shouldShowArchived: shouldShowArchived,
-                        allEpisodesCount: false
-                    )
-                }
             case .allEpisodeCount:
-                if FeatureFlag.optimizeManualPlaylistQueries.enabled {
-                    let manualCTE =
-                        """
+                let manualCTE =
+                    """
                         WITH playlist AS (
                           SELECT episodeUuid, MIN(episodePosition) AS pos
                           FROM \(DataManager.playlistEpisodeTableName)
@@ -196,8 +147,8 @@ public class PlaylistQueryBuilder {
                           WHERE episode.uuid IN (SELECT episodeUuid FROM playlist)
                         )
                         """
-                    let manualJoin =
-                        """
+                let manualJoin =
+                    """
                         FROM playlist p
                         JOIN deduped_episode episode
                           ON episode.uuid = p.episodeUuid
@@ -205,20 +156,13 @@ public class PlaylistQueryBuilder {
                         LEFT JOIN \(DataManager.podcastTableName) podcast
                           ON episode.podcast_id = podcast.id
                         """
-                    queryString =
-                        """
+                queryString =
+                    """
                         \(manualCTE)
                         SELECT COUNT(*)
                         \(manualJoin)
                         \(shouldShowArchived ? "" : "WHERE episode.archived = 0")
                         """
-                } else {
-                    return manualPlaylistEpisodesCount(
-                        playlistUUID: playlist.uuid,
-                        shouldShowArchived: shouldShowArchived,
-                        allEpisodesCount: true
-                    )
-                }
             case .firstDistinctEpisodes:
                 return manualPlaylistFirstDistinctEpisodes(
                     sortFor: sortType,
@@ -240,19 +184,21 @@ public class PlaylistQueryBuilder {
                     sortFor: sortType,
                     limit: limit,
                     values: stringifiedValues,
-                    addedUuid: addedUuid.boolValue
+                    addedUuid: addedUuid.boolValue,
+                    shouldShowArchived: playlist.showArchivedEpisodes
                 )
             }
             if clause == .episodeCount || clause == .allEpisodeCount {
                 return smartPlaylistEpisodesCount(
-                    shouldShowArchived: shouldShowArchived,
+                    shouldShowArchived: shouldShowArchived || (clause == .allEpisodeCount && playlist.showArchivedEpisodes),
                     allEpisodesCount: clause == .allEpisodeCount,
                     values: stringifiedValues
                 )
             }
 
             let select = select(clause: clause)
-            queryString = "\(select) WHERE episode.archived = 0 \(stringifiedValues)"
+            let archivedCondition = playlist.showArchivedEpisodes ? "1 = 1" : "episode.archived = 0"
+            queryString = "\(select) WHERE \(archivedCondition) \(stringifiedValues)"
             queryString += ")"
             if addedUuid.boolValue {
                 queryString += ")"
@@ -282,11 +228,13 @@ public class PlaylistQueryBuilder {
         sortFor sortType: Int32,
         limit: Int,
         values: String,
-        addedUuid: Bool
+        addedUuid: Bool,
+        shouldShowArchived: Bool
     ) -> String {
         let sortClause = add(sortFor: sortType) ?? ""
         var sortClauseStripped = sortClause.replacingOccurrences(of: "ORDER BY", with: "")
         sortClauseStripped = sortClauseStripped.replacingOccurrences(of: "episode.", with: "")
+        let archivedCondition = shouldShowArchived ? "1 = 1" : "episode.archived = 0"
 
         var query = """
         WITH limited_episodes AS (
@@ -299,7 +247,7 @@ public class PlaylistQueryBuilder {
                 FROM \(DataManager.episodeTableName) episode
                 LEFT JOIN \(DataManager.podcastTableName) podcast
                   ON episode.podcast_id = podcast.id
-                WHERE episode.archived = 0 \(values)\(addedUuid ? ")" : ")")
+                WHERE \(archivedCondition) \(values)\(addedUuid ? ")" : ")")
                 \(sortClause)
                 LIMIT \(episodeLimit)
             )
@@ -439,14 +387,11 @@ public class PlaylistQueryBuilder {
         }
 
         let archivedPredicateForDeduped = shouldShowArchived ? "" : "AND de.archived = 0"
-        let archivedPredicateForEpisode = shouldShowArchived ? "" : "AND episode.archived = 0"
         let archivedPreference = shouldShowArchived ? "1" : "0"
-        let archivedPredicate = shouldShowArchived ? "" : "AND episode.archived = 0"
         let episodePositionOrderByStripped = episodePositionOrderBy.replacingOccurrences(of: "episode.", with: "")
 
         if isCustomOrderSortType {
-            if FeatureFlag.optimizeManualPlaylistQueries.enabled {
-                return """
+            return """
                 WITH playlist AS (
                   SELECT episodeUuid, MIN(episodePosition) AS episodePosition
                   FROM \(DataManager.playlistEpisodeTableName)
@@ -497,45 +442,9 @@ public class PlaylistQueryBuilder {
                 ORDER BY c.playlist_position ASC
                 LIMIT \(limit)
                 """
-            } else {
-                // Original query without deduplication
-                return """
-                WITH playlist_rows AS (
-                  SELECT episode.id,
-                         episode.podcast_id,
-                         playlist.episodePosition AS playlist_position
-                  FROM \(DataManager.episodeTableName) episode
-                  JOIN \(DataManager.playlistEpisodeTableName) playlist
-                    ON episode.uuid = playlist.episodeUuid
-                  WHERE playlist.playlist_uuid = '\(playlistUUID)'
-                  \(archivedPredicate)
-                  LIMIT \(episodeLimit)
-                ),
-                first_per_podcast AS (
-                  SELECT podcast_id, MIN(playlist_position) AS min_pos
-                  FROM playlist_rows
-                  GROUP BY podcast_id
-                ),
-                chosen_ids AS (
-                  SELECT pr.id, pr.playlist_position
-                  FROM playlist_rows pr
-                  JOIN first_per_podcast f
-                    ON pr.podcast_id = f.podcast_id
-                   AND pr.playlist_position = f.min_pos
-                )
-                SELECT episode.*
-                FROM \(DataManager.episodeTableName) episode
-                JOIN chosen_ids c
-                  ON episode.id = c.id
-                ORDER BY c.playlist_position ASC
-                LIMIT \(limit)
-                """
-            }
         }
-
-        if FeatureFlag.optimizeManualPlaylistQueries.enabled {
-            // Optimized version: deduplicates by UUID first, then partitions by podcast
-            return """
+        // Optimized version: deduplicates by UUID first, then partitions by podcast
+        return """
             WITH playlist AS (
               SELECT episodeUuid, MIN(episodePosition) AS episodePosition
               FROM \(DataManager.playlistEpisodeTableName)
@@ -579,39 +488,6 @@ public class PlaylistQueryBuilder {
             \(playlistPositionOrderBy)
             LIMIT \(limit)
             """
-        }
-
-        return """
-        WITH ordered_episodes AS (
-          SELECT episode.id,
-                 episode.podcast_id,
-                 playlist.episodePosition AS playlist_position,
-                 episode.publishedDate,
-                 episode.addedDate,
-                 episode.duration
-          FROM \(DataManager.episodeTableName) episode
-          JOIN \(DataManager.playlistEpisodeTableName) playlist
-            ON episode.uuid = playlist.episodeUuid
-          WHERE playlist.playlist_uuid = '\(playlistUUID)'
-          \(archivedPredicateForEpisode)
-          LIMIT \(episodeLimit)
-        ),
-        numbered AS (
-          SELECT *,
-                 ROW_NUMBER() OVER (
-                   PARTITION BY podcast_id
-                   \(episodePositionOrderByStripped)
-                 ) AS rn
-          FROM ordered_episodes
-        )
-        SELECT episode.*
-        FROM numbered n
-        JOIN \(DataManager.episodeTableName) episode
-          ON episode.id = n.id
-        WHERE n.rn = 1
-        \(playlistPositionOrderBy)
-        LIMIT \(limit)
-        """
     }
 
     private static func select(clause: SelectClause) -> String {
@@ -852,14 +728,14 @@ public class PlaylistQueryBuilder {
             if haveStartedWhere { queryString += "AND " }
 
             queryString += "episode.publishedDate > \(filterTimeFor(hours: playlist.filterHours)) "
-             haveStartedWhere = true
+            haveStartedWhere = true
         }
     }
 
     // MARK: - Legacy
 
     public class func queryFor(filter: EpisodeFilter, episodeUuidToAdd: String?, limit: Int) -> String {
-        var queryString = "archived = 0 "
+        var queryString = filter.showArchivedEpisodes ? "1 = 1 " : "archived = 0 "
         var addedUuid = false
 
         if let episodeUuidToAdd {

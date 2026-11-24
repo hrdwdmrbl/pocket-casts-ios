@@ -11,7 +11,7 @@ public class UpNextHistoryManager {
         "timeModified",
         "wasDeleted",
         "title",
-        "podcastUuid",
+        "podcastUuid"
     ]
 
     /// The number of days to keep the snapshots

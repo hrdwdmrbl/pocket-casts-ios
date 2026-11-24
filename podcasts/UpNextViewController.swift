@@ -40,9 +40,7 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
             if !isMultiSelectEnabled {
                 multiSelectActionBar.isHidden = true
                 selectedPlayListEpisodes.removeAll()
-                track(.upNextMultiSelectExited)
             } else {
-                track(.upNextMultiSelectEntered)
             }
             updateNavBarButtons(animated: true)
             if showingInTab {
@@ -53,8 +51,6 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
     }
 
     let remainingLabel = ThemeableLabel()
-    // Use HitTargetButton so these small header controls meet Apple's recommended 44x44pt minimum tap target without changing their visible size.
-    let shuffleButton = HitTargetButton(frame: CGRect(x: 0, y: 0, width: 24, height: 24))
     let sortButton = HitTargetButton(frame: CGRect(x: 0, y: 0, width: 24, height: 24))
     var selectedPlayListEpisodes = [PlaylistEpisode]() {
         didSet {
@@ -84,38 +80,17 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
             remainingLabel.topAnchor.constraint(equalTo: headerView.topAnchor, constant: 8),
             remainingLabel.bottomAnchor.constraint(equalTo: headerView.bottomAnchor, constant: -8)
         ])
-
-        if FeatureFlag.upNextSort.enabled {
-            headerView.addSubview(sortButton)
-            sortButton.translatesAutoresizingMaskIntoConstraints = false
-            sortButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-            NSLayoutConstraint.activate([
-                sortButton.trailingAnchor.constraint(equalTo: headerView.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-                sortButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
-                sortButton.widthAnchor.constraint(equalToConstant: 24),
-                sortButton.heightAnchor.constraint(equalToConstant: 24)
-            ])
-        }
-
-        // When the sort button is shown, the shuffle button sits to its left.
-        let trailingButtonAnchor = FeatureFlag.upNextSort.enabled ? sortButton.leadingAnchor : headerView.safeAreaLayoutGuide.trailingAnchor
-        let trailingButtonConstant: CGFloat = FeatureFlag.upNextSort.enabled ? -16 : -20
-
-        headerView.addSubview(shuffleButton)
-        shuffleButton.translatesAutoresizingMaskIntoConstraints = false
-        shuffleButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        headerView.addSubview(sortButton)
+        sortButton.translatesAutoresizingMaskIntoConstraints = false
+        sortButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         NSLayoutConstraint.activate([
-            shuffleButton.trailingAnchor.constraint(equalTo: trailingButtonAnchor, constant: trailingButtonConstant),
-            shuffleButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
-            shuffleButton.leadingAnchor.constraint(greaterThanOrEqualTo: remainingLabel.trailingAnchor, constant: 10),
-            shuffleButton.widthAnchor.constraint(equalToConstant: 24),
-            shuffleButton.heightAnchor.constraint(equalToConstant: 24)
+            sortButton.trailingAnchor.constraint(equalTo: headerView.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            sortButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
+            sortButton.widthAnchor.constraint(equalToConstant: 24),
+            sortButton.heightAnchor.constraint(equalToConstant: 24)
         ])
 
-        shuffleButton.isHidden = PlaybackManager.shared.queue.upNextCount() == 0
-        if FeatureFlag.upNextSort.enabled {
-            sortButton.isHidden = PlaybackManager.shared.queue.upNextCount() == 0
-        }
+        sortButton.isHidden = PlaybackManager.shared.queue.upNextCount() == 0
         updateSize()
         return headerView
     }()
@@ -192,10 +167,6 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(reorderingDidBegin), name: .tableViewReorderWillBegin, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(reorderingDidEnd), name: .tableViewReorderDidEnd, object: nil)
 
-        if showingInTab {
-            NotificationCenter.default.addObserver(self, selector: #selector(updateShuffleButtonState), name: Constants.Notifications.upNextShuffleToggle, object: nil)
-        }
-
         remainingLabel.font = UIFont.font(ofSize: 14, weight: .medium, scalingWith: .footnote)
         remainingLabel.adjustsFontSizeToFitWidth = true
         remainingLabel.adjustsFontForContentSizeCategory = true
@@ -216,19 +187,12 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
         super.viewWillAppear(animated)
         updateNavBarButtons()
         setupActionButtonsIfNecessary()
-        themeDidChange()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         // fix issues with the now playing cell not animating by reloading it on appear
         reloadTable()
-
-        track(.upNextShown, properties: ["source": source])
-
-        AnalyticsHelper.upNextOpened()
-
-        showUpNextSortDurationTipIfNeeded()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -241,8 +205,6 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-
-        track(.upNextDismissed)
     }
 
     @objc func clearQueueTapped() {
@@ -255,74 +217,12 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
         isMultiSelectEnabled = false
     }
 
-    @objc private func shuffleButtonTapped() {
-        FileLog.shared.addMessage("UpNext shuffleButtonTapped: user has active subscription: \(SubscriptionHelper.hasActiveSubscription()) and is logged in: \(SyncManager.isUserLoggedIn())")
-
-        if !SubscriptionHelper.hasActiveSubscription() || !SyncManager.isUserLoggedIn() {
-            // Edge case where the UpNext is presented by the player container with a free user.
-            // In this case we need to dismiss the UpNext to present the paywall
-            if let mainTabBar = presentingViewController?.presentingViewController, presentingViewController is PlayerContainerViewController {
-                dismiss(animated: true) {
-                    NavigationManager.shared.showUpsellView(from: mainTabBar, source: .upNextShuffle)
-                }
-            } else {
-                NavigationManager.shared.showUpsellView(from: self, source: .upNextShuffle)
-            }
-            return
-        }
-        Settings.upNextShuffleToggle()
-        if !showingInTab {
-            updateShuffleButtonState()
-        }
-        let upNextShuffleEnabled = Settings.upNextShuffleEnabled()
-        if upNextShuffleEnabled {
-            Toast.show(L10n.upNextShuffleToastMessage, aboveMiniPlayer: self.showingInTab ? true : false)
-        }
-        FileLog.shared.addMessage("UpNext shuffleButtonTapped: shuffle enabled: \(upNextShuffleEnabled)")
-        track(.upNextShuffleEnabled, properties: ["value": upNextShuffleEnabled])
-    }
-
-    @objc private func themeDidChange() {
-        FileLog.shared.addMessage("UpNext themeDidChange: user has active subscription: \(SubscriptionHelper.hasActiveSubscription()) and is logged in: \(SyncManager.isUserLoggedIn())")
-
-        if !SubscriptionHelper.hasActiveSubscription() || !SyncManager.isUserLoggedIn() {
-            shuffleButton.setImage(UIImage(named: "shuffle-plus"), for: .normal)
-            shuffleButton.isSelected = false
-        } else {
-            let unselected = UIImage(named: "shuffle")?.withTintColor(AppTheme.colorForStyle(.primaryIcon02, themeOverride: themeOverride), renderingMode: .alwaysOriginal)
-            let selected = UIImage(named: "shuffle-enabled")?.withTintColor(AppTheme.colorForStyle(.primaryIcon01, themeOverride: themeOverride), renderingMode: .alwaysOriginal)
-            shuffleButton.setImage(unselected, for: .normal)
-            shuffleButton.setImage(selected, for: .selected)
-            updateShuffleButtonState()
-        }
-        shuffleButton.imageView?.adjustsImageSizeForAccessibilityContentSizeCategory = true
-        shuffleButton.imageView?.contentMode = .scaleAspectFit
-        shuffleButton.imageView?.translatesAutoresizingMaskIntoConstraints = false
-    }
-
-    @objc private func subscriptionStatusDidChange() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            FileLog.shared.addMessage("UpNext subscriptionStatusDidChange: user has active subscription: \(SubscriptionHelper.hasActiveSubscription()) and is logged in: \(SyncManager.isUserLoggedIn())")
-
-            setupActionButtonsIfNecessary()
-            themeDidChange()
-            updateNavBarButtons()
-            reloadTable()
-        }
-    }
-
     private func setupActionButtonsIfNecessary() {
-        guard shuffleButton.allTargets.isEmpty else { return }
-        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: Constants.Notifications.themeChanged, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(subscriptionStatusDidChange), name: ServerNotifications.subscriptionStatusChanged, object: nil)
-        themeDidChange()
-        shuffleButton.addTarget(self, action: #selector(shuffleButtonTapped), for: .touchUpInside)
         setupSortButtonIfNecessary()
     }
 
     private func setupSortButtonIfNecessary() {
-        guard FeatureFlag.upNextSort.enabled, sortButton.allTargets.isEmpty else { return }
+        guard sortButton.allTargets.isEmpty else { return }
         NotificationCenter.default.addObserver(self, selector: #selector(updateSortButtonImage), name: Constants.Notifications.themeChanged, object: nil)
         updateSortButtonImage()
         sortButton.addTarget(self, action: #selector(sortButtonTapped), for: .touchUpInside)
@@ -338,8 +238,6 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
     }
 
     @objc private func sortButtonTapped() {
-        // If the tooltip is still up, opening the picker counts as discovering the feature: dismiss and mark it seen.
-        dismissUpNextSortDurationTip()
         let optionsPicker = makeSortOptionsPicker()
         optionsPicker.present(from: self)
     }
@@ -351,15 +249,10 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
                 let queue = PlaybackManager.shared.queue
                 queue.reorderUpNext(sortedEpisodes: option.sort(queue.allEpisodes(includeNowPlaying: false)))
                 self?.reloadTable()
-                self?.track(.upNextSort, properties: ["sort_type": option.analyticsDescription])
             }
             optionsPicker.addAction(action: action)
         }
         return optionsPicker
-    }
-
-    @objc private func updateShuffleButtonState() {
-        shuffleButton.isSelected = Settings.upNextShuffleEnabled()
     }
 
     static func clearQueueAlert(queueCount: Int, onClear: @escaping () -> Void) -> UIAlertController {
@@ -381,13 +274,9 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
     private func performClearAll() {
         PlaybackManager.shared.queue.clearUpNextList()
         reloadTable()
-        track(.upNextQueueCleared)
     }
 
     var userEpisodeDetailVC: UserEpisodeDetailViewController?
-
-    /// The "Sort by duration" tooltip popover, while it's on screen. See `UIViewController.presentTip` in TipView.swift.
-    var upNextSortDurationTip: UIViewController?
 
     func showEpisodeDetailViewController(for episode: BaseEpisode?) {
         if let episode = episode as? Episode, let parentPodcast = episode.parentPodcast() {
@@ -453,8 +342,6 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
     @objc func selectAllTapped() {
         guard DataManager.shared.allUpNextEpisodes().count > 1 else { return }
         upNextTable.selectAllBelow(fromIndexPath: IndexPath(row: 0, section: sections.upNextSection.rawValue))
-
-        track(.upNextSelectAllButtonTapped, properties: ["select_all": true])
         updateNavBarButtons()
     }
 
@@ -464,7 +351,6 @@ class UpNextViewController: UIViewController, UIGestureRecognizerDelegate {
 
     @objc func deselectAllTapped() {
         upNextTable.deselectAll()
-        track(.upNextSelectAllButtonTapped, properties: ["select_all": false])
     }
 
     func updateNavBarButtons(animated: Bool = false) {
@@ -535,30 +421,17 @@ extension UpNextViewController {
     }
 }
 
-// MARK: - Analytics
-
-extension UpNextViewController {
-    func track(_ event: AnalyticsEvent, properties: [String: Any]? = nil) {
-        let defaultProperties: [String: Any] = ["source": source]
-        let props = defaultProperties.merging(properties ?? [:]) { current, _ in current }
-
-        Analytics.track(event, properties: props)
-    }
-}
-
-enum UpNextViewSource: String, AnalyticsDescribable {
+enum UpNextViewSource: String {
     case miniPlayer = "mini_player"
     case nowPlaying = "now_playing"
     case player
     case lockScreenWidget = "lock_screen_widget"
     case tabBar = "tab_bar"
     case unknown
-
-    var analyticsDescription: String { rawValue }
 }
 
 /// Sort orders offered by the Up Next sort button; a one-off reorder, so there's no persisted "current" option.
-enum UpNextSortOption: CaseIterable, AnalyticsDescribable {
+enum UpNextSortOption: CaseIterable {
     case newestToOldest
     case oldestToNewest
     case shortestToLongest
@@ -575,19 +448,6 @@ enum UpNextSortOption: CaseIterable, AnalyticsDescribable {
             return L10n.upNextSortShortestToLongest
         case .longestToShortest:
             return L10n.upNextSortLongestToShortest
-        }
-    }
-
-    var analyticsDescription: String {
-        switch self {
-        case .newestToOldest:
-            return "newest_to_oldest"
-        case .oldestToNewest:
-            return "oldest_to_newest"
-        case .shortestToLongest:
-            return "shortest_to_longest"
-        case .longestToShortest:
-            return "longest_to_shortest"
         }
     }
 
@@ -645,63 +505,12 @@ enum UpNextSortOption: CaseIterable, AnalyticsDescribable {
     }
 }
 
-extension UpNextViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .upNext
-    }
-}
-
 // MARK: - Dynamic Type support
 extension UpNextViewController {
 
     func updateSize() {
         let metric = UIFontMetrics(forTextStyle: .largeTitle)
         let buttonSize = max(24, metric.scaledValue(for: 24))
-        shuffleButton.updateSizeConstraints(to: buttonSize)
-        if FeatureFlag.upNextSort.enabled {
-            sortButton.updateSizeConstraints(to: buttonSize)
-        }
-    }
-}
-
-// MARK: - Sort by Duration tooltip
-
-/// Shows a one-time "Sort by duration" tooltip on the Up Next tab, only for upgrading users since AppDelegate suppresses the flag on fresh installs.
-extension UpNextViewController {
-    func showUpNextSortDurationTipIfNeeded() {
-        guard
-            Settings.shouldShowUpNextSortDurationTip,
-            FeatureFlag.upNextSort.enabled,
-            source == .tabBar,
-            upNextSortDurationTip == nil,
-            // Only when the sort button is actually on screen (it's hidden while the queue is empty).
-            !sortButton.isHidden,
-            PlaybackManager.shared.queue.upNextCount() > 0
-        else {
-            return
-        }
-        upNextSortDurationTip = presentTip(
-            title: L10n.upNextSortDurationTooltipTitle,
-            message: L10n.upNextSortDurationTooltipBody,
-            anchor: .item(sortButton),
-            onTap: { [weak self] in
-                self?.dismissUpNextSortDurationTip()
-            },
-            onDismiss: { [weak self] in
-                self?.dismissUpNextSortDurationTip()
-            },
-            onShow: { [weak self] in
-                self?.track(.upNextSortTooltipShown)
-            }
-        )
-    }
-
-    func dismissUpNextSortDurationTip() {
-        guard upNextSortDurationTip != nil else { return }
-        Settings.shouldShowUpNextSortDurationTip = false
-        track(.upNextSortTooltipClosed)
-        upNextSortDurationTip?.dismiss(animated: true) { [weak self] in
-            self?.upNextSortDurationTip = nil
-        }
+        sortButton.updateSizeConstraints(to: buttonSize)
     }
 }

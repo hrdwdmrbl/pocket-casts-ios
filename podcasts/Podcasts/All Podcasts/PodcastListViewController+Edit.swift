@@ -64,12 +64,10 @@ extension PodcastListViewController {
 
     private func addReorderHandle(to cell: UICollectionViewCell) {
         (cell as? PodcastListCell)?.showsReorderHandle = true
-        (cell as? FolderListCell)?.showsReorderHandle = true
     }
 
     private func removeReorderHandle(from cell: UICollectionViewCell) {
         (cell as? PodcastListCell)?.showsReorderHandle = false
-        (cell as? FolderListCell)?.showsReorderHandle = false
     }
 }
 
@@ -80,7 +78,7 @@ extension PodcastListViewController: UICollectionViewDragDelegate, UICollectionV
         guard isEditingOrder, let item = itemAt(indexPath: indexPath), !item.isEmpty else {
             return []
         }
-        let provider = NSItemProvider(object: (item.podcast?.uuid ?? item.folder?.uuid ?? "") as NSString)
+        let provider = NSItemProvider(object: (item.podcast?.uuid ?? "") as NSString)
         let dragItem = UIDragItem(itemProvider: provider)
         dragItem.localObject = item
         return [dragItem]
@@ -119,6 +117,5 @@ extension PodcastListViewController: UICollectionViewDragDelegate, UICollectionV
             collectionView.moveItem(at: sourceIndexPath, to: destinationIndexPath)
         }
         coordinator.drop(dropItem.dragItem, toItemAt: destinationIndexPath)
-        Analytics.track(.podcastsListReordered)
     }
 }

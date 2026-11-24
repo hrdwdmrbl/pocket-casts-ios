@@ -222,7 +222,7 @@ extension RichExpandableLabel: WKNavigationDelegate {
         evaluateJavaScript("document.readyState", completionHandler: { [weak self] complete, _ in
             guard let self,
                   let result = complete as? String,
-                  result == "complete" // ensure that the load of HTML is complete and not in another loading state
+                  result == "complete"
             else {
                 return
             }

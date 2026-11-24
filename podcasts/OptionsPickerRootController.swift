@@ -227,7 +227,7 @@ class OptionsPickerRootController: UIViewController, UISheetPresentationControll
             label.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: layoutHorizontalMargin),
             label.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -layoutHorizontalMargin),
             label.topAnchor.constraint(equalTo: containerView.layoutMarginsGuide.topAnchor),
-            label.bottomAnchor.constraint(equalTo: containerView.layoutMarginsGuide.bottomAnchor),
+            label.bottomAnchor.constraint(equalTo: containerView.layoutMarginsGuide.bottomAnchor)
         ])
         label.setContentHuggingPriority(.defaultLow, for: .vertical)
         label.setContentCompressionResistancePriority(.required, for: .vertical)

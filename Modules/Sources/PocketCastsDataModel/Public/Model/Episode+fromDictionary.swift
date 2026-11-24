@@ -73,12 +73,6 @@ extension Episode {
             episode.episodeType = type
         }
 
-        if let type = episodeJson["has_generated_transcript"] as? Bool {
-            episode.hasGeneratedTranscript = type
-        } else {
-            episode.hasGeneratedTranscript = nil
-        }
-
         episode.hlsUrl = hlsUrl(fromEpisodeJson: episodeJson)
 
         return episode

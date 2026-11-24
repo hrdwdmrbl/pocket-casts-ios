@@ -90,7 +90,6 @@ public final class ReloadScheduler<Scope: OptionSet> {
         onReload(scope)
     }
 
-
     /// Awaits any scheduled flush or auto-resume work. For tests.
     func waitForIdle() async {
         while true {

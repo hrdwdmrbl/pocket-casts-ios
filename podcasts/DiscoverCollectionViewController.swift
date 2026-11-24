@@ -1,7 +1,6 @@
 import PocketCastsServer
 import SwiftUI
 import PocketCastsUtils
-import EndOfYear
 
 class DiscoverCollectionViewController: PCViewController {
 
@@ -29,7 +28,7 @@ class DiscoverCollectionViewController: PCViewController {
     private(set) lazy var searchController: PCSearchBarController = {
         PCSearchBarController()
     }()
-    lazy var searchResultsController = SearchResultsViewController(source: .discover, showLocalResults: false)
+    lazy var searchResultsController = SearchResultsViewController(showLocalResults: false)
 
     var resultsControllerDelegate: SearchResultsDelegate {
         searchResultsController
@@ -56,15 +55,12 @@ class DiscoverCollectionViewController: PCViewController {
         reloadData()
 
         setupMiniPlayerObservers()
-        setupLoginObserver()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         searchController.beginAppearanceTransition(true, animated: animated)
         searchController.endAppearanceTransition()
-        AnalyticsHelper.navigatedToDiscover()
-        Analytics.track(.discoverShown)
 
         miniPlayerStatusDidChange()
     }
@@ -92,10 +88,6 @@ class DiscoverCollectionViewController: PCViewController {
         collectionView.reloadData()
     }
 
-    private func checkSourceAuthentication(for item: DiscoverItem) async -> Bool {
-        return await DiscoverServerHandler.shared.checkSourceAuthentication(for: item)
-    }
-
     func populateFrom(discoverLayout: DiscoverLayout?, selectedCategory: DiscoverCategory? = nil, shouldInclude: ((DiscoverItem) -> Bool)? = nil) {
         self.selectedCategory = selectedCategory
         loadingContent = false
@@ -111,72 +103,14 @@ class DiscoverCollectionViewController: PCViewController {
         }
 
         let itemFilter = shouldInclude ?? { item in
-            item.categoryID == nil && item.shouldShowAuthenticated()
+            item.categoryID == nil
         }
 
         self.discoverLayout = discoverLayout
 
         let currentRegion = Settings.discoverRegion(discoverLayout: discoverLayout)
-
-        if FeatureFlag.recommendations.enabled {
-            var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-            snapshot.appendSections([0])
-
-            loadingTasks.values.forEach { $0.cancel() }
-            loadingTasks = [:]
-
-            for item in items {
-                let selectedCategory = item.cellType() != .categoriesSelector ? selectedCategory : nil
-
-                if itemFilter(item) && item.regions.contains(currentRegion) {
-                    if item.authenticated == true, let uuid = item.uuid {
-                        snapshot.appendItems([.loading(uuid)])
-                        loadingTasks[uuid] = Task { [weak self] in
-                            guard let self, !Task.isCancelled else { return }
-                            let isAuthenticated = await self.checkSourceAuthentication(for: item)
-                            guard !Task.isCancelled else { return }
-                            self.updateItemInSnapshot(item: item, isAuthenticated: isAuthenticated, region: currentRegion, selectedCategory: selectedCategory)
-                            self.loadingTasks.removeValue(forKey: uuid)
-                        }
-                    } else {
-                        let model = DiscoverCellModel(item: item, region: currentRegion, selectedCategory: selectedCategory)
-                        if let cellType = item.cellType() {
-                            snapshot.appendItems([.item(DiscoverCellType.ItemType(cellType: cellType, model: model))])
-                        }
-                    }
-                }
-            }
-
-            dataSource.apply(snapshot)
-        } else {
-            let snapshot = discoverLayout.layout?.makeDataSourceSnapshot(region: currentRegion, selectedCategory: selectedCategory, itemFilter: itemFilter)
-            if let snapshot {
-                dataSource.apply(snapshot)
-            }
-        }
-    }
-
-    private func updateItemInSnapshot(item: DiscoverItem, isAuthenticated: Bool, region: String, selectedCategory: DiscoverCategory?) {
-        var snapshot = dataSource.snapshot()
-
-        // Find the loading placeholder for this specific item using its UUID
-        let items = snapshot.itemIdentifiers(inSection: 0)
-        if let loadingItem = items.first(where: {
-            if case .loading(let uuid) = $0, uuid == item.uuid { return true }
-            return false
-        }) {
-            // Replace the loading placeholder with either the authenticated item or empty
-            if isAuthenticated {
-                let model = DiscoverCellModel(item: item, region: region, selectedCategory: selectedCategory)
-                if let cellType = item.cellType() {
-                    let newItem = CellType.item(DiscoverCellType.ItemType(cellType: cellType, model: model))
-                    snapshot.insertItems([newItem], beforeItem: loadingItem)
-                }
-            } else {
-                snapshot.insertItems([.empty], beforeItem: loadingItem)
-            }
-            snapshot.deleteItems([loadingItem])
-
+        let snapshot = discoverLayout.layout?.makeDataSourceSnapshot(region: currentRegion, selectedCategory: selectedCategory, itemFilter: itemFilter)
+        if let snapshot {
             dataSource.apply(snapshot)
         }
     }
@@ -298,7 +232,7 @@ extension DiscoverCollectionViewController {
 
     private func createCompositionalLayout() -> UICollectionViewCompositionalLayout {
         return UICollectionViewCompositionalLayout { [weak self] (_: Int,
-                                                      _: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection? in
+                                                                  _: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection? in
             let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
                                                   heightDimension: self?.discoverLayout == nil ? .fractionalHeight(0.8) : .estimated(100))
 
@@ -327,12 +261,6 @@ extension DiscoverCollectionViewController {
     }
 }
 
-extension DiscoverCollectionViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .discover
-    }
-}
-
 // MARK: - Mini Player
 extension DiscoverCollectionViewController {
     fileprivate func setupMiniPlayerObservers() {
@@ -344,15 +272,5 @@ extension DiscoverCollectionViewController {
         let miniPlayerOffset = Constants.effectiveMiniPlayerOffset
         collectionView.contentInset = UIEdgeInsets(top: PCSearchBarController.defaultHeight, left: 0, bottom: miniPlayerOffset, right: 0)
         collectionView.verticalScrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: miniPlayerOffset, right: 0)
-    }
-}
-
-// MARK: - Authentication Handling
-extension DiscoverCollectionViewController {
-    fileprivate func setupLoginObserver() {
-        // Add observer for login/logout notification
-        NotificationCenter.default.addObserver(forName: .userLoginDidChange, object: nil, queue: .main) { [weak self] _ in
-            self?.reloadData()
-        }
     }
 }

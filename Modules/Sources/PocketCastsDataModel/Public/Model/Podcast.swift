@@ -47,12 +47,10 @@ public class Podcast: NSObject, Identifiable {
     @objc public var overrideGlobalArchive = false
     @objc public var autoArchivePlayedAfter = 0 as Double
     @objc public var autoArchiveInactiveAfter = 0 as Double
-    @objc public var isPaid = false
     @objc public var licensing = 0 as Int32
     @objc public var fullSyncLastSyncAt: String?
     @objc public var showArchived = false
     @objc public var refreshAvailable = false
-    @objc public var folderUuid: String?
     @objc public var usedCustomEffectsBefore = false
     @objc public var isPrivate = false
     @objc public var isExplicit = false
@@ -166,12 +164,10 @@ public class Podcast: NSObject, Identifiable {
         case overrideGlobalArchive
         case autoArchivePlayedAfter
         case autoArchiveInactiveAfter
-        case isPaid
         case licensing
         case fullSyncLastSyncAt
         case showArchived
         case refreshAvailable
-        case folderUuid
         case usedCustomEffectsBefore
         case isPrivate
         case isExplicit
@@ -226,12 +222,10 @@ public class Podcast: NSObject, Identifiable {
         overrideGlobalArchive = try container.decodeIfPresent(Bool.self, forKey: .overrideGlobalArchive) ?? false
         autoArchivePlayedAfter = try container.decodeIfPresent(Double.self, forKey: .autoArchivePlayedAfter) ?? 0
         autoArchiveInactiveAfter = try container.decodeIfPresent(Double.self, forKey: .autoArchiveInactiveAfter) ?? 0
-        isPaid = try container.decodeIfPresent(Bool.self, forKey: .isPaid) ?? false
         licensing = try container.decodeIfPresent(Int32.self, forKey: .licensing) ?? 0
         fullSyncLastSyncAt = try container.decodeIfPresent(String.self, forKey: .fullSyncLastSyncAt)
         showArchived = try container.decodeIfPresent(Bool.self, forKey: .showArchived) ?? false
         refreshAvailable = try container.decodeIfPresent(Bool.self, forKey: .refreshAvailable) ?? false
-        folderUuid = try container.decodeIfPresent(String.self, forKey: .folderUuid)
         usedCustomEffectsBefore = try container.decodeIfPresent(Bool.self, forKey: .usedCustomEffectsBefore) ?? false
         isPrivate = try container.decodeIfPresent(Bool.self, forKey: .isPrivate) ?? false
         isExplicit = try container.decodeIfPresent(Bool.self, forKey: .isExplicit) ?? false
@@ -284,12 +278,10 @@ public class Podcast: NSObject, Identifiable {
         container["overrideGlobalArchive"] = overrideGlobalArchive
         container["autoArchivePlayedAfter"] = autoArchivePlayedAfter
         container["autoArchiveInactiveAfter"] = autoArchiveInactiveAfter
-        container["isPaid"] = isPaid
         container["licensing"] = licensing
         container["fullSyncLastSyncAt"] = fullSyncLastSyncAt
         container["showArchived"] = showArchived
         container["refreshAvailable"] = refreshAvailable
-        container["folderUuid"] = folderUuid
         container["usedCustomEffectsBefore"] = usedCustomEffectsBefore
         container["isPrivate"] = isPrivate
         container["isExplicit"] = isExplicit
@@ -342,12 +334,10 @@ public class Podcast: NSObject, Identifiable {
         public static let overrideGlobalArchive = Column(CodingKeys.overrideGlobalArchive)
         public static let autoArchivePlayedAfter = Column(CodingKeys.autoArchivePlayedAfter)
         public static let autoArchiveInactiveAfter = Column(CodingKeys.autoArchiveInactiveAfter)
-        public static let isPaid = Column(CodingKeys.isPaid)
         public static let licensing = Column(CodingKeys.licensing)
         public static let fullSyncLastSyncAt = Column(CodingKeys.fullSyncLastSyncAt)
         public static let showArchived = Column(CodingKeys.showArchived)
         public static let refreshAvailable = Column(CodingKeys.refreshAvailable)
-        public static let folderUuid = Column(CodingKeys.folderUuid)
         public static let usedCustomEffectsBefore = Column(CodingKeys.usedCustomEffectsBefore)
         public static let isPrivate = Column(CodingKeys.isPrivate)
         public static let isExplicit = Column(CodingKeys.isExplicit)

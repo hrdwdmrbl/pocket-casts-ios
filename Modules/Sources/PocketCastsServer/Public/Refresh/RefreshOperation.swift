@@ -28,9 +28,6 @@ class RefreshOperation: Operation, @unchecked Sendable {
                 return
             }
 
-            let trace = TraceManager.shared.beginTracing(eventName: "SERVER_REFRESH")
-            defer { TraceManager.shared.endTracing(trace: trace) }
-
             // look for new podcasts from the server
             let refreshResult = performRefresh()
 
@@ -50,53 +47,13 @@ class RefreshOperation: Operation, @unchecked Sendable {
 
                 return
             }
+            completionHandler?(refreshResult == .successNewData ? .newData : .noData)
 
-            // refresh is done, now perform a sync if the user has a sync account
-            if SyncManager.isUserLoggedIn() {
-                NotificationCenter.default.post(name: ServerNotifications.syncStarted, object: nil)
-
-                if SubscriptionHelper.hasActiveSubscription() { apiQueue.addOperation(RetrieveCustomFilesTask()) }
-                apiQueue.addOperation(UpNextSyncTask())
-                let syncTask = SyncTask()
-                apiQueue.addOperation(syncTask)
-
-                apiQueue.addOperation(SyncHistoryTask())
-
-                apiQueue.addOperation(SyncSettingsTask())
-
-                #if !os(watchOS)
-                    ServerSettings.iapUnverifiedPurchaseReceiptDate() == nil ? apiQueue.addOperation(SubscriptionStatusTask()) : apiQueue.addOperation(PurchaseReceiptTask())
-                #endif
-
-                #if !os(watchOS)
-                    // update our local copy of the remote stats. Doesn't really matter if this fails or succeeds
-                    StatsManager.shared.loadRemoteStats(completion: nil)
-                #endif
-
-                apiQueue.waitUntilAllOperationsAreFinished()
-
-                // we use the sync task as the main indication of whether the sync has failed
-                let syncResult = syncTask.status
-                if syncResult == .failed || syncResult == .cancelled {
-                    completionHandler?(.failed)
-                } else {
-                    // however we use the refresh to indicate to iOS whether we found new stuff or not
-                    completionHandler?(refreshResult == .successNewData ? .newData : .noData)
-
-                    FileLog.shared.addMessage("Sync succeeded")
-
-                    ServerNotificationsHelper.shared.fireSyncCompleted()
-                    ServerConfig.shared.syncDelegate?.playlistChanged()
-                }
-            } else { // no sync required, we're done
-                completionHandler?(refreshResult == .successNewData ? .newData : .noData)
-            }
-
-            ServerConfig.shared.syncDelegate?.applyAutoArchivingToAllPodcasts()
+            ServerConfig.shared.refreshDelegate?.applyAutoArchivingToAllPodcasts()
 
             processAutoAddUpNextCandidates()
 
-            ServerConfig.shared.syncDelegate?.performActionsAfterSync()
+            ServerConfig.shared.refreshDelegate?.performActionsAfterRefresh()
         }
     }
 
@@ -145,12 +102,12 @@ class RefreshOperation: Operation, @unchecked Sendable {
                 }
 
                 #if !os(watchOS)
-                    // so we don't flood the users phone, set a limit on the amount of meta data requests made. So if they open it after
-                    // 4 weeks of not using it doesn't sit there for years
-                    if metadataRequestsQueued < 10 {
-                        MetadataUpdater.shared.updatedMetadata(episodeUuid: episode.uuid)
-                        metadataRequestsQueued += 1
-                    }
+                // so we don't flood the users phone, set a limit on the amount of meta data requests made. So if they open it after
+                // 4 weeks of not using it doesn't sit there for years
+                if metadataRequestsQueued < 10 {
+                    MetadataUpdater.shared.updatedMetadata(episodeUuid: episode.uuid)
+                    metadataRequestsQueued += 1
+                }
                 #endif
             }
 
@@ -160,8 +117,8 @@ class RefreshOperation: Operation, @unchecked Sendable {
             ServerPodcastManager.shared.updateLatestEpisodeInfo(podcast: podcast, setDefaults: false)
         }
 
-        ServerConfig.shared.syncDelegate?.checkForUnusedPodcasts()
-        ServerConfig.shared.syncDelegate?.cleanupAllUnusedEpisodeBuffers()
+        ServerConfig.shared.refreshDelegate?.checkForUnusedPodcasts()
+        ServerConfig.shared.refreshDelegate?.cleanupAllUnusedEpisodeBuffers()
 
         UserDefaults.standard.set(Date(), forKey: ServerConstants.UserDefaults.lastRefreshEndTime)
 

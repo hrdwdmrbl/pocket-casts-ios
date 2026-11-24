@@ -30,9 +30,6 @@ import Foundation
     var playedUpTo: Double { get set }
     var duration: Double { get set }
 
-    var deselectedChapters: String? { get set }
-    var deselectedChaptersModified: Int64 { get set }
-
     func displayableTitle() -> String
     func parentIdentifier() -> String
 
@@ -59,8 +56,6 @@ import Foundation
 
     func videoPodcast() -> Bool
     func mayContainChapters() -> Bool
-
-    var hasBookmarks: Bool { get }
 
     // This property is true if the only filled property is the episode's UUID. If true, this object should only be used as a thin wrapper over the UUID.
     var hasOnlyUuid: Bool { get set }

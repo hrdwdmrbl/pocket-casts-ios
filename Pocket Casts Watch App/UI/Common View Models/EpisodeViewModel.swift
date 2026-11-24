@@ -7,7 +7,7 @@ class EpisodeViewModel: ObservableObject {
     @Published var inUpNext = false
     @Published var downloadProgress: DownloadProgress?
 
-    let playSourceViewModel = PlaySourceHelper.playSourceViewModel
+    let playSourceViewModel = PhoneSourceViewModel()
     var cancellables = Set<AnyCancellable>()
     var alreadyHydrated = false
 

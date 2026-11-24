@@ -3,7 +3,6 @@ import PocketCastsServer
 
 struct SearchResultsView: View {
     @EnvironmentObject var theme: Theme
-    @EnvironmentObject var searchAnalyticsHelper: SearchAnalyticsHelper
     @EnvironmentObject var searchResults: SearchResultsModel
 
     @State var displayMode: SearchDisplayMode = .allResults
@@ -26,7 +25,7 @@ struct SearchResultsView: View {
                 .frame(maxHeight: .infinity)
                 .background(Theme.shared.searchBackground)
             } else if searchResults.isSearchingForPodcasts || (searchResults.isSearchingPredictive && searchResults.predictive.isEmpty) {
-                  ProgressView()
+                ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .tint(AppTheme.loadingActivityColor.color)
             } else if searchResults.noResults {
@@ -51,7 +50,6 @@ struct SearchResultsView: View {
                     Section(content: {
                         PredictiveList()
                             .onAppear {
-                                self.searchAnalyticsHelper.trackPredictiveShown()
                             }
                     }, footer: {
                         showFullResultsButton
@@ -80,7 +78,6 @@ struct SearchResultsView: View {
                     .scrollContentBackground(.hidden)
                     .ignoresSafeArea(.keyboard, edges: .bottom)
                     .onAppear() {
-                        self.searchAnalyticsHelper.trackListShown(activeDisplayMode)
                     }
                 }
             }
@@ -91,7 +88,6 @@ struct SearchResultsView: View {
     @ViewBuilder var showFullResultsButton: some View {
         Button(action: {
             searchResults.search(term: searchResults.currentSearchTerm)
-            searchAnalyticsHelper.trackPredictiveViewAllTapped(term: searchResults.currentPredictiveSearchTerm)
         }, label: {
             Text(L10n.searchResultsViewAll(searchResults.currentSearchTerm))
                 .font(style: .subheadline, weight: .medium)
@@ -121,8 +117,7 @@ struct SearchResultsView: View {
         }
         .padding(.bottom, 8)
         .background(LiquidGlass.isEnabled ? theme.searchBackground : theme.secondaryUi01)
-        .onChange(of: displayMode) { _, newValue in
-            searchAnalyticsHelper.trackFilterTapped(newValue.analyticsDescription)
+        .onChange(of: displayMode) { _, _ in
         }
     }
 
@@ -131,63 +126,63 @@ struct SearchResultsView: View {
             result.uuid
         })
         switch activeDisplayMode {
-            case .allResults:
-                return searchResults.combinedResults.filter { result in
-                    switch result {
-                        case .podcast(let podcast):
-                            return !podcastsUuids.contains(podcast.uuid)
-                        default:
-                            return true
-                    }
+        case .allResults:
+            return searchResults.combinedResults.filter { result in
+                switch result {
+                case .podcast(let podcast):
+                    return !podcastsUuids.contains(podcast.uuid)
+                default:
+                    return true
                 }
-            case .episodes:
-                return searchResults.combinedResults.filter { result in
-                    if case .episode = result {
-                        return true
-                    } else {
-                        return false
-                    }
+            }
+        case .episodes:
+            return searchResults.combinedResults.filter { result in
+                if case .episode = result {
+                    return true
+                } else {
+                    return false
                 }
-            case .podcasts:
-                return searchResults.combinedResults.filter { result in
-                    if case let .podcast(podcast) = result {
-                        return !podcastsUuids.contains(podcast.uuid)
-                    } else {
-                        return false
-                    }
+            }
+        case .podcasts:
+            return searchResults.combinedResults.filter { result in
+                if case let .podcast(podcast) = result {
+                    return !podcastsUuids.contains(podcast.uuid)
+                } else {
+                    return false
                 }
-            case .networks:
-                return searchResults.combinedResults.filter { result in
-                    if case .network = result {
-                        return true
-                    } else {
-                        return false
-                    }
+            }
+        case .networks:
+            return searchResults.combinedResults.filter { result in
+                if case .network = result {
+                    return true
+                } else {
+                    return false
                 }
+            }
         }
     }
 
     @ViewBuilder var combinedList: some View {
         ForEach(filteredResults, id: \.self) { result in
             switch result {
-                case .podcast(let podcast):
-                    SearchResultCell(episode: nil, result: podcast, played: false, showDivider: false, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
-                        .listRowBackground(theme.searchBackground)
-                        .alignmentGuide(.listRowSeparatorLeading) { _ in
-                            return 0
-                        }
-                case .episode(let episode):
-                    SearchResultCell(episode: episode, result: nil, showDivider: false, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
-                        .listRowBackground(theme.searchBackground)
-                        .alignmentGuide(.listRowSeparatorLeading) { _ in
-                            return 0
-                        }
-                case .network(let network):
-                    NetworkSearchResultCell(network: network, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
-                        .listRowBackground(theme.searchBackground)
-                        .alignmentGuide(.listRowSeparatorLeading) { _ in
-                            return 0
-                        }
+            case .podcast(let podcast):
+                SearchResultCell(episode: nil, result: podcast, played: false, showDivider: false, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
+                    .listRowBackground(theme.searchBackground)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in
+                        return 0
+                    }
+            case .episode(let episode):
+                SearchResultCell(episode: episode, result: nil, showDivider: false, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
+                    .listRowBackground(theme.searchBackground)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in
+                        return 0
+                    }
+            case .network(let network):
+                NetworkSearchResultCell(network: network, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
+                    .listRowBackground(theme.searchBackground)
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in
+                        return 0
+                    }
             }
         }
     }
@@ -234,8 +229,7 @@ struct SearchResultsView_Previews: PreviewProvider {
     return SearchResultsView()
         .setupDefaultEnvironment()
         .environmentObject(searchResults)
-        .environmentObject(SearchAnalyticsHelper(source: .discover))
-        .environmentObject(NetworkNavigator(source: .discover))
+        .environmentObject(NetworkNavigator())
         .environmentObject(SearchHistoryModel.shared)
 }
 

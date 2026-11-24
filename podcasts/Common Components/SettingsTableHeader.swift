@@ -50,7 +50,7 @@ class SettingsTableHeader: ThemeableView {
             titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor),
             titleLabel.topAnchor.constraint(equalTo: topAnchor),
             titleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: Constants.Values.tableSectionHeaderHeight),
-            titleTrailing,
+            titleTrailing
         ])
 
         if showLockedImage {

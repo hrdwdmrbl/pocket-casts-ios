@@ -22,7 +22,6 @@ public extension UserEpisode {
         episodeMap["downloadErrorDetails"] = downloadErrorDetails ?? ""
         episodeMap["episodeId"] = "\(id)"
         episodeMap["sizeInBytes"] = "\(sizeInBytes)"
-        episodeMap["uploadStatus"] = "\(uploadStatus)"
         episodeMap["imageUrl"] = imageUrl
         episodeMap["imageColor"] = "\(imageColor)"
         episodeMap["hasCustomImage"] = "\(hasCustomImage)"
@@ -46,7 +45,6 @@ public extension UserEpisode {
         playbackErrorDetails = decodeOptionalStringFromString(value: episodeMap["playbackErrorDetails"])
         archived = decodeBoolFromString(value: episodeMap["archived"])
         downloadErrorDetails = decodeOptionalStringFromString(value: episodeMap["downloadErrorDetails"])
-        uploadStatus = decodeInt32FromString(value: episodeMap["uploadStatus"])
         imageUrl = episodeMap["imageUrl"]
         imageColor = decodeInt32FromString(value: episodeMap["imageColor"])
         hasCustomImage = decodeBoolFromString(value: episodeMap["hasCustomImage"])

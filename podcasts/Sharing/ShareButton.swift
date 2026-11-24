@@ -11,7 +11,6 @@ struct ShareButton: View {
     let style: ShareImageStyle
     let clipTime: ClipTime
     let clipUUID: String
-    let source: AnalyticsSource
 
     var frame: CurrentValueSubject<CGRect, Never> = .init(.zero)
 
@@ -20,15 +19,14 @@ struct ShareButton: View {
     var body: some View {
         Button {
             isExporting = true
-            shareTask = Task.detached { @MainActor in
+            shareTask = Task { @MainActor in
+                defer { isExporting = false }
                 do {
-                    try await destination.share(option, style: style, clipTime: clipTime, clipUUID: clipUUID, progress: $progress, presentFrom: frame, source: source)
+                    try await destination.share(option, style: style, clipTime: clipTime, clipUUID: clipUUID, progress: $progress, presentFrom: frame)
                 } catch {
                     if Task.isCancelled { return }
-                    await MainActor.run {
-                        Toast.show("Failed clip export: \(error.localizedDescription)")
-                        progress = nil
-                    }
+                    Toast.show(L10n.shareFailed(error.localizedDescription))
+                    progress = nil
                 }
             }
         } label: {

@@ -26,10 +26,6 @@ class CountryChooserViewController: PCViewController, UITableViewDataSource, UIT
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-
-        if didChangeRegion {
-            Analytics.track(.discoverRegionChanged, properties: ["region": selectedRegion])
-        }
     }
 
     // MARK: - UITableView Methods

@@ -48,12 +48,12 @@ extension PlaylistDetailViewController {
                     icon
                 },
                 actions: [
-                .init(
-                    title: emptyStateButtonTitle,
-                    action: { [weak self] in
-                        self?.emptyStateAction()
-                    }
-                )
+                    .init(
+                        title: emptyStateButtonTitle,
+                        action: { [weak self] in
+                            self?.emptyStateAction()
+                        }
+                    )
                 ])
         }
         set(configuration: config)
@@ -65,16 +65,13 @@ extension PlaylistDetailViewController {
 
     private func emptyStateAction() {
         if !viewModel.isManualPlaylist {
-            track(.filterEditRulesCtaEmptyTapped)
             editPlaylist()
             return
         }
         if viewModel.hasSubscribedPodcasts {
-            track(.filterAddEpisodesCtaEmptyTapped)
             addEpisodes()
             return
         }
-        track(.filterBrowseShowsCtaEmptyTapped)
         NavigationManager.shared.navigateTo(NavigationManager.discoverPageKey)
     }
 }

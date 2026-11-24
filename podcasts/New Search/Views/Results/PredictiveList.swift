@@ -5,7 +5,6 @@ import PocketCastsServer
 struct PredictiveList: View {
 
     @EnvironmentObject var theme: Theme
-    @EnvironmentObject var searchAnalyticsHelper: SearchAnalyticsHelper
     @EnvironmentObject var searchResults: SearchResultsModel
     @EnvironmentObject var searchHistory: SearchHistoryModel
 
@@ -24,12 +23,12 @@ struct PredictiveList: View {
         })
         return searchResults.predictive.filter { result in
             switch result.type {
-                case .podcast(let podcast):
-                    return !podcastsUuids.contains { uuid in
-                        uuid == podcast.uuid
-                    }
-                default:
-                    return false
+            case .podcast(let podcast):
+                return !podcastsUuids.contains { uuid in
+                    uuid == podcast.uuid
+                }
+            default:
+                return false
             }
         }
     }
@@ -53,21 +52,21 @@ struct PredictiveList: View {
     @ViewBuilder
     func predictiveRow(for predictiveSearch: PredictiveSearchResult) -> some View {
         switch predictiveSearch.type {
-            case .term(let searchTerm):
-                termRow(term: searchTerm)
-                    .listRowBackground(theme.searchBackground)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in
-                        return 0
-                    }
-                    .background(theme.searchBackground)
-            case .podcast:
-                SearchResultCell(episode: nil, result: PodcastFolderSearchResult(from: predictiveSearch), played: false, showDivider: false, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
-                    .listRowBackground(theme.searchBackground)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in
-                        return 0
-                    }
-            default:
-                EmptyView()
+        case .term(let searchTerm):
+            termRow(term: searchTerm)
+                .listRowBackground(theme.searchBackground)
+                .alignmentGuide(.listRowSeparatorLeading) { _ in
+                    return 0
+                }
+                .background(theme.searchBackground)
+        case .podcast:
+            SearchResultCell(episode: nil, result: PodcastSearchResult(from: predictiveSearch), played: false, showDivider: false, cellStyle: ListCellButtonStyle(backgroundStyle: .searchBackground))
+                .listRowBackground(theme.searchBackground)
+                .alignmentGuide(.listRowSeparatorLeading) { _ in
+                    return 0
+                }
+        default:
+            EmptyView()
         }
     }
 
@@ -86,7 +85,6 @@ struct PredictiveList: View {
     func termRow(term: String) -> some View {
         let formattedText = highlightTerm(searchResults.currentPredictiveSearchTerm, on: term)
         Button(action: {
-            searchAnalyticsHelper.trackPredictiveTermTapped(term: term)
             searchResults.search(term: term)
             searchHistory.add(searchTerm: term)
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.podcastSearchRequest, object: term)

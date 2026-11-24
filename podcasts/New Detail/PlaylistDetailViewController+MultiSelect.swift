@@ -4,82 +4,76 @@ import PocketCastsServer
 import PocketCastsUtils
 
 extension PlaylistDetailViewController: MultiSelectActionDelegate {
-        // MARK: - MultiSelect action delegate
+    // MARK: - MultiSelect action delegate
 
-        func multiSelectPresentingViewController() -> UIViewController {
-            self
+    func multiSelectPresentingViewController() -> UIViewController {
+        self
+    }
+
+    func multiSelectedBaseEpisodes() -> [BaseEpisode] {
+        selectedEpisodes.map(\.episode)
+    }
+
+    func multiSelectedPlayListEpisodes() -> [PlaylistEpisode]? {
+        nil
+    }
+
+    func multiSelectActionBegan(status: String) {
+        multiSelectActionInProgress = true
+        multiSelectFooter.setStatus(status: status)
+    }
+
+    func multiSelectActionCompleted() {
+        view.layoutIfNeeded()
+        UIView.animate(withDuration: Constants.Animation.defaultAnimationTime, animations: {
+            self.multiSelectFooterBottomConstraint.constant = 0
+            self.view.layoutIfNeeded()
+        }, completion: { _ in
+            self.multiSelectActionInProgress = false
+            self.isMultiSelectEnabled = false
+        })
+    }
+
+    // MARK: - Selected Episode
+
+    func selectedEpisodesContains(uuid: String) -> Bool {
+        let selectedUuids = selectedEpisodes.map(\.episode.uuid)
+        return selectedUuids.contains(uuid)
+    }
+
+    func selectedEpisodesRemove(uuid: String) {
+        let selectedUuids = selectedEpisodes.map(\.episode.uuid)
+        if let currentEpisodeIndex = selectedUuids.firstIndex(of: uuid) {
+            selectedEpisodes.remove(at: currentEpisodeIndex)
         }
+    }
 
-        func multiSelectedBaseEpisodes() -> [BaseEpisode] {
-            selectedEpisodes.map(\.episode)
+    func updateSelectAllBtn() {
+        guard isMultiSelectEnabled, let multiSelectAllBarButton else { return }
+        multiSelectAllBarButton.title = MultiSelectHelper.shouldSelectAll(onCount: selectedEpisodes.count, totalCount: viewModel.episodes.count) ? L10n.selectAll : L10n.deselectAll
+    }
+
+    @objc func selectAllTapped() {
+        let shouldSelectAll = MultiSelectHelper.shouldSelectAll(onCount: selectedEpisodes.count, totalCount: viewModel.episodes.count)
+
+        if shouldSelectAll {
+            tableView.selectAll()
+        } else {
+            tableView.deselectAll()
         }
+        updateSelectAllBtn()
+    }
 
-        func multiSelectedPlayListEpisodes() -> [PlaylistEpisode]? {
-            nil
-        }
+    @objc func cancelTapped() {
+        isMultiSelectEnabled = false
+    }
 
-        func multiSelectActionBegan(status: String) {
-            multiSelectActionInProgress = true
-            multiSelectFooter.setStatus(status: status)
-        }
+    func refreshMultiSelectEpisodes() {
+        guard isMultiSelectEnabled, !multiSelectActionInProgress else { return }
 
-        func multiSelectActionCompleted() {
-            view.layoutIfNeeded()
-            UIView.animate(withDuration: Constants.Animation.defaultAnimationTime, animations: {
-                self.multiSelectFooterBottomConstraint.constant = 0
-                self.view.layoutIfNeeded()
-            }, completion: { _ in
-                self.multiSelectActionInProgress = false
-                self.isMultiSelectEnabled = false
-            })
-        }
-
-        var multiSelectViewSource: AnalyticsSource {
-            analyticsSource
-        }
-
-        // MARK: - Selected Episode
-
-        func selectedEpisodesContains(uuid: String) -> Bool {
-            let selectedUuids = selectedEpisodes.map(\.episode.uuid)
-            return selectedUuids.contains(uuid)
-        }
-
-        func selectedEpisodesRemove(uuid: String) {
-            let selectedUuids = selectedEpisodes.map(\.episode.uuid)
-            if let currentEpisodeIndex = selectedUuids.firstIndex(of: uuid) {
-                selectedEpisodes.remove(at: currentEpisodeIndex)
-            }
-        }
-
-        func updateSelectAllBtn() {
-            guard isMultiSelectEnabled, let multiSelectAllBarButton else { return }
-            multiSelectAllBarButton.title = MultiSelectHelper.shouldSelectAll(onCount: selectedEpisodes.count, totalCount: viewModel.episodes.count) ? L10n.selectAll : L10n.deselectAll
-        }
-
-        @objc func selectAllTapped() {
-            let shouldSelectAll = MultiSelectHelper.shouldSelectAll(onCount: selectedEpisodes.count, totalCount: viewModel.episodes.count)
-
-            track(shouldSelectAll ? .filterSelectAll : .filterDeselectAll)
-
-            if shouldSelectAll {
-                tableView.selectAll()
-            } else {
-                tableView.deselectAll()
-            }
-            updateSelectAllBtn()
-        }
-
-        @objc func cancelTapped() {
-            isMultiSelectEnabled = false
-        }
-
-        func refreshMultiSelectEpisodes() {
-            guard isMultiSelectEnabled, !multiSelectActionInProgress else { return }
-
-            let selectedEpisodesInUpdatedEpisodes = selectedEpisodes.filter { viewModel.episodes.contains($0) }
-            selectedEpisodes.removeAll()
-            selectedEpisodes.append(contentsOf: selectedEpisodesInUpdatedEpisodes)
-            multiSelectFooter.setSelectedCount(count: selectedEpisodes.count)
-        }
+        let selectedEpisodesInUpdatedEpisodes = selectedEpisodes.filter { viewModel.episodes.contains($0) }
+        selectedEpisodes.removeAll()
+        selectedEpisodes.append(contentsOf: selectedEpisodesInUpdatedEpisodes)
+        multiSelectFooter.setSelectedCount(count: selectedEpisodes.count)
+    }
 }

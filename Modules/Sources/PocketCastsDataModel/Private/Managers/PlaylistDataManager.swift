@@ -96,10 +96,6 @@ class PlaylistDataManager {
         }
     }
 
-    func allUnsyncedPlaylists(dbQueue: GRDBQueue) -> [EpisodeFilter] {
-        allPlaylists(query: "SELECT * from \(DataManager.playlistsTableName) WHERE syncStatus = ? ORDER BY sortPosition ASC", values: [SyncStatus.notSynced.rawValue], dbQueue: dbQueue)
-    }
-
     func playlistContainsEpisode(episodeUuid: String, includeDeleted: Bool, dbQueue: GRDBQueue) -> Bool {
         var exists = false
         dbQueue.read { db in
@@ -281,26 +277,6 @@ class PlaylistDataManager {
                 try db.executeUpdate("DELETE FROM \(DataManager.playlistEpisodeTableName) WHERE playlist_uuid = ? OR playlist_id = ?", values: [playlist.uuid, playlist.id])
             } catch {
                 FileLog.shared.addMessage("PlaylistDataManager.delete error: \(error)")
-            }
-        }
-    }
-
-    func markAllSynced(dbQueue: GRDBQueue) {
-        dbQueue.write { db in
-            do {
-                try db.executeUpdate("UPDATE \(DataManager.playlistsTableName) SET syncStatus = ? WHERE syncStatus = ?", values: [SyncStatus.synced.rawValue, SyncStatus.notSynced.rawValue])
-            } catch {
-                FileLog.shared.addMessage("PlaylistDataManager.markAllSynced error: \(error)")
-            }
-        }
-    }
-
-    func markAllUnsynced(dbQueue: GRDBQueue) {
-        dbQueue.write { db in
-            do {
-                try db.executeUpdate("UPDATE \(DataManager.playlistsTableName) SET syncStatus = ? WHERE syncStatus = ?", values: [SyncStatus.notSynced.rawValue, SyncStatus.synced.rawValue])
-            } catch {
-                FileLog.shared.addMessage("PlaylistDataManager.markAllUnsynced error: \(error)")
             }
         }
     }

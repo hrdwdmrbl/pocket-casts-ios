@@ -4,7 +4,6 @@ import UIKit
 import Foundation
 import PocketCastsDataModel
 #if !os(watchOS) && !APPCLIP && !os(tvOS)
-import EndOfYear
 #endif
 
 extension EpisodeFilter {
@@ -77,26 +76,26 @@ extension EpisodeFilter {
     }
 
     #if !os(watchOS)
-        func playlistColor() -> UIColor {
-            AppTheme.colorForStyle(playlistStyle())
-        }
+    func playlistColor() -> UIColor {
+        AppTheme.colorForStyle(playlistStyle())
+    }
 
-        func playlistStyle() -> ThemeStyle {
-            guard let icon = PlaylistIcon(rawValue: customIcon) else { return .filter01 }
+    func playlistStyle() -> ThemeStyle {
+        guard let icon = PlaylistIcon(rawValue: customIcon) else { return .filter01 }
 
-            switch icon {
-            case .redPlaylist, .redmostPlayed, .redRecent, .redDownloading, .redUnplayed, .redAudio, .redVideo, .redTop:
-                return .filter01
-            case .bluePlaylist, .bluemostPlayed, .blueRecent, .blueDownloading, .blueUnplayed, .blueAudio, .blueVideo, .blueTop:
-                return .filter05
-            case .greenPlaylist, .greenmostPlayed, .greenRecent, .greenDownloading, .greenUnplayed, .greenAudio, .greenVideo, .greenTop:
-                return .filter04
-            case .purplePlaylist, .purplemostPlayed, .purpleRecent, .purpleDownloading, .purpleUnplayed, .purpleAudio, .purpleVideo, .purpleTop:
-                return .filter06
-            case .yellowPlaylist, .yellowmostPlayed, .yellowRecent, .yellowDownloading, .yellowUnplayed, .yellowAudio, .yellowVideo, .yellowTop:
-                return .filter03
-            }
+        switch icon {
+        case .redPlaylist, .redmostPlayed, .redRecent, .redDownloading, .redUnplayed, .redAudio, .redVideo, .redTop:
+            return .filter01
+        case .bluePlaylist, .bluemostPlayed, .blueRecent, .blueDownloading, .blueUnplayed, .blueAudio, .blueVideo, .blueTop:
+            return .filter05
+        case .greenPlaylist, .greenmostPlayed, .greenRecent, .greenDownloading, .greenUnplayed, .greenAudio, .greenVideo, .greenTop:
+            return .filter04
+        case .purplePlaylist, .purplemostPlayed, .purpleRecent, .purpleDownloading, .purpleUnplayed, .purpleAudio, .purpleVideo, .purpleTop:
+            return .filter06
+        case .yellowPlaylist, .yellowmostPlayed, .yellowRecent, .yellowDownloading, .yellowUnplayed, .yellowAudio, .yellowVideo, .yellowTop:
+            return .filter03
         }
+    }
     #endif
 
     func maxAutoDownloadEpisodes() -> Int32 {

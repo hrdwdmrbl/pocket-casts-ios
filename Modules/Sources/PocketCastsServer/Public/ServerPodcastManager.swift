@@ -26,6 +26,12 @@ public class ServerPodcastManager: NSObject {
 
     private let urlConnection = URLConnection(handler: URLSession.shared)
 
+    public func finishPendingSubscriptions() async {
+        await withCheckedContinuation { continuation in
+            subscribeQueue.addBarrierBlock { continuation.resume() }
+        }
+    }
+
     // MARK: - Podcast add functions
 
     /// This tries to add the podcast with UUID up to 7 times if the call fails first time.
@@ -87,7 +93,6 @@ public class ServerPodcastManager: NSObject {
             guard let strongSelf = self else { return }
 
             let added = strongSelf.addPodcast(podcastInfo: podcastInfo, subscribe: subscribe, autoDownloads: autoDownloads, lastModified: lastModified)
-            if subscribe, added { ServerConfig.shared.syncDelegate?.subscribedToPodcast() } // addFromUuid and addFromiTunesId end up here, so just need this one analytic
             completion?(added)
         }
     }
@@ -113,13 +118,6 @@ public class ServerPodcastManager: NSObject {
                 return
             }
 
-            // at this point we have the podcast, now we need the sync info for it if we're signed in
-            if SyncManager.isUserLoggedIn() {
-                guard let episodes = ApiServerHandler.shared.retrieveEpisodeTaskSynchronouusly(podcastUuid: upNextItem.podcastUuid) else { return }
-
-                DataManager.shared.saveBulkEpisodeSyncInfo(episodes: DataConverter.convert(syncInfoEpisodes: episodes))
-            }
-
             self?.addToDatabase(upNextItem: upNextItem, to: existingPodcast)
             completion?(true)
         }
@@ -127,9 +125,8 @@ public class ServerPodcastManager: NSObject {
 
     public func addMissingPodcast(episodeUuid: String, podcastUuid: String) {
         let url = ServerConstants.Urls.cache() + "mobile/podcast/findbyepisode/\(podcastUuid)/\(episodeUuid)"
-
-        if let info = loadFrom(url: url), addPodcast(podcastInfo: info, subscribe: false, lastModified: nil) {
-            // all good
+        if let info = loadFrom(url: url) {
+            _ = addPodcast(podcastInfo: info, subscribe: false, lastModified: nil)
         }
     }
 
@@ -151,7 +148,7 @@ public class ServerPodcastManager: NSObject {
 
         if let info = loadFrom(url: url) {
             // Ensure podcast is added, otherwise episode won't be
-            if !PodcastExistsHelper.shared.exists(uuid: podcastUuid) {
+            if DataManager.shared.findPodcast(uuid: podcastUuid, includeUnsubscribed: true) == nil {
                 _ = addPodcast(podcastInfo: info, subscribe: false, lastModified: nil)
             }
 
@@ -170,7 +167,7 @@ public class ServerPodcastManager: NSObject {
             }
 
             // Ensure podcast is added, otherwise episode won't be
-            if !PodcastExistsHelper.shared.exists(uuid: podcastUuid) {
+            if DataManager.shared.findPodcast(uuid: podcastUuid, includeUnsubscribed: true) == nil {
                 _ = addPodcast(podcastInfo: info, subscribe: false, lastModified: nil)
             }
 
@@ -216,7 +213,7 @@ public class ServerPodcastManager: NSObject {
             DataManager.shared.save(podcast: existingPodcast)
             updateLatestEpisodeInfo(podcast: existingPodcast, setDefaults: true, autoDownloadLimit: autoDownloads)
 
-            ServerConfig.shared.syncDelegate?.podcastAdded(podcastUuid: existingPodcast.uuid)
+            ServerConfig.shared.refreshDelegate?.podcastAdded(podcastUuid: existingPodcast.uuid)
 
             return true
         }
@@ -240,7 +237,7 @@ public class ServerPodcastManager: NSObject {
 
         updateLatestEpisodeInfo(podcast: podcast, setDefaults: subscribe, autoDownloadLimit: autoDownloads)
 
-        if subscribe { ServerConfig.shared.syncDelegate?.podcastAdded(podcastUuid: podcast.uuid) }
+        if subscribe { ServerConfig.shared.refreshDelegate?.podcastAdded(podcastUuid: podcast.uuid) }
 
         return true
     }
@@ -267,7 +264,6 @@ public class ServerPodcastManager: NSObject {
                 episode.episodeNumber = updatedEpisode.episodeNumber
                 episode.seasonNumber = updatedEpisode.seasonNumber
                 episode.episodeType = updatedEpisode.episodeType
-                episode.hasGeneratedTranscript = updatedEpisode.hasGeneratedTranscript
                 // Only overwrite when the response actually carries an HLS url — the server can omit
                 // alternate enclosures on an update, and we don't want to clear one a feed refresh set.
                 if let hlsUrl = updatedEpisode.hlsUrl, !hlsUrl.isEmpty {
@@ -389,30 +385,13 @@ public class ServerPodcastManager: NSObject {
         homeGridSortOrder(highest: false)
     }
 
-    public func highestSortOrder(for folder: Folder) -> Int32 {
-        let folderPodcasts = DataManager.shared.allPodcastsInFolder(folder: folder)
-        var highest: Int32 = 1
-
-        for podcast in folderPodcasts {
-            if podcast.sortOrder > highest { highest = podcast.sortOrder }
-        }
-
-        return highest
-    }
-
     private func homeGridSortOrder(highest: Bool) -> Int32 {
-        let gridPodcasts = DataManager.shared.allPodcasts(includeUnsubscribed: false).filter { $0.folderUuid == nil }
-        let allFolders = DataManager.shared.allFolders()
+        let gridPodcasts = DataManager.shared.allPodcasts(includeUnsubscribed: false)
         var value: Int32 = highest ? 1 : 0
 
         for podcast in gridPodcasts {
             if highest, podcast.sortOrder > value { value = podcast.sortOrder }
             else if !highest, podcast.sortOrder < value { value = podcast.sortOrder }
-        }
-
-        for folder in allFolders {
-            if highest, folder.sortOrder > value { value = folder.sortOrder }
-            else if !highest, folder.sortOrder < value { value = folder.sortOrder }
         }
 
         return value

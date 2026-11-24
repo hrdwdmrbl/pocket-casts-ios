@@ -1,487 +1,106 @@
-import AVFoundation
 import PocketCastsDataModel
-import PocketCastsServer
 import PocketCastsUtils
 import UIKit
 
 class AddCustomViewController: PCViewController, UITextFieldDelegate {
-    @IBOutlet var backgroundView: ThemeableView! {
-        didSet {
-            backgroundView.style = .primaryUi04
-        }
-    }
+    private let fileUrl: URL
+    private let uuid: String
+    private let episodeToEdit: UserEpisode?
+    private var destinationUrl: URL?
+    private var duration: TimeInterval = 0
+    private var artwork: UIImage?
+    private var avFileUtil: AVFileUtil?
+    private let nameTextfield = UITextField()
 
-    @IBOutlet var nameTextfield: ThemeableTextField! {
-        didSet {
-            nameTextfield.delegate = self
-            nameTextfield.returnKeyType = .done
-            nameTextfield.textStyle = .primaryText01
-            nameTextfield.backgroundStyle = .primaryUi02
-        }
-    }
-
-    @IBOutlet var nameLabel: ThemeableLabel! {
-        didSet {
-            nameLabel.style = .primaryText02
-        }
-    }
-
-    @IBOutlet var sizeLabel: ThemeableLabel! {
-        didSet {
-            nameLabel.style = .primaryText02
-        }
-    }
-
-    @IBOutlet var nameContainerView: ThemeableView! {
-        didSet {
-            nameContainerView.style = .primaryUi02
-            nameContainerView.layer.borderWidth = 0.5
-            nameContainerView.layer.borderColor = AppTheme.colorForStyle(.primaryUi05).cgColor
-        }
-    }
-
-    @IBOutlet var customiseArtworkView: ThemeableView! {
-        didSet {
-            customiseArtworkView.style = .primaryUi02
-            customiseArtworkView.layer.borderWidth = 0.5
-            customiseArtworkView.layer.borderColor = AppTheme.colorForStyle(.primaryUi05).cgColor
-        }
-    }
-
-    @IBOutlet var lockView: PlusLockedInfoView! {
-        didSet {
-            lockView.delegate = self
-        }
-    }
-
-    @IBOutlet var imageBackgroundView: UIView!
-    @IBOutlet var fileImageView: UIImageView! {
-        didSet {
-            fileImageView.layer.cornerRadius = 8
-            fileImageView.clipsToBounds = true
-        }
-    }
-
-    @IBOutlet var addCustomlock: UIImageView!
-    @IBOutlet var addCustomImageButton: ThemeableRoundedButton! {
-        didSet {
-            addCustomImageButton.textStyle = .primaryInteractive01
-            addCustomImageButton.buttonStyle = .primaryUi02
-        }
-    }
-
-    @IBOutlet var colorPickerView: UICollectionView! {
-        didSet {
-            colorPickerView.contentInset = UIEdgeInsets(top: 0, left: 13, bottom: 0, right: 0)
-            colorPickerView.register(UINib(nibName: "CustomStorageColorCell", bundle: nil), forCellWithReuseIdentifier: AddCustomViewController.colorCellId)
-        }
-    }
-
-    @IBOutlet var errorView: ThemeableView! {
-        didSet {
-            errorView.style = .primaryUi01
-        }
-    }
-
-    @IBOutlet var errorImageView: ThemeableImageView! {
-        didSet {
-            errorImageView.imageNameFunc = AppTheme.fileErrorImageName
-        }
-    }
-
-    @IBOutlet var errorLabel: ThemeableLabel!
-    @IBOutlet var imageSaveErrorLabel: ThemeableLabel! {
-        didSet {
-            imageSaveErrorLabel.style = .primaryText02
-        }
-    }
-
-    @IBOutlet var scrollView: UIScrollView!
-    static let colorCellId = "ColorCellId"
-
-    let fileUrl: URL
-    var name: String
-    var destinationUrl: URL!
-    var isVideo: Bool = false
-    var fileSize: Int = 0 {
-        didSet {
-            if fileSize > 0 {
-                let maxStorage = Int64(max(ServerSettings.customStorageUserLimit(), Constants.RemoteParams.customStorageLimitGBDefault.gigabytes))
-                let usedStorage = Int64(ServerSettings.customStorageUsed())
-                if usedStorage + Int64(fileSize) > maxStorage, Settings.userFilesAutoUpload() {
-                    showError(message: L10n.fileUploadError + "\n" + L10n.fileUploadErrorSubtitle)
-                }
-            }
-        }
-    }
-
-    var artwork: UIImage? {
-        didSet {
-            if let artworkImage = artwork {
-                fileImageView.image = artworkImage // artworkImage.kf.scaled(to: 680)
-                fileImageView.contentMode = .scaleAspectFit
-                fileImageView.backgroundColor = AppTheme.embeddedArtworkColor
-                imageBackgroundView.backgroundColor = AppTheme.embeddedArtworkColor
-                addCustomImageButton.setTitle(L10n.fileUploadRemoveImage, for: .normal)
-                colorPickerView.reloadData()
-            } else {
-                addCustomImageButton.setTitle(L10n.fileUploadAddImage, for: .normal)
-            }
-        }
-    }
-
-    var artworkNeedsUpdating = false
-
-    var duration: TimeInterval = 0
-    var selectedColor: Int = 1
-    var selectedColorIndex: Int = 0 {
-        didSet {
-            selectedColor = artwork == nil ? selectedColorIndex + 1 : selectedColorIndex
-            if selectedColor > 0 {
-                fileImageView.contentMode = .scaleToFill
-                ImageManager.shared.imageForUserEpisodeColor(color: selectedColor, imageView: fileImageView, size: .list, completionHandler: { found in
-                    if !found {
-                        self.fileImageView.backgroundColor = AppTheme.userEpisodeColor(number: self.selectedColorIndex)
-                    }
-                })
-            } else {
-                if let artworkImage = artwork {
-                    fileImageView.image = artworkImage.kf.scaled(to: 680)
-                    fileImageView.contentMode = .scaleAspectFit
-                    imageBackgroundView.backgroundColor = AppTheme.embeddedArtworkColor
-                }
-            }
-        }
-    }
-
-    var embeddedImage: UIImage?
-    var artworkIndexPath: IndexPath?
-    var greyIndexPath = IndexPath(row: 0, section: 0)
-    var uuid: String
-    var episodeToEdit: UserEpisode?
-
-    required init(fileUrl: URL) {
+    init(fileUrl: URL) {
         self.fileUrl = fileUrl
-        name = fileUrl.deletingPathExtension().lastPathComponent
         uuid = UUID().uuidString.lowercased()
-        selectedColor = 1
+        episodeToEdit = nil
         super.init(nibName: nil, bundle: nil)
     }
 
-    required init(episode: UserEpisode) {
-        uuid = episode.uuid
+    init(episode: UserEpisode) {
         fileUrl = URL(fileURLWithPath: DownloadManager.shared.path(for: episode))
+        uuid = episode.uuid
         episodeToEdit = episode
-        name = episode.title ?? ""
         super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("AddCUstomViewController init(coder) not implemented")
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func loadView() {
+        view = UIView()
+        view.backgroundColor = AppTheme.colorForStyle(.primaryUi01)
+        nameTextfield.borderStyle = .roundedRect
+        nameTextfield.returnKeyType = .done
+        nameTextfield.delegate = self
+        nameTextfield.accessibilityLabel = L10n.fileUploadNameRequired
+        nameTextfield.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(nameTextfield)
+        NSLayoutConstraint.activate([
+            nameTextfield.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            nameTextfield.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            nameTextfield.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
+            nameTextfield.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+        ])
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Analytics.track(.userFileEditShown)
-        if let mainView = view as? ThemeableView {
-            mainView.style = .primaryUi04
+        title = episodeToEdit == nil ? L10n.fileUploadAddFile : L10n.fileUploadEditFile
+        nameTextfield.text = episodeToEdit?.title ?? fileUrl.deletingPathExtension().lastPathComponent
+        nameTextfield.addTarget(self, action: #selector(nameChanged), for: .editingChanged)
+        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
+        customRightBtn = UIBarButtonItem(title: L10n.fileUploadSave, style: .plain, target: self, action: #selector(saveTapped))
+        guard episodeToEdit == nil else { return }
+        do {
+            let destination = try DownloadManager.shared.addLocalFile(url: fileUrl, uuid: uuid)
+            destinationUrl = destination
+            avFileUtil = AVFileUtil(fileURL: destination, durationHandler: { [weak self] duration in
+                DispatchQueue.main.async { self?.duration = duration }
+            }, titleHandler: { _ in }, artworkHandler: { [weak self] image in
+                DispatchQueue.main.async { self?.artwork = image }
+            })
+        } catch {
+            customRightBtn?.isEnabled = false
+            showError(error)
         }
-        setupColorPicker()
+    }
+
+    @objc private func nameChanged() {
+        customRightBtn?.isEnabled = !(nameTextfield.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    @objc private func saveTapped() {
+        guard let name = nameTextfield.text, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         if let episode = episodeToEdit {
-            title = L10n.fileUploadEditFile
-            nameTextfield.text = name
-            nameLabel.text = name
-            fileSize = Int(episode.sizeInBytes)
-            sizeLabel.text = SizeFormatter.shared.defaultFormat(bytes: Int64(fileSize))
-
-            if episode.imageColor == 0 {
-                ImageManager.shared.image(for: episode, size: .list) { [weak self] image in
-                    self?.artwork = image
-                }
-            } else {
-                selectedColorIndex = Int(episode.imageColor) - 1
-                artwork = nil
-            }
-
-            imageSaveErrorLabel.isHidden = true
-            errorView.isHidden = true
-            let cancelButton = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
-            navigationItem.leftBarButtonItem = cancelButton
-
-            colorPickerView.selectItem(at: IndexPath(item: selectedColorIndex, section: 0), animated: false, scrollPosition: .left)
-            view.backgroundColor = AppTheme.uploadProgressBackgroundColor
-
-            nameTextfield.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
-            setupScrollViewOffset()
-            setupUserAccess()
-        } else {
-            guard FileTypeUtil.isSupportedUserFileType(fileName: fileUrl.absoluteString) else {
-                showError(message: L10n.fileUploadSupportError)
-                return
-            }
+            UserEpisodeManager.updateUserEpisode(uuid: uuid, title: name, color: Int(episode.imageColor))
+            navigationController?.popViewController(animated: true)
+        } else if let destinationUrl {
             do {
-                let newFileLocation = try DownloadManager.shared.addLocalFile(url: fileUrl, uuid: uuid)
-                destinationUrl = newFileLocation
-                title = L10n.fileUploadAddFile
-                errorView.isHidden = true
-                let cancelButton = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
-                navigationItem.leftBarButtonItem = cancelButton
-
-                view.backgroundColor = AppTheme.uploadProgressBackgroundColor
-
-                nameTextfield.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
-                setupFileDetails()
-                imageSaveErrorLabel.isHidden = true
-                setupScrollViewOffset()
-            } catch {
-                showError(message: L10n.pleaseTryAgain) // TODO: update error meessage
-            }
-        }
-
-        addCustomObserver(ServerNotifications.subscriptionStatusChanged, selector: #selector(setupUserAccess))
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        colorPickerView.selectItem(at: IndexPath(item: selectedColorIndex, section: 0), animated: false, scrollPosition: .centeredHorizontally)
-        let saveButton = UIBarButtonItem(title: L10n.fileUploadSave, style: .plain, target: self, action: #selector(saveTapped))
-        customRightBtn = saveButton
-    }
-
-    // MARK: Private helpers
-
-    private func setupScrollViewOffset() {
-        let existingInset = scrollView.contentInset
-        scrollView.contentInset = UIEdgeInsets(top: existingInset.top, left: existingInset.left, bottom: existingInset.bottom + Constants.Values.miniPlayerOffset, right: existingInset.right)
-    }
-
-    private var avFileUtil: AVFileUtil?
-    private func setupFileDetails() {
-        avFileUtil = AVFileUtil(fileURL: destinationUrl, durationHandler: { [weak self] duration in
-            self?.duration = duration
-        }, titleHandler: { [weak self] embeddedName in
-            guard let self else { return }
-            if let embeddedName {
-                self.name = embeddedName
-            }
-            DispatchQueue.main.async {
-                self.nameTextfield.text = self.name
-                self.nameLabel.text = self.name
-            }
-        }, artworkHandler: { [weak self] image in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.embeddedImage = image
-                self.artwork = image
-                self.selectedColorIndex = 0
-                self.colorPickerView.reloadData()
-                self.colorPickerView.selectItem(at: IndexPath(item: self.selectedColorIndex, section: 0), animated: false, scrollPosition: .left)
-                self.setupUserAccess()
-            }
-        })
-
-        DispatchQueue.main.async {
-            do {
-                let resources = try self.destinationUrl.resourceValues(forKeys: [.fileSizeKey])
-                self.fileSize = resources.fileSize ?? 0
-                self.sizeLabel.text = SizeFormatter.shared.defaultFormat(bytes: Int64(self.fileSize))
-            } catch {}
+                let size = try destinationUrl.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                _ = try UserEpisodeManager.addUserEpisode(uuid: uuid, title: name, localFileUrl: destinationUrl, artwork: artwork, color: 1, fileSize: size, duration: duration)
+                dismiss(animated: true)
+            } catch { showError(error) }
         }
     }
 
-    private lazy var lockedArtworkTapGesture = UITapGestureRecognizer(target: self, action: #selector(showSubscriptionRequired))
-
-    @objc private func setupUserAccess() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            if SubscriptionHelper.hasActiveSubscription() {
-                self.addCustomlock.isHidden = true
-                self.lockView.isHidden = true
-                self.addCustomImageButton.alpha = 1
-            } else {
-                self.addCustomImageButton.setTitle(L10n.fileUploadAddImage, for: .normal)
-                self.addCustomImageButton.isEnabled = true
-                self.addCustomlock.isHidden = false
-                self.lockView.isHidden = Settings.plusInfoDismissedOnFilesAdd
-
-                if self.embeddedImage == nil {
-                    self.customiseArtworkView.addGestureRecognizer(self.lockedArtworkTapGesture)
-                    self.customiseArtworkView.alpha = 0.3
-                } else {
-                    self.customiseArtworkView.removeGestureRecognizer(self.lockedArtworkTapGesture)
-                    self.customiseArtworkView.alpha = 1
-                    self.addCustomImageButton.alpha = 0.3
-                }
-            }
-        }
-    }
-
-    // MARK: Actions
-
-    @IBAction func cancelTapped() {
-        Analytics.track(.userFileEditDismissed)
-        navigationController?.navigationBar.isHidden = false
+    @objc func cancelTapped() {
         if episodeToEdit == nil {
-            if let destinationUrl {
-                StorageManager.removeItem(at: destinationUrl)
-            }
-            dismiss(animated: true, completion: nil)
+            if let destinationUrl { StorageManager.removeItem(at: destinationUrl) }
+            dismiss(animated: true)
         } else {
             navigationController?.popViewController(animated: true)
         }
     }
 
-    @objc func saveTapped() {
-        Analytics.track(.userFileEditSave)
-        nameTextfield.resignFirstResponder()
-        nameTextfield.isHidden = true
-        imageSaveErrorLabel.isHidden = true
-
-        let selectedColor = greyIndexPath.item == 0 ? selectedColorIndex + 1 : selectedColorIndex
-
-        if let episodeToEdit {
-            if artworkNeedsUpdating {
-                do {
-                    try UserEpisodeManager.updateUserEpisodeImage(uuid: episodeToEdit.uuid, artwork: artwork, completion: {
-                        UserEpisodeManager.updateUserEpisode(uuid: episodeToEdit.uuid, title: self.name, color: selectedColor)
-                        DispatchQueue.main.async {
-                            self.navigationController?.popViewController(animated: true)
-                        }
-                        WidgetHelper.shared.updateCustomImage(userEpisode: episodeToEdit)
-                    })
-                } catch {
-                    imageSaveErrorLabel.isHidden = false
-                    return
-                }
-            } else {
-                UserEpisodeManager.updateUserEpisode(uuid: episodeToEdit.uuid, title: name, color: selectedColor)
-
-                navigationController?.popViewController(animated: true)
-            }
-        } else {
-            do {
-                _ = try UserEpisodeManager.addUserEpisode(uuid: uuid, title: name, localFileUrl: destinationUrl, artwork: artwork, color: selectedColor, fileSize: fileSize, duration: duration)
-                dismiss(animated: true, completion: nil)
-            } catch {
-                imageSaveErrorLabel.isHidden = false
-            }
-        }
+    private func showError(_ error: Error) {
+        SJUIUtils.showAlert(title: L10n.fileUploadAddFile, message: error.localizedDescription, from: self)
     }
-
-    @IBAction func addCustomImageClicked(_ sender: Any) {
-        guard SubscriptionHelper.hasActiveSubscription() else {
-            showSubscriptionRequired()
-            return
-        }
-
-        if artwork == nil { // add image
-            // Check permissions and add the actions
-            switch AVCaptureDevice.authorizationStatus(for: .video) {
-            case .authorized:
-                showAddImagePicker(hasCameraAccess: true)
-            case .notDetermined:
-                AVCaptureDevice.requestAccess(for: .video) { granted in
-                    // as per the documentation: The completion handler is called on an arbitrary dispatch queue. It is the client's responsibility to ensure that any UIKit-related updates are called on the main queue or main thread as a result.
-                    DispatchQueue.main.async {
-                        self.showAddImagePicker(hasCameraAccess: granted)
-                    }
-                }
-            default:
-                showAddImagePicker(hasCameraAccess: false)
-            }
-        } else { // remove image
-            artwork = nil
-            artworkNeedsUpdating = true
-            colorPickerView.reloadData()
-            if selectedColorIndex > 0 {
-                selectedColorIndex = selectedColorIndex - 1
-            } else {
-                selectedColorIndex = 0
-            }
-            colorPickerView.selectItem(at: IndexPath(item: selectedColorIndex, section: 0), animated: false, scrollPosition: .left)
-        }
-    }
-
-    private func showAddImagePicker(hasCameraAccess: Bool) {
-        let optionPicker = OptionsPicker(title: L10n.fileUploadChooseImage)
-
-        if hasCameraAccess {
-            let cameraAction = OptionAction(label: L10n.fileUploadChooseImageCamera, icon: nil) {
-                self.showCamera()
-            }
-            optionPicker.addAction(action: cameraAction)
-        }
-
-        let libraryAction = OptionAction(label: L10n.fileUploadChooseImagePhotoLibrary, icon: nil) {
-            self.showPhotoLibrary()
-        }
-        optionPicker.addAction(action: libraryAction)
-
-        optionPicker.present(from: self)
-    }
-
-    private func showError(message: String) {
-        navigationController?.navigationBar.isHidden = true
-        errorLabel.text = message
-        errorView.isHidden = false
-    }
-
-    override func handleThemeChanged() {
-        customiseArtworkView.layer.borderColor = AppTheme.colorForStyle(.primaryUi05).cgColor
-        nameContainerView.layer.borderColor = AppTheme.colorForStyle(.primaryUi05).cgColor
-        colorPickerView.reloadData()
-        colorPickerView.selectItem(at: IndexPath(item: selectedColorIndex, section: 0), animated: false, scrollPosition: .centeredHorizontally)
-    }
-
-    // MARK: Textfield delegate
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
-        return false
-    }
-
-    func textFieldDidBeginEditing(_ textField: UITextField) {
-        NotificationCenter.postOnMainThread(notification: Constants.Notifications.textEditingDidStart)
-    }
-
-    func textFieldDidEndEditing(_ textField: UITextField) {
-        NotificationCenter.postOnMainThread(notification: Constants.Notifications.textEditingDidEnd)
-        textField.resignFirstResponder()
-    }
-
-    @objc func textFieldDidChange(_ textField: UITextField) {
-        if let typedText = nameTextfield.text, !typedText.isEmpty {
-            nameLabel.text = typedText
-            name = typedText
-            nameLabel.style = .primaryText02
-            navigationItem.rightBarButtonItem?.isEnabled = true
-        } else {
-            navigationItem.rightBarButtonItem?.isEnabled = false
-            nameLabel.text = L10n.fileUploadNameRequired
-            nameLabel.style = .support05
-        }
-    }
-
-    @objc func showSubscriptionRequired() {
-        NavigationManager.shared.showUpsellView(from: self, source: .files)
-    }
-}
-
-// MARK: Plus Locked Info Delegate
-
-extension AddCustomViewController: PlusLockedInfoDelegate {
-    func closeInfoTapped() {
-        lockView.isHidden = true
-        Settings.plusInfoDismissedOnFilesAdd = true
-    }
-
-    var displayingViewController: UIViewController {
-        self
-    }
-
-    var displaySource: PlusUpgradeViewSource {
-        .files
+        return true
     }
 }

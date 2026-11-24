@@ -2,18 +2,12 @@ import PocketCastsDataModel
 import UIKit
 import PocketCastsUtils
 
-protocol ShareListDelegate: AnyObject {
-    func shareUrlAvailable(_ shareUrl: String, listName: String)
-}
-
 class SharePodcastsViewController: PCViewController, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     private let podcastCellId = "SelectPodcastCell"
 
     private let interCellPadding = 8 as CGFloat
     private let sidePadding = 16 as CGFloat
     private let podcastsPerRow = 4 as CGFloat
-
-    weak var delegate: ShareListDelegate?
 
     @IBOutlet var selectedCount: UILabel!
     @IBOutlet var selectAllBtn: UIButton!
@@ -32,11 +26,11 @@ class SharePodcastsViewController: PCViewController, UICollectionViewDelegate, U
 
     private var podcasts = [Podcast]()
     private var selectedPodcasts = [Podcast]()
-    private var nextBtn: UIBarButtonItem!
+    private var shareBtn: UIBarButtonItem!
 
     override func viewDidLoad() {
-        nextBtn = UIBarButtonItem(title: L10n.next, style: .plain, target: self, action: #selector(SharePodcastsViewController.nextTapped))
-        customRightBtn = nextBtn
+        shareBtn = UIBarButtonItem(title: L10n.share, style: .plain, target: self, action: #selector(shareTapped))
+        customRightBtn = shareBtn
 
         super.viewDidLoad()
         title = L10n.shareSelectPodcasts
@@ -44,17 +38,30 @@ class SharePodcastsViewController: PCViewController, UICollectionViewDelegate, U
 
         loadPodcasts()
         updateSelectButton()
-
-        Analytics.track(.sharePodcastsShown)
     }
 
     // MARK: - Main Actions
 
-    @objc private func nextTapped() {
-        Analytics.track(.sharePodcastsPodcastsSelected, properties: ["count": selectedPodcasts.count])
+    @objc private func shareTapped() {
+        shareBtn.isEnabled = false
+        podcastCollectionView.isUserInteractionEnabled = false
+        selectAllBtn.isEnabled = false
 
-        let nextPage = SharePublishViewController(podcasts: selectedPodcasts, delegate: delegate)
-        navigationController?.pushViewController(nextPage, animated: true)
+        Task { @MainActor in
+            defer {
+                updateSelectButton()
+                podcastCollectionView.isUserInteractionEnabled = true
+                selectAllBtn.isEnabled = true
+            }
+            do {
+                let url = try await OpmlExporter(podcasts: selectedPodcasts).export()
+                let activityViewController = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+                activityViewController.popoverPresentationController?.barButtonItem = shareBtn
+                present(activityViewController, animated: true)
+            } catch {
+                SJUIUtils.showAlert(title: L10n.settingsExportError, message: L10n.settingsExportErrorMsg, from: self)
+            }
+        }
     }
 
     @objc private func cancelTapped() {
@@ -130,15 +137,11 @@ class SharePodcastsViewController: PCViewController, UICollectionViewDelegate, U
             self.selectAllBtn.layoutIfNeeded()
         }
 
-        nextBtn.isEnabled = !selectedPodcasts.isEmpty
+        shareBtn.isEnabled = !selectedPodcasts.isEmpty
     }
 
     private func loadPodcasts() {
-        let loadedPodcasts = DataManager.shared.allPodcastsOrderedByTitle()
-        for podcast in loadedPodcasts {
-            if podcast.isPrivate { continue } // Hide all private podcasts
-            podcasts.append(podcast)
-        }
+        podcasts = DataManager.shared.allPodcastsOrderedByTitle()
 
         podcastCollectionView.reloadData()
     }

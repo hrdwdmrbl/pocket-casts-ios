@@ -82,10 +82,6 @@ class ExpandedEpisodeListViewController: PCViewController, UITableViewDelegate, 
         guard let podcastUuid = episode.podcastUuid,
               let episodeUuid = episode.uuid else { return }
 
-        if let listId = podcastCollection.listId {
-            AnalyticsHelper.podcastEpisodeTapped(fromList: listId, podcastUuid: podcastUuid, episodeUuid: episodeUuid)
-        }
-
         DiscoverEpisodeViewModel.loadPodcast(podcastUuid, episodeUuid: episodeUuid)
             .receive(on: RunLoop.main)
             .sink { [weak self] podcast in
@@ -114,11 +110,5 @@ class ExpandedEpisodeListViewController: PCViewController, UITableViewDelegate, 
         } else {
             present(SFSafariViewController(with: url), animated: true, completion: nil)
         }
-    }
-}
-
-extension ExpandedEpisodeListViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .discoverEpisodeList
     }
 }

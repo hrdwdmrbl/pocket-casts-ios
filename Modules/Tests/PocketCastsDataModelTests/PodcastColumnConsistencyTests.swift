@@ -70,11 +70,9 @@ final class PodcastColumnConsistencyTests: DataManagerTestCase {
             XCTAssertEqual(loaded.overrideGlobalArchive, original.overrideGlobalArchive, "overrideGlobalArchive should match")
             XCTAssertEqual(loaded.autoArchivePlayedAfter, original.autoArchivePlayedAfter, "autoArchivePlayedAfter should match")
             XCTAssertEqual(loaded.autoArchiveInactiveAfter, original.autoArchiveInactiveAfter, "autoArchiveInactiveAfter should match")
-            XCTAssertEqual(loaded.isPaid, original.isPaid, "isPaid should match")
             XCTAssertEqual(loaded.licensing, original.licensing, "licensing should match")
             XCTAssertEqual(loaded.showArchived, original.showArchived, "showArchived should match")
             XCTAssertEqual(loaded.refreshAvailable, original.refreshAvailable, "refreshAvailable should match")
-            XCTAssertEqual(loaded.folderUuid, original.folderUuid, "folderUuid should match")
             XCTAssertEqual(loaded.usedCustomEffectsBefore, original.usedCustomEffectsBefore, "usedCustomEffectsBefore should match")
             XCTAssertEqual(loaded.isPrivate, original.isPrivate, "isPrivate should match")
             XCTAssertEqual(loaded.isExplicit, original.isExplicit, "isExplicit should match")
@@ -304,11 +302,9 @@ final class PodcastColumnConsistencyTests: DataManagerTestCase {
         podcast.overrideGlobalArchive = true
         podcast.autoArchivePlayedAfter = 86400
         podcast.autoArchiveInactiveAfter = 604800
-        podcast.isPaid = true
         podcast.licensing = 1
         podcast.showArchived = true
         podcast.refreshAvailable = true
-        podcast.folderUuid = "folder-uuid-123"
         podcast.usedCustomEffectsBefore = true
         podcast.isPrivate = true
         podcast.isExplicit = true

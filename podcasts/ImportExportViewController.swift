@@ -1,6 +1,4 @@
-import AEXML
 import PocketCastsDataModel
-import PocketCastsServer
 import PocketCastsUtils
 import UIKit
 
@@ -65,7 +63,6 @@ class ImportExportViewController: PCViewController, UIDocumentInteractionControl
         super.viewDidLoad()
 
         title = L10n.exportPodcastsOption
-        Analytics.track(.settingsImportShown)
     }
 
     @IBOutlet var mainScrollView: UIScrollView!
@@ -75,67 +72,34 @@ class ImportExportViewController: PCViewController, UIDocumentInteractionControl
         loadingAlert?.showAlert(self, hasProgress: false, completion: {
             self.startExport()
         })
-
-        Analytics.track(.settingsImportExportTapped)
     }
 
     private func startExport() {
-        Analytics.track(.settingsImportExportStarted)
         let podcasts = DataManager.shared.allPodcasts(includeUnsubscribed: false)
 
-        let uuids = podcasts.map(\.uuid)
-
-        MainServerHandler.shared.exportPodcasts(uuids: uuids) { [weak self] exportResponse in
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.loadingAlert?.hideAlert(false)
-                self.loadingAlert = nil
-
-                guard let exportResponse, exportResponse.success(), let mapping = exportResponse.result else {
-                    self.presentError()
-                    Analytics.track(.settingsImportExportFailed)
-                    return
-                }
-
-                self.performOpmlExport(podcasts, mappingDictionary: mapping)
+        Task { @MainActor in
+            do {
+                let url = try await OpmlExporter(podcasts: podcasts).export()
+                hideLoadingAlert()
+                shareOpmlDocument(at: url)
+            } catch {
+                hideLoadingAlert()
+                presentError()
             }
         }
     }
 
-    private func performOpmlExport(_ podcasts: [Podcast], mappingDictionary: [String: String]) {
-        let exportXML = AEXMLDocument()
-        let opml = exportXML.addChild(name: "opml", attributes: ["version": "1.0"])
-        let header = opml.addChild(name: "head")
-        _ = header.addChild(name: "title", value: "Pocket Casts Feeds")
-
-        let body = opml.addChild(name: "body")
-        let outline = body.addChild(name: "outline", attributes: ["text": "feeds"])
-        for podcast in podcasts {
-            let podcastTitle = podcast.title ?? ""
-            let urlToUse = mappingDictionary[podcast.uuid] ?? ""
-            _ = outline.addChild(name: "outline", attributes: ["type": "rss", "text": podcastTitle, "xmlUrl": urlToUse])
-        }
-
-        shareOpmlDocument(exportXML)
-        Analytics.track(.settingsImportExportFinished)
+    private func hideLoadingAlert() {
+        loadingAlert?.hideAlert(false)
+        loadingAlert = nil
     }
 
-    private func shareOpmlDocument(_ document: AEXMLDocument) {
-        let text = document.xmlString
-        let homeDirectory = NSTemporaryDirectory() as NSString
-        let filePath = homeDirectory.appendingPathComponent("podcasts.opml")
-        do {
-            try text.write(toFile: filePath, atomically: true, encoding: String.Encoding.utf8)
+    private func shareOpmlDocument(at url: URL) {
+        opmlShareController = UIDocumentInteractionController(url: url)
+        opmlShareController?.delegate = self
 
-            let fileUrl = URL(fileURLWithPath: filePath)
-            opmlShareController = UIDocumentInteractionController(url: fileUrl)
-            opmlShareController?.delegate = self
-
-            let presentRect = view.convert(exportBtn.frame, from: exportBtn.superview)
-            opmlShareController?.presentOptionsMenu(from: presentRect, in: view, animated: true)
-        } catch {
-            presentError()
-        }
+        let presentRect = view.convert(exportBtn.frame, from: exportBtn.superview)
+        opmlShareController?.presentOptionsMenu(from: presentRect, in: view, animated: true)
     }
 
     func documentInteractionControllerDidDismissOptionsMenu(_ controller: UIDocumentInteractionController) {

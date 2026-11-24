@@ -11,7 +11,6 @@ struct Constants {
         static let upNextEpisodeAddedToTopKey = "PCUpNextAddedToTop"
         static let upNextEpisodeRemoved = NSNotification.Name(rawValue: "SJUpNextEpisodeRemoved")
         static let upNextQueueChanged = NSNotification.Name(rawValue: "SJUpNextChanged")
-        static let upNextShuffleToggle = NSNotification.Name(rawValue: "SJUpNextShuffleToggle")
         static let playbackStarted = NSNotification.Name(rawValue: "SJPlaybackStart")
         static let playbackStarting = NSNotification.Name(rawValue: "SJPlaybackStarting")
         static let playbackPaused = NSNotification.Name(rawValue: "SJPlaybackPaused")
@@ -86,22 +85,6 @@ struct Constants {
         static let opmlImportCompleted = NSNotification.Name(rawValue: "SJOpmlImportCompleted")
         static let opmlImportFailed = NSNotification.Name(rawValue: "SJOpmlImportFailed")
 
-        // watch
-        static let watchAutoDownloadSettingsChanged = NSNotification.Name(rawValue: "SJWatchAutoDownloadSettingsChanged")
-
-        // folders
-        /// This is triggered many times whenever a folder is changed
-        static let folderChanged = NSNotification.Name(rawValue: "SJFolderChanged")
-        static let folderDeleted = NSNotification.Name(rawValue: "SJFolderDeleted")
-        /// This is triggered just once after a folder finishes editing
-        static let folderEdited = NSNotification.Name(rawValue: "SJFolderEdited")
-
-        // End of Year
-        static let profileSeen = NSNotification.Name(rawValue: "profileSeen")
-
-        // Gravatar
-        static let avatarNeedsRefreshing = NSNotification.Name(rawValue: "avatarNeedsRefreshing")
-
         static let discoverNavigateToCategory = Notification.Name(rawValue: "DiscoverNavigateToCategory")
     }
 
@@ -132,37 +115,9 @@ struct Constants {
         static let lastFilterShown = "SJLastFilter"
         static let lastTabOpened = "SJLastTabOpened"
         static let lastImageRefreshTime = "SJLastImageRefreshDate"
-        static let promotionFinishedAcknowledged = "SJPromotionFinishedAcknowledged"
-
-        static let loginDetailsUpdated = "SJLoginDetailsUpdated"
-        static let watchAutoDownloadUpNextEnabled = "SJWatchAutoDownloadUpNextEnabled"
-        static let watchAutoDownloadUpNextCount = "SJWatchAutoDownloadCountUpNext"
-        static let watchAutoDeleteUpNext = "SJWatchAutoDeleteUpNext"
-
-        public static let analyticsOptOut = "SJAnalyticsOptOut"
-
-        static let supportName = "PCSupportRequestName"
-        static let supportEmail = "PCSupportRequestEmail"
-        static let supportRemoveDebugInfo = "PCSupportRemoveDebugInfo"
-
-        static let lastPickerSort = "PCLastPickerSort"
 
         static let shouldFollowSystemThemeKey = "FollowSystemTheme"
         static let themeKey = "theme"
-
-        static let lastRunVersion = "lastRunVersion"
-
-        static let reviewRequestDates = "reviewRequestDates"
-        static let surveyPresentationDates = "surveyPresentationDates"
-        static let lastSurveyNotReallyDate = "lastSurveyNotReallyDate"
-
-        static let showBadgeForEndOfYear = "showBadgeFor%dEndOfYear"
-        static let modalHasBeenShown = "modal%dHasBeenShown"
-        static let hasSyncedEpisodesForPlayback = "hasSyncedEpisodesForPlayback%d"
-        static let hasSyncedEpisodesForPlaybackAsPlusUser = "hasSyncedEpisodesForPlayback%dAsPlusUser"
-        static let top5PodcastsListLink = "top5PodcastsListLink2023_2"
-        static let shouldShowInitialOnboardingFlow = "shouldShowInitialOnboardingFlow"
-        static let encourageAccountCreationReferenceDate = "encourageAccountCreationReferenceDate"
 
         static let autoplay = "autoplay"
 
@@ -175,43 +130,21 @@ struct Constants {
         static let sleepTimerSetting = "sleepTimerSetting"
 
         static let isLockScreenScrubbingDisabled = "IsLockScreenScrubbingDisabled"
-
-        static let shouldShowRecentlyPlayedSortingTip = "ShouldShowRecentlyPlayedSortingTip"
-
-        static let shouldShowUpNextSortDurationTip = "ShouldShowUpNextSortDurationTip"
-
-        static let newFilterTip = "NewFilterTip"
-        static let newFilterTipCreationView = "NewFilterTipCreationView"
-        static let playlistDragAndDropTip = "PlaylistDragAndDropTip"
-        static let playlistsOnboarding = "NewPlaylistsOnboarding"
-        static let firstTimePlaylistCreated = "FirstTimePlaylistCreated"
         static let saveCurrentUpNextQueueIntoPlaylist = "SaveCurrentUpNextQueueIntoPlaylist"
-        static let shouldResultEndOfYearSyncStatus = "ShouldResultEndOfYearSyncStatus"
         static let lastNetworkDataUsageCleanupDate = "lastNetworkDataUsageCleanupDate"
 
         enum headphones {
             static let previousAction = SettingValue("headphones.previousAction",
-                                                      defaultValue: HeadphoneControlAction.skipBack)
+                                                     defaultValue: HeadphoneControlAction.skipBack)
 
             static let nextAction = SettingValue("headphones.nextAction",
-                                                      defaultValue: HeadphoneControlAction.skipForward)
-        }
-
-        enum bookmarks {
-            static let creationSound = SettingValue("bookmarks.creationSound", defaultValue: true)
-
-            static let playerSort = SettingValue("bookmarks.playerSort", defaultValue: BookmarkSortOption.newestToOldest)
-            static let podcastSort = SettingValue("bookmarks.podcastSort", defaultValue: BookmarkSortOption.newestToOldest)
-            static let episodeSort = SettingValue("bookmarks.episodeSort", defaultValue: BookmarkSortOption.newestToOldest)
-            static let profileSort = SettingValue("bookmarks.profileSort", defaultValue: BookmarkSortOption.newestToOldest)
-
-            static let showPlayerTip = "bookmarks.showPlayerTip"
+                                                 defaultValue: HeadphoneControlAction.skipForward)
         }
 
         enum appearance {
             static let darkUpNextTheme = SettingValue("appearance.darkUpNextTheme", defaultValue: true)
             static var tabBarMinimizingEnabled: SettingValue<Bool> {
-                SettingValue("appearance.tabBarMinimizingEnabled", defaultValue: !FeatureFlag.minimizeTabsOptIn.enabled)
+                SettingValue("appearance.tabBarMinimizingEnabled", defaultValue: false)
             }
         }
 
@@ -228,17 +161,9 @@ struct Constants {
         }
 
         enum podcastFeedReload {
-            static let showTip = "podcastFeedReload.showtip"
-        }
-
-        enum suggestedFolders {
-            static let lastUpsellDate = "suggestedFolders.lastUpsellDate"
-            static let upsellCount = "suggestedFolders.upsellCount"
-            static let lastPodcastsUsed = "suggestedFolders.lastPodcastsUsed"
         }
 
         enum podcastViewChanges {
-            static let showTip = "podcastViewChanges.showtip"
         }
 
         enum notifications {
@@ -265,15 +190,6 @@ struct Constants {
         static let tableRowHeaderHeight: CGFloat = 64
 
         static let refreshTaskId = "au.com.shiftyjelly.podcasts.Refresh"
-
-        /// We show the offer by default since if the app was just downloaded
-        /// there is a chance it doesn't have a receipt and we won't be able to do a server check
-        /// However Apple considers this user to be eligible
-        public static let offerEligibilityDefaultValue = true
-
-        static let bookmarkMaxTitleLength = 100
-
-        static let numberOfEpisodesListenedRequiredToRate = 2
     }
 
     enum Limits {
@@ -284,14 +200,13 @@ struct Constants {
         static let maxSleepTime = 5.hours
 
         #if os(watchOS)
-            static let watchListItems = 50
+        static let watchListItems = 50
         #else
-            static let maxListItemsToSendToWatch = 50
-            static let maxFilterItems = 1000
-            static let maxCarplayItems = 100
-            static let maxBulkDownloads = 100
-            static let maxSubscriptionExpirySeconds: TimeInterval = 30.days
-            static let maxShelfActions = 4
+        static let maxListItemsToSendToWatch = 50
+        static let maxFilterItems = 1000
+        static let maxCarplayItems = 100
+        static let maxBulkDownloads = 100
+        static let maxShelfActions = 4
         #endif
     }
 
@@ -303,18 +218,17 @@ struct Constants {
     }
 
     #if !os(watchOS)
-        enum SiriActions {
-            static let resumeId = "Resume ID"
-            static let playPodcastId = "Play podcast ID"
-            static let playSuggestedId = "Play suggested ID"
-            static let playUpNextId = "play up next ID"
-            static let playFilterId = "Play filter ID"
-            static let playAllFilterId = "Play all filter ID"
-            static let pauseId = "Pause ID"
-            static let nextChapterId = "Next Chapter ID"
-            static let previousChapterId = "Previous Chapter ID"
-            static let markAsPlayedId = "Mark As Played ID"
-        }
+    enum SiriActions {
+        static let resumeId = "Resume ID"
+        static let playPodcastId = "Play podcast ID"
+        static let playUpNextId = "play up next ID"
+        static let playFilterId = "Play filter ID"
+        static let playAllFilterId = "Play all filter ID"
+        static let pauseId = "Pause ID"
+        static let nextChapterId = "Next Chapter ID"
+        static let previousChapterId = "Previous Chapter ID"
+        static let markAsPlayedId = "Mark As Played ID"
+    }
     #endif
 
     enum Audio {
@@ -322,32 +236,6 @@ struct Constants {
     }
 
     enum RemoteParams {
-        static let periodicSaveTimeMs = "periodic_playback_save_ms"
-        static let periodicSaveTimeMsDefault: Double = 60000
-
-        static let podcastSearchDebounceMs = "podcast_search_debounce_ms"
-        static let podcastSearchDebounceMsDefault: Double = 800
-
-        static let episodeSearchDebounceMs = "episode_search_debounce_ms"
-        static let episodeSearchDebounceMsDefault: Double = 800
-
-        static let customStorageLimitGB = "custom_storage_limit_gb"
-        static let customStorageLimitGBDefault: Int = 20
-
-        static let endOfYearRequireAccount = "end_of_year_require_account"
-        static let endOfYearRequireAccountDefault: Bool = true
-
-        static let patronCloudStorageGB = "patron_custom_storage_limit_gb"
-        static let patronCloudStorageGBDefault = 100
-
-        static let addMissingEpisodes = "add_missing_episodes"
-        static let addMissingEpisodesDefault: Bool = true
-
-        static let errorLogoutHandling = "error_logout_handling"
-        static let errorLogoutHandlingDefault: Bool = false
-
-        static let slumberStudiosPromoCode = "slumber_studios_yearly_promo_code"
-        static let slumberStudiosPromoCodeDefault = ""
     }
 
     static let defaultDebounceTime: TimeInterval = 0.5
@@ -405,83 +293,6 @@ struct Constants {
     }
 }
 
-enum PlusUpgradeViewSource: String {
-    case profile
-    case appearance
-    case files
-    case folders
-    case themes
-    case icons
-    case watch
-    case unknown
-    case endOfYear
-    case promoCode
-    case promotionFinished
-    case upNextShuffle
-    case generatedTranscripts
-    case onboarding
-    case onboardingRecommendations = "onboarding_recommendations"
-    case encourageAccountCreation = "encourage_account_creation"
-    case suggestedFolders = "suggested_folders"
-    case bannerAd = "banner_ad"
-    case login
-    case accountCreated = "account_created"
-    case account
-    case settings
-    case referral
-    case deselectChapterWhatsNew = "deselect_chapters_whats_new"
-    case syncedTranscripts = "synced_transcripts"
-    case bookmarksLocked = "bookmarks_locked"
-    case overflowMenu = "overflow_menu"
-    case slumber
-    case deselectChapters = "deselect_chapters"
-    case headphoneSettings =  "headphone_settings"
-    case bookmarksShelfAction = "bookmarks_shelf_action"
-    case whatsNew = "whats_new"
-    case sonosLink = "sonos_link"
-    case deepLink
-    case deviceApproval = "device_approval"
-
-    /// Purchase completed with no record of its originating source (e.g. StoreKit re-delivering a
-    /// deferred/pending transaction). Keeps `source` defined and distinct from a real `unknown`.
-    case unattributed
-
-    func isEligibleForExperiment() -> Bool {
-        switch self {
-        case .profile, .onboarding:
-            return true
-        default:
-            return false
-        }
-    }
-
-    func paywallHeadline() -> String {
-        switch self {
-        case .folders:
-            return L10n.paywallDynamicHeadlineFolder
-        case .upNextShuffle:
-            return L10n.paywallDynamicHeadlineUpNextShuffle
-        case .themes:
-            return L10n.paywallDynamicHeadlineThemes
-        case .watch:
-            return L10n.paywallDynamicHeadlineWatch
-        case .icons:
-            return L10n.paywallDynamicHeadlineIcons
-        case .files:
-            return L10n.paywallDynamicHeadlineFiles
-        case .bannerAd:
-            return L10n.paywallDynamicHeadlineBannerAd
-        default:
-            return L10n.plusMarketingTitle
-        }
-    }
-
-    static func from(string: String?) -> PlusUpgradeViewSource {
-        guard let string else { return .unknown }
-        return PlusUpgradeViewSource(rawValue: string) ?? .unknown
-    }
-}
-
 // MARK: - HeadphoneControlAction
 
 /// Describes how the headphone/bluetooth skip next/back button actions should perform in the app
@@ -497,13 +308,4 @@ enum HeadphoneControlAction: JSONCodable {
 
     /// If the episode has chapters, then skip to the next chapter, if not default to .skipForward behavior
     case nextChapter
-
-    /// Create a new bookmark for the currently playing episode
-    case addBookmark
-}
-
-// MARK: - Bookmark Sorting
-
-enum BookmarkSortOption: JSONCodable {
-    case newestToOldest, oldestToNewest, timestamp, episode, podcastAndEpisode
 }

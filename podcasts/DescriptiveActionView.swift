@@ -72,7 +72,7 @@ class DescriptiveActionView: UIView {
 
         // add message
         let messageBottomAnchor: NSLayoutYAxisAnchor
-        if FeatureFlag.useDescriptiveActionAttributedTextView.enabled, let message {
+        if let message {
             let messageViewRoot = DescriptiveActionAttributedTextView(
                 text: message,
                 onLinkTap: onLinkTap

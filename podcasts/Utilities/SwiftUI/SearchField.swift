@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// A SwiftUI TextField that mimics the functionality of a UISearchTextField
 /// SwiftUI has the [`.searchable(text:)`](https://developer.apple.com/documentation/swiftui/adding-a-search-interface-to-your-app) modifier
@@ -92,8 +93,8 @@ struct SearchField: View {
                 .foregroundStyle(theme.cancel)
                 .transition(
                     .move(edge: .trailing)
-                    .combined(with: .opacity)
-                    .animation(.linear(duration: 0.1))
+                        .combined(with: .opacity)
+                        .animation(.linear(duration: 0.1))
                 )
             }
         }
@@ -157,5 +158,19 @@ struct SearchFieldView_Preview: PreviewProvider {
         var body: some View {
             SearchField(text: $title).padding()
         }
+    }
+}
+
+class ThemeObserver: ObservableObject {
+    let theme: Theme = .shared
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        Constants.Notifications.themeChanged.publisher()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 }

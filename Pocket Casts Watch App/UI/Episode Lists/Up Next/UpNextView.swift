@@ -15,7 +15,7 @@ struct UpNextView: View {
                     NowPlayingRow(isPlaying: $viewModel.isPlaying, podcastName: $viewModel.upNextTitle)
                 }
                 .padding(.horizontal, -4)
-                EpisodeListView(title: L10n.upNext.prefixSourceUnicode, showArtwork: true, episodes: $viewModel.episodes, playlist: nil)
+                EpisodeListView(title: L10n.upNext, showArtwork: true, episodes: $viewModel.episodes, playlist: nil)
                     .padding(.vertical, 10)
             }
             .listStyle(.plain)
@@ -45,7 +45,7 @@ struct UpNextView: View {
                 )
             }
         }
-        .navigationTitle(L10n.upNext.prefixSourceUnicode)
+        .navigationTitle(L10n.upNext)
         .restorable(.upnext)
     }
 }

@@ -30,8 +30,6 @@ final class PodcastManagerTests: DBTestCase {
     }
 
     func testCleanupKeepsDownloadsInPlaylist() async throws {
-        ServerSettings.setSyncingEmail(email: "test@example.com")
-        defer { ServerSettings.setSyncingEmail(email: nil) }
 
         let (_, episode) = makeDownloadedPodcastAndEpisode()
         let playlist = EpisodeFilter()
@@ -50,8 +48,6 @@ final class PodcastManagerTests: DBTestCase {
     }
 
     func testCleanupKeepsDownloadsNotInPlaylist() async throws {
-        ServerSettings.setSyncingEmail(email: "test@example.com")
-        defer { ServerSettings.setSyncingEmail(email: nil) }
 
         let (_, episode) = makeDownloadedPodcastAndEpisode()
 
@@ -64,8 +60,6 @@ final class PodcastManagerTests: DBTestCase {
     }
 
     func testUnsubscribeRemovesDownloadsInPlaylist() throws {
-        ServerSettings.setSyncingEmail(email: "test@example.com")
-        defer { ServerSettings.setSyncingEmail(email: nil) }
 
         let (podcast, episode) = makeDownloadedPodcastAndEpisode()
         let playlist = EpisodeFilter()
@@ -84,8 +78,6 @@ final class PodcastManagerTests: DBTestCase {
     }
 
     func testUnsubscribeRemovesDownloadsNotInPlaylist() throws {
-        ServerSettings.setSyncingEmail(email: "test@example.com")
-        defer { ServerSettings.setSyncingEmail(email: nil) }
 
         let (podcast, episode) = makeDownloadedPodcastAndEpisode()
         let podcastManager = PodcastManager(dataManager: dataManager, downloadManager: downloadManager)

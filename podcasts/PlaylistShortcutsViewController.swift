@@ -39,8 +39,6 @@ class PlaylistShortcutsViewController: PCViewController, UITableViewDelegate, UI
 
         tableView.register(UINib(nibName: "SiriShortcutEnabledCell", bundle: nil), forCellReuseIdentifier: enabledCellId)
         tableView.register(UINib(nibName: "SiriShortcutSuggestedCell", bundle: nil), forCellReuseIdentifier: suggestedCellId)
-
-        track(.filterSiriShortcutsShown)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -219,7 +217,6 @@ class PlaylistShortcutsViewController: PCViewController, UITableViewDelegate, UI
         getEnabledShortcuts()
         reloadData()
         controller.dismiss(animated: true, completion: nil)
-        track(.filterSiriShortcutAdded)
     }
 
     func addVoiceShortcutViewControllerDidCancel(_ controller: INUIAddVoiceShortcutViewController) {
@@ -238,7 +235,6 @@ class PlaylistShortcutsViewController: PCViewController, UITableViewDelegate, UI
         getEnabledShortcuts()
         reloadData()
         controller.dismiss(animated: true, completion: nil)
-        track(.filterSiriShortcutRemoved)
     }
 
     func editVoiceShortcutViewControllerDidCancel(_ controller: INUIEditVoiceShortcutViewController) {
@@ -247,11 +243,5 @@ class PlaylistShortcutsViewController: PCViewController, UITableViewDelegate, UI
 
     @IBAction func tryAgainTapped() {
         getEnabledShortcuts()
-    }
-}
-
-extension PlaylistShortcutsViewController: PlaylistTypeTrackerProvider {
-    var analyticsSourceType: String {
-        playlist.manual ? "manual" : "smart"
     }
 }

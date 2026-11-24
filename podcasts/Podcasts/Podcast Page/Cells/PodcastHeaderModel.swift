@@ -47,34 +47,25 @@ class PodcastHeaderViewModel: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private func addObservers() {
         NotificationCenter.default.publisher(for: Constants.Notifications.podcastUpdated)
-        .receive(on: OperationQueue.main)
-        .sink { [unowned self] notification in
-            guard let podcastUuid = notification.object as? String,
-                  podcastUuid == podcast.uuid,
-                  let podcast = DataManager.shared.findPodcast(uuid: podcastUuid, includeUnsubscribed: true)
-            else {
-                return
+            .receive(on: OperationQueue.main)
+            .sink { [unowned self] notification in
+                guard let podcastUuid = notification.object as? String,
+                      podcastUuid == podcast.uuid,
+                      let podcast = DataManager.shared.findPodcast(uuid: podcastUuid, includeUnsubscribed: true)
+                else {
+                    return
+                }
+                self.podcast = podcast
+                self.isSubscribed = podcast.isSubscribed()
             }
-            self.podcast = podcast
-            self.isSubscribed = podcast.isSubscribed()
-        }
-        .store(in: &cancellables)
+            .store(in: &cancellables)
     }
 
     lazy var podcastRatingViewModel: PodcastRatingViewModel = {
         let podcastRatingViewModel = PodcastRatingViewModel()
         podcastRatingViewModel.update(podcast: podcast)
-        podcastRatingViewModel.presentLogin = { [weak self] _ in
-            self?.delegate?.showLogin(message: L10n.ratingLoginRequired)
-        }
         return podcastRatingViewModel
     }()
-
-    var folderImage: String {
-        let isSubscriptionAvailable = SubscriptionHelper.hasActiveSubscription() && SyncManager.isUserLoggedIn()
-        let folderImage = isSubscriptionAvailable ? (podcast.folderUuid?.isEmpty ?? true) ? "folder-empty" : "folder-check" : "folder-create"
-        return folderImage
-    }
 
     var firstCategory: String {
         guard let category = podcast.podcastCategory,
@@ -104,7 +95,7 @@ class PodcastHeaderViewModel: NSObject, ObservableObject {
 
     /// The network the podcast belongs to, while the app shows networks at all.
     var networkListId: String? {
-        FeatureFlag.networkDiscovery.enabled ? podcast.networkListId : nil
+        podcast.networkListId
     }
 
     func networkTapped() {
@@ -161,14 +152,12 @@ class PodcastHeaderViewModel: NSObject, ObservableObject {
 
     func websiteLinkTapped() {
         guard let website = podcast.podcastUrl, let url = URL(string: website) else { return }
-        Analytics.track(.podcastScreenPodcastDetailsLinkTapped, properties: ["podcast_uuid": podcast.uuid])
         delegate?.open(url: url)
     }
 
     func toggleExpanded() {
         let willBeExpanded = !isExpanded
         delegate?.setSummaryExpanded(expanded: willBeExpanded)
-        Analytics.track(.podcastScreenToggleSummary, properties: ["is_expanded": willBeExpanded])
         isExpanded.toggle()
     }
 
@@ -196,7 +185,6 @@ extension PodcastHeaderViewModel: ExpandableLabelDelegate {
     // MARK: - ExpandableLabelDelegate
 
     func willExpandLabel(_ label: UIView) {
-        Analytics.track(.podcastScreenPodcastDescriptionTapped)
         delegate?.tableView().beginUpdates()
     }
 
@@ -205,7 +193,6 @@ extension PodcastHeaderViewModel: ExpandableLabelDelegate {
     }
 
     func willCollapseLabel(_ label: UIView) {
-        Analytics.track(.podcastScreenPodcastDescriptionTapped)
         delegate?.tableView().beginUpdates()
     }
 
@@ -214,9 +201,6 @@ extension PodcastHeaderViewModel: ExpandableLabelDelegate {
     }
 
     func linkTapped(url: URL) {
-        if let uuid = delegate?.displayedPodcast()?.uuid {
-            Analytics.track(.podcastScreenPodcastDescriptionLinkTapped, properties: ["podcast_uuid": uuid])
-        }
         delegate?.open(url: url)
     }
 }

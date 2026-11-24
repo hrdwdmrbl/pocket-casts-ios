@@ -72,7 +72,7 @@ final class MiniPlayerScrollingTitleView: UIView {
             UIColor.clear.cgColor,
             UIColor.black.cgColor,
             UIColor.black.cgColor,
-            UIColor.clear.cgColor,
+            UIColor.clear.cgColor
         ]
 
         setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -170,7 +170,7 @@ final class MiniPlayerScrollingTitleView: UIView {
             0,
             NSNumber(value: leadingOpen ? fadeFraction : 0),
             NSNumber(value: 1 - fadeFraction),
-            1,
+            1
         ]
     }
 
@@ -213,11 +213,11 @@ final class MiniPlayerScrollingTitleView: UIView {
         transformAnim.keyTimes = [
             0,
             NSNumber(value: pauseDuration / totalDuration),
-            1,
+            1
         ]
         transformAnim.timingFunctions = [
             CAMediaTimingFunction(name: .linear),
-            CAMediaTimingFunction(name: .linear),
+            CAMediaTimingFunction(name: .linear)
         ]
         transformAnim.duration = totalDuration
         transformAnim.repeatCount = .infinity
@@ -244,14 +244,14 @@ final class MiniPlayerScrollingTitleView: UIView {
             NSNumber(value: fadeInEnd / totalDuration),
             NSNumber(value: holdEnd / totalDuration),
             NSNumber(value: fadeOutEnd / totalDuration),
-            1,
+            1
         ]
         maskAnim.timingFunctions = [
             CAMediaTimingFunction(name: .linear),
             CAMediaTimingFunction(name: .easeInEaseOut),
             CAMediaTimingFunction(name: .linear),
             CAMediaTimingFunction(name: .easeInEaseOut),
-            CAMediaTimingFunction(name: .linear),
+            CAMediaTimingFunction(name: .linear)
         ]
         maskAnim.duration = totalDuration
         maskAnim.repeatCount = .infinity

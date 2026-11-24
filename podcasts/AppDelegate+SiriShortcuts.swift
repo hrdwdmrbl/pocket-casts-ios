@@ -35,21 +35,8 @@ extension AppDelegate {
                 return
             }
 
-            if path.startsWith(string: "/redeem") {
-                handleReferralsDeepLink(url: incomingURL)
-                return
-            }
-
             if path == "/discover" || path.startsWith(string: "/discover/") {
                 if let url = URL(string: "pktc:/\(path)") {
-                    NavigationManager.shared.dismissPresentedViewController()
-                    JLRoutes.routeURL(url)
-                }
-                return
-            }
-
-            if path == "/pair" || path.startsWith(string: "/pair/") {
-                if let url = URL(string: "pktc:/\(path)?\(components.query ?? "")") {
                     NavigationManager.shared.dismissPresentedViewController()
                     JLRoutes.routeURL(url)
                 }
@@ -79,8 +66,6 @@ extension AppDelegate {
                     if let containerId = playIntent.mediaContainer?.identifier {
                         urlString = "pktc://shortcuts/podcast/\(containerId)"
                     }
-                } else if mediaItem.identifier == Constants.SiriActions.playSuggestedId {
-                    urlString = "pktc://shortcuts/discover"
                 }
             }
             // to fix missing media items when called from shortcuts
@@ -138,9 +123,7 @@ extension AppDelegate {
         }
 
         if let identifier = thisIntent.mediaItems?.first?.identifier {
-            if identifier == Constants.SiriActions.playSuggestedId {
-                responseCode = SiriShortcutsManager.shared.playSuggested()
-            } else if identifier == Constants.SiriActions.playUpNextId {
+            if identifier == Constants.SiriActions.playUpNextId {
                 responseCode = SiriShortcutsManager.shared.playUpNext()
             } else if identifier == Constants.SiriActions.playPodcastId {
                 if let uuid = thisIntent.mediaContainer?.identifier {
@@ -227,9 +210,5 @@ extension AppDelegate {
 
             NavigationManager.shared.navigateTo(NavigationManager.filterPageKey, data: [NavigationManager.filterUuidKey: filter.uuid])
         }
-    }
-
-    func handleReferralsDeepLink(url: URL) {
-        NavigationManager.shared.navigateTo(NavigationManager.settingsRedeemGuestPassKey, data: [NavigationManager.redeemGuestPassURLKey: url])
     }
 }

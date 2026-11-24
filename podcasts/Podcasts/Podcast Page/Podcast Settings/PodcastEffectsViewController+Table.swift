@@ -116,8 +116,6 @@ extension PodcastEffectsViewController: UITableViewDataSource, UITableViewDelega
             DataManager.shared.save(podcast: self.podcast)
 
             self.effectsTable.reloadData()
-            AnalyticsPlaybackHelper.shared.currentSource = self.analyticsSource
-            AnalyticsPlaybackHelper.shared.trimSilenceAmountChanged(amount: level)
         }
         to.addAction(action: action)
     }
@@ -159,41 +157,23 @@ extension PodcastEffectsViewController: UITableViewDataSource, UITableViewDelega
         saveUpdates()
 
         playbackSpeedDebouncer.call {
-            AnalyticsPlaybackHelper.shared.currentSource = self.analyticsSource
-            if self.isCustomPlaybackSettingsEnabled {
-                AnalyticsPlaybackHelper.shared.playbackSpeedChanged(to: roundedSpeed, currentSettings: "local")
-            } else {
-                AnalyticsPlaybackHelper.shared.playbackSpeedChanged(to: roundedSpeed)
-            }
         }
     }
 
     @objc private func trimSilenceToggled(_ sender: UISwitch) {
         podcast.trimSilenceAmount = sender.isOn ? Int32(PlaybackEffects.defaultRemoveSilenceAmount) : 0
         saveUpdates()
-        if isCustomPlaybackSettingsEnabled {
-            AnalyticsPlaybackHelper.shared.trimSilenceToggled(enabled: sender.isOn, currentSettings: "local")
-        } else {
-            AnalyticsPlaybackHelper.shared.trimSilenceToggled(enabled: sender.isOn)
-        }
     }
 
     @objc private func boostVolumeToggled(_ sender: UISwitch) {
         podcast.boostVolume = sender.isOn
         saveUpdates()
-        if isCustomPlaybackSettingsEnabled {
-            AnalyticsPlaybackHelper.shared.volumeBoostToggled(enabled: sender.isOn, currentSettings: "local")
-        } else {
-            AnalyticsPlaybackHelper.shared.volumeBoostToggled(enabled: sender.isOn)
-        }
     }
 
     @objc private func overrideEffectsToggled(_ sender: UISwitch) {
         podcast.overrideGlobalEffects = sender.isOn
         podcast.syncStatus = SyncStatus.notSynced.rawValue
         saveUpdates()
-
-        Analytics.track(.podcastSettingsCustomPlaybackEffectsToggled, properties: ["enabled": sender.isOn])
     }
 
     private func tableData() -> [[TableRow]] {

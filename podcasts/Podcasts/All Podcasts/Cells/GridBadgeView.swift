@@ -28,10 +28,6 @@ class GridBadgeView: UIView {
         updateBadge(count: podcast.cachedUnreadCount, badgeType: badgeType)
     }
 
-    func populateFrom(folder: Folder, badgeType: BadgeType) {
-        updateBadge(count: folder.cachedUnreadCount, badgeType: badgeType)
-    }
-
     private func updateBadge(count: Int, badgeType: BadgeType) {
         guard count > 0 else {
             isHidden = true

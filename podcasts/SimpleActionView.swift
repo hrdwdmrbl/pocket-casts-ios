@@ -62,12 +62,12 @@ class SimpleActionView: UIView {
                 imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
                 imageView.heightAnchor.constraint(equalToConstant: 24),
                 imageView.widthAnchor.constraint(equalToConstant: 24),
-                label.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 20),
+                label.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 20)
             ])
             self.imageView = imageView
         } else {
             NSLayoutConstraint.activate([
-                label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+                label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20)
             ])
         }
         labelVerticalConstraints = [
@@ -132,7 +132,6 @@ class SimpleActionView: UIView {
             label.trailingAnchor.constraint(equalTo: previousView.leadingAnchor, constant: -24).isActive = true
         }
         trailingAnchor.constraint(equalTo: previousView.trailingAnchor, constant: 20).isActive = true
-
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(actionTapped))
         addGestureRecognizer(tapGesture)

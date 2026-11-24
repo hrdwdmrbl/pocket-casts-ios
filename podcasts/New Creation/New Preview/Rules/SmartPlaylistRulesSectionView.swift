@@ -133,6 +133,8 @@ struct SmartPlaylistRulesSectionView: View {
             mediaTypePicker
         case .starred:
             starredPicker
+        case .archived:
+            archivedPicker
         default:
             EmptyView()
         }
@@ -147,7 +149,7 @@ struct SmartPlaylistRulesSectionView: View {
             set: { newValue in
                 viewModel.newPlaylist.filterHours = newValue.rawValue
                 viewModel.newPlaylist.releaseDateSmartRuleApplied = true
-                viewModel.saveFilter(analyticsGroup: "release_date")
+                viewModel.saveFilter()
             }
         )) {
             ForEach(options, id: \.self) { option in
@@ -186,7 +188,7 @@ struct SmartPlaylistRulesSectionView: View {
                     filter.filterNotDownloaded = true
                 }
                 filter.downloadStatusSmartRuleApplied = true
-                viewModel.saveFilter(analyticsGroup: "download_status")
+                viewModel.saveFilter()
             }
         )) {
             Text(L10n.filterValueAll).tag(DownloadStatusOption.all)
@@ -206,7 +208,7 @@ struct SmartPlaylistRulesSectionView: View {
             set: { newValue in
                 viewModel.newPlaylist.filterAudioVideoType = newValue.rawValue
                 viewModel.newPlaylist.mediaTypeSmartRuleApplied = true
-                viewModel.saveFilter(analyticsGroup: "audio_video")
+                viewModel.saveFilter()
             }
         )) {
             ForEach(options, id: \.self) { option in
@@ -224,13 +226,30 @@ struct SmartPlaylistRulesSectionView: View {
             get: { viewModel.newPlaylist.filterStarred },
             set: { newValue in
                 viewModel.newPlaylist.filterStarred = newValue
-                viewModel.saveFilter(analyticsGroup: "starred")
+                viewModel.saveFilter()
             }
         )) {
             Text(L10n.on).tag(true)
             Text(L10n.off).tag(false)
         } label: {
             Text(SmartPlaylistRule.starred.title)
+        }
+        .pickerStyle(.automatic)
+        .tint(theme.primaryText02)
+    }
+
+    private var archivedPicker: some View {
+        Picker(selection: Binding(
+            get: { viewModel.newPlaylist.showArchivedEpisodes },
+            set: { newValue in
+                viewModel.newPlaylist.showArchivedEpisodes = newValue
+                viewModel.saveFilter()
+            }
+        )) {
+            Text(L10n.on).tag(true)
+            Text(L10n.off).tag(false)
+        } label: {
+            Text(SmartPlaylistRule.archived.title)
         }
         .pickerStyle(.automatic)
         .tint(theme.primaryText02)

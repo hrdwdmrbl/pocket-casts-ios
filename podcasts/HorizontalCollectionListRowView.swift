@@ -127,7 +127,7 @@ struct HorizontalCollectionListRowView: View {
                 LinearGradient(
                     stops: [
                         Gradient.Stop(color: Color(red: 0.16, green: 0.05, blue: 0.02).opacity(0), location: 0),
-                        Gradient.Stop(color: Color(red: 0.09, green: 0.05, blue: 0.03), location: 1),
+                        Gradient.Stop(color: Color(red: 0.09, green: 0.05, blue: 0.03), location: 1)
                     ],
                     startPoint: UnitPoint(x: 0.5, y: 0),
                     endPoint: UnitPoint(x: 0.5, y: 0.7)
@@ -164,7 +164,7 @@ struct HorizontalCollectionListRowView: View {
                 }
             }
             .layoutPriority(1)
-            SubscribeButtonView(podcastUuid: podcast.uuid ?? "", source: .discover) {
+            SubscribeButtonView(podcastUuid: podcast.uuid ?? "") {
                 model.subscribePodcast(podcast)
             }
         }

@@ -35,6 +35,12 @@ public class ThreadSafeDictionary<Key: Hashable, Value> {
         return table.removeValue(forKey: key)
     }
 
+    public var values: [Value] {
+        tableLock.lock()
+        defer { tableLock.unlock() }
+        return Array(table.values)
+    }
+
     public func removeAll() {
         tableLock.lock()
         defer { tableLock.unlock() }

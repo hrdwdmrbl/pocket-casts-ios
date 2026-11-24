@@ -43,14 +43,10 @@ class PlaylistPreviewViewModel: ObservableObject {
         )
     }
 
-    func saveFilter(analyticsGroup: String? = nil) {
+    func saveFilter() {
         newPlaylist.syncStatus = SyncStatus.notSynced.rawValue
         DataManager.shared.save(playlist: newPlaylist)
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged, object: newPlaylist)
-
-        if !newPlaylist.isNew, let group = analyticsGroup {
-            Analytics.track(.filterUpdated, properties: ["group": group, "source": "filters"])
-        }
     }
 
     func smartRuleIsApplied(for rule: SmartPlaylistRule) -> Bool {
@@ -69,6 +65,8 @@ class PlaylistPreviewViewModel: ObservableObject {
             return newPlaylist.filterStarred
         case .duration:
             return newPlaylist.filterDuration
+        case .archived:
+            return newPlaylist.showArchivedEpisodes
         }
     }
 
@@ -116,6 +114,8 @@ class PlaylistPreviewViewModel: ObservableObject {
             return ReleaseDateFilterOption(rawValue: newPlaylist.filterHours)?.description
         case .starred:
             return newPlaylist.filterStarred ? L10n.on : L10n.off
+        case .archived:
+            return newPlaylist.showArchivedEpisodes ? L10n.on : L10n.off
         case .duration:
             if newPlaylist.filterDuration {
                 let shortTime = TimeFormatter.shared.multipleUnitFormattedShortTime(time: TimeInterval(newPlaylist.shorterThan * 60))

@@ -5,7 +5,7 @@ extension Array<DiscoverItem> {
     func makeDataSourceSnapshot(region: String, selectedCategory: DiscoverCategory?, itemFilter: (DiscoverItem) -> Bool) -> NSDiffableDataSourceSnapshot<Int, DiscoverCollectionViewController.Item> {
         var snapshot = NSDiffableDataSourceSnapshot<Int, DiscoverCollectionViewController.Item>()
 
-        let items = filter({ (itemFilter($0)) })
+        let items = filter { !$0.isAuthenticated && $0.isSponsored != true && itemFilter($0) }
 
         let models: [DiscoverCollectionViewController.Item] = items.compactMap { item in
             let selectedCategory = item.cellType() != .categoriesSelector ? selectedCategory : nil

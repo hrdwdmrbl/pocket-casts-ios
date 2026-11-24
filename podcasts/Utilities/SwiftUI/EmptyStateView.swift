@@ -39,7 +39,7 @@ struct EmptyStateAction: Identifiable {
 /// The colors can be customized using EmptyStateViewStyle
 struct EmptyStateView<Title: View, Style: EmptyStateViewStyle>: View {
     @ScaledMetric(relativeTo: .headline)
-   private var iconSize = 30
+    private var iconSize = 30
 
     @ObservedObject var style: Style
     let icon: (() -> Image)?
@@ -141,4 +141,15 @@ struct EmptyStateView_Previews: PreviewProvider {
         var icon: Color { .primary }
         var button: Color { .red }
     }
+}
+
+class DefaultEmptyStateStyle: ThemeObserver, EmptyStateViewStyle {
+    var title: Color { theme.primaryText01 }
+    var message: Color { theme.primaryText02 }
+    var icon: Color { theme.primaryIcon03 }
+    var button: Color { theme.primaryInteractive01 }
+}
+
+extension EmptyStateViewStyle where Self == DefaultEmptyStateStyle {
+    static var defaultStyle: DefaultEmptyStateStyle { DefaultEmptyStateStyle() }
 }

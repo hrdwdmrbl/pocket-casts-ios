@@ -6,21 +6,14 @@ import PocketCastsUtils
 import UIKit
 import SafariServices
 
-class PodcastListViewController: PCViewController, ShareListDelegate {
+class PodcastListViewController: PCViewController {
     let gridHelper = GridHelper()
-    var refreshController: FullSyncRefreshController?
-    var bannerAdModel: BannerAdModel?
-
-    /// Indicates whether the banner ad is currently animating to indicate to the collection view layout which size to use
-    var isAnimatingBannerAd = false
-
-    private var bannerTask: Task<Void, Never>? = nil
+    var refreshController: FeedRefreshController?
 
     @IBOutlet var addPodcastBtn: ThemeableButton! {
         didSet {
             addPodcastBtn.buttonTitle = L10n.podcastGridDiscoverPodcasts
             addPodcastBtn.buttonTapped = {
-                Analytics.track(.podcastsListDiscoverButtonTapped)
                 NavigationManager.shared.navigateTo(NavigationManager.discoverPageKey, data: nil)
             }
         }
@@ -79,11 +72,9 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
         return queue
     }()
 
-    var recentlyPlayedSortingTip: UIViewController?
-
     var searchController: PCSearchBarController!
 
-    lazy var searchResultsController = SearchResultsViewController(source: .podcastsList, showLocalResults: true)
+    lazy var searchResultsController = SearchResultsViewController(showLocalResults: true)
 
     var resultsControllerDelegate: SearchResultsDelegate {
         searchResultsController
@@ -125,16 +116,6 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
         refreshGridItems()
         addEventObservers()
         updateNavigationButtons()
-
-        Analytics.track(.podcastsListShown, properties: [
-            "sort_order": Settings.homeFolderSortOrder,
-            "badge_type": Settings.podcastBadgeType,
-            "layout": Settings.libraryType,
-            "number_of_podcasts": homeGridDataHelper.numberOfPodcasts,
-            "number_of_folders": homeGridDataHelper.numberOfFolders
-        ])
-
-        showRecentlyPlayedSortingTipIfNeeded()
     }
 
     override func viewWillLayoutSubviews() {
@@ -159,12 +140,10 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
         super.viewWillAppear(animated)
 
         navigationController?.navigationBar.shadowImage = UIImage()
-        loadBannerAd()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        bannerTask?.cancel()
         navigationController?.navigationBar.shadowImage = nil
         removeAllCustomObservers()
         if isEditingOrder {
@@ -174,69 +153,20 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
 
     private func addEventObservers() {
         addCustomObserver(ServerNotifications.podcastsRefreshed, selector: #selector(refreshGridItems))
-        addCustomObserver(ServerNotifications.subscriptionStatusChanged, selector: #selector(subscriptionStatusDidChange))
         addCustomObserver(Constants.Notifications.podcastAdded, selector: #selector(refreshGridItems))
         addCustomObserver(Constants.Notifications.podcastDeleted, selector: #selector(refreshGridItems))
         addCustomObserver(Constants.Notifications.opmlImportCompleted, selector: #selector(refreshGridItems))
-        addCustomObserver(ServerNotifications.syncCompleted, selector: #selector(refreshGridItems))
         addCustomObserver(Constants.Notifications.playbackTrackChanged, selector: #selector(refreshGridItems))
         addCustomObserver(Constants.Notifications.playbackEnded, selector: #selector(refreshGridItems))
         addCustomObserver(Constants.Notifications.episodeArchiveStatusChanged, selector: #selector(refreshGridItems))
         addCustomObserver(Constants.Notifications.episodePlayStatusChanged, selector: #selector(refreshGridItems))
 
-        addCustomObserver(Constants.Notifications.folderChanged, selector: #selector(refreshGridItems))
-        addCustomObserver(Constants.Notifications.folderDeleted, selector: #selector(refreshGridItems))
-
         addCustomObserver(Constants.Notifications.tappedOnSelectedTab, selector: #selector(checkForScrollTap(_:)))
         addCustomObserver(Constants.Notifications.searchRequested, selector: #selector(searchRequested))
     }
 
-    @objc private func subscriptionStatusDidChange() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            self.updateNavigationButtons()
-            self.loadBannerAd()
-        }
-    }
-
-    private func loadBannerAd() {
-        bannerTask?.cancel()
-
-        if SubscriptionHelper.shouldDisplayBannerAd {
-            DiscoverServerHandler.shared.blazePromotion(for: .podcastList) { [weak self] promotion, shouldAnimate in
-                guard let self else { return }
-
-                if shouldAnimate {
-                    self.bannerTask = Task { [weak self] in
-                        try? await Task.sleep(for: .seconds(2))
-                        await MainActor.run {
-                            self?.setupBannerAd(promotion: promotion, shouldAnimate: true)
-                        }
-                    }
-                } else {
-                    self.setupBannerAd(promotion: promotion, shouldAnimate: false)
-                }
-            }
-        } else {
-            if bannerAdModel != nil {
-                bannerAdModel = nil
-                UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
-                    self.isAnimatingBannerAd = false
-                } completion: { _ in
-                    self.podcastsCollectionView.performBatchUpdates({
-                        self.podcastsCollectionView.collectionViewLayout.invalidateLayout()
-                    })
-                }
-            }
-        }
-    }
-
     private func updateNavigationButtons() {
-        let folderImage = UIImage(named: "folder-create")
-        let folderButton = UIBarButtonItem(image: folderImage, style: .plain, target: self, action: #selector(createFolderTapped(_:)))
-        folderButton.accessibilityLabel = L10n.folderCreateNew
-        navigationItem.leftBarButtonItem = folderButton
+
         extraRightButtons = []
     }
 
@@ -382,7 +312,7 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
             guard let strongSelf = self else { return }
 
             let oldData = strongSelf.gridItems
-            var newData = HomeGridDataHelper.gridListItems(orderedBy: Settings.homeFolderSortOrder, badgeType: Settings.podcastBadgeType)
+            var newData = HomeGridDataHelper.gridListItems(orderedBy: Settings.librarySortOrder, badgeType: Settings.podcastBadgeType)
 
             if newData.isEmpty {
                 newData = [HomeGridListItem.empty]
@@ -398,29 +328,15 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
                         strongSelf.gridItems = data
                     })
                 }
-                strongSelf.foldersCoordinator.showUpsellIfNeeded(from: strongSelf)
             }
         }
-    }
-
-    private lazy var foldersCoordinator: FoldersCoordinator = {
-        return FoldersCoordinator()
-    }()
-
-    func showSuggestedFolders() {
-        foldersCoordinator.showSuggestedFolders(from: self)
-    }
-
-    @objc private func createFolderTapped(_ sender: UIBarButtonItem) {
-        foldersCoordinator.startFolderCreationFlow(from: self)
     }
 
     @objc private func podcastOptionsTapped(_ sender: UIBarButtonItem) {
         let optionsPicker = OptionsPicker(title: nil)
 
-        let sortOption = Settings.homeFolderSortOrder
+        let sortOption = Settings.librarySortOrder
         let sortAction = OptionAction(label: L10n.sortBy, secondaryLabel: sortOption.description, icon: "podcast-sort") {
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "sort_by"])
         }
         sortAction.submenu = { [weak self] in self?.makeSortOrderOptionsPicker() }
         optionsPicker.addAction(action: sortAction)
@@ -428,54 +344,36 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
         let largeGridAction = OptionAction(label: L10n.podcastsLargeGrid, icon: "podcastlist_largegrid", selected: Settings.libraryType == .threeByThree) { [weak self] in
             Settings.libraryType = .threeByThree
             self?.gridTypeChanged()
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "layout"])
-            Analytics.track(.podcastsListLayoutChanged, properties: ["layout": LibraryType.threeByThree])
         }
         let smallGridAction = OptionAction(label: L10n.podcastsSmallGrid, icon: "podcastlist_smallgrid", selected: Settings.libraryType == .fourByFour) { [weak self] in
             Settings.libraryType = .fourByFour
             self?.gridTypeChanged()
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "layout"])
-            Analytics.track(.podcastsListLayoutChanged, properties: ["layout": LibraryType.fourByFour])
         }
         let listGridAction = OptionAction(label: L10n.podcastsList, icon: "podcastlist_listview", selected: Settings.libraryType == .list) { [weak self] in
             Settings.libraryType = .list
             self?.gridTypeChanged()
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "layout"])
-            Analytics.track(.podcastsListLayoutChanged, properties: ["layout": LibraryType.list])
         }
         optionsPicker.addSegmentedAction(name: L10n.podcastsLayout, icon: "podcastlist_largegrid", actions: [largeGridAction, smallGridAction, listGridAction])
 
         let badgeType = Settings.podcastBadgeType
         let badgesAction = OptionAction(label: L10n.podcastsBadges, secondaryLabel: badgeType.description, icon: "badges") {
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "badges"])
         }
         badgesAction.submenu = { [weak self] in self?.makeBadgeOptionsPicker() }
         optionsPicker.addAction(action: badgesAction)
 
         let shareAction = OptionAction(label: L10n.podcastsShare, icon: "podcast-share") {
             let shareController = SharePodcastsViewController()
-            shareController.delegate = self
             let navController = SJUIUtils.navController(for: shareController)
             self.present(navController, animated: true, completion: nil)
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "share"])
         }
         optionsPicker.addAction(action: shareAction)
 
         let editAction = OptionAction(label: L10n.podcastsEdit, icon: "filter_manual_episode_order") { [weak self] in
             self?.setEditingOrder(true)
-            Analytics.track(.podcastsListModalOptionTapped, properties: ["option": "edit"])
         }
         optionsPicker.addAction(action: editAction)
 
         optionsPicker.present(from: self)
-
-        Analytics.track(.podcastsListOptionsButtonTapped)
-    }
-
-    // MARK: - ShareListDelegate
-
-    func shareUrlAvailable(_ shareUrl: String, listName: String) {
-        SharingHelper.shared.shareLinkToPodcastList(name: listName, url: shareUrl, fromController: self, barButtonItem: customRightBtn, completionHandler: nil)
     }
 
     func itemCount() -> Int {
@@ -501,7 +399,6 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
 
             Settings.podcastBadgeType = .off
             strongSelf.refreshGridItems()
-            Analytics.track(.podcastsListBadgesChanged, properties: ["type": BadgeType.off])
         }
         options.addAction(action: badgeOffAction)
 
@@ -510,7 +407,6 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
 
             Settings.podcastBadgeType = .allUnplayed
             strongSelf.refreshGridItems()
-            Analytics.track(.podcastsListBadgesChanged, properties: ["type": BadgeType.allUnplayed])
         }
         options.addAction(action: latestEpisodeAction)
 
@@ -519,7 +415,6 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
 
             Settings.podcastBadgeType = .latestEpisode
             strongSelf.refreshGridItems()
-            Analytics.track(.podcastsListBadgesChanged, properties: ["type": BadgeType.latestEpisode])
         }
         options.addAction(action: unplayedCountAction)
 
@@ -531,46 +426,14 @@ class PodcastListViewController: PCViewController, ShareListDelegate {
         podcastsCollectionView.reloadData()
         updateBottomFadeColor()
     }
-
-    private func setupBannerAd(promotion: BlazePromotion, shouldAnimate: Bool) {
-        guard SubscriptionHelper.shouldDisplayBannerAd else {
-            return
-        }
-        bannerAdModel = BannerAdModel(promotion: promotion) {
-            UIApplication.shared.openSafariVCIfPossible(promotion.urlApple)
-        }
-        isAnimatingBannerAd = shouldAnimate
-
-        if shouldAnimate {
-            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
-                self.isAnimatingBannerAd = false
-            } completion: { _ in
-                self.podcastsCollectionView.performBatchUpdates({
-                    self.podcastsCollectionView.collectionViewLayout.invalidateLayout()
-                })
-            }
-        } else {
-            podcastsCollectionView.performBatchUpdates({
-                podcastsCollectionView.collectionViewLayout.invalidateLayout()
-            })
-        }
-    }
 }
 
 // MARK: - Refresh Control
 
 extension PodcastListViewController {
     func setupRefreshControl() {
-        let controller = FullSyncRefreshController(source: .podcastsList)
+        let controller = FeedRefreshController()
         podcastsCollectionView.refreshControl = controller.refreshControl
         self.refreshController = controller
-    }
-}
-
-// MARK: - Podcast list
-
-extension PodcastListViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .podcastsList
     }
 }

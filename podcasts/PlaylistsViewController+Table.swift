@@ -45,30 +45,7 @@ extension PlaylistsViewController: UITableViewDelegate, UITableViewDataSource {
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        if informationalBannerCoordinator.shouldShowBanner() {
-            return UITableView.automaticDimension
-        } else {
-            return CGFloat.leastNormalMagnitude
-        }
-    }
-
-    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        if !informationalBannerCoordinator.shouldShowBanner() {
-            return nil
-        }
-        return informationalBannerCoordinator.tableHeaderView(size: CGSize(width: filtersTable.bounds.width, height: 135)) { [weak self] in
-            UIView.animate(withDuration: 0.5) { [weak self] in
-                self?.filtersTable.reloadData()
-            }
-        }
-    }
-
-    func tableView(_ tableView: UITableView, estimatedHeightForHeaderInSection section: Int) -> CGFloat {
-        if informationalBannerCoordinator.shouldShowBanner() {
-            return 135
-        } else {
-            return CGFloat.leastNormalMagnitude
-        }
+        CGFloat.leastNormalMagnitude
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -114,8 +91,6 @@ extension PlaylistsViewController: UITableViewDelegate, UITableViewDataSource {
         }
 
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged)
-
-        Analytics.track(.filterListReordered)
     }
 }
 
@@ -123,9 +98,6 @@ extension PlaylistsViewController: UITableViewDelegate, UITableViewDataSource {
 
 extension PlaylistsViewController {
     fileprivate func showDeleteConfirmationDialog(for playlist: EpisodeFilter, at indexPath: IndexPath, in tableView: UITableView) {
-        let playlistType = playlist.manual ? "manual" : "smart"
-        let analyticsProperties = ["filter_type": playlistType]
-        Analytics.track(.filterDeleteTriggered, properties: analyticsProperties)
 
         let alert = UIAlertController(
             title: L10n.playlistsDeleteAlertTitle,
@@ -133,7 +105,6 @@ extension PlaylistsViewController {
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: L10n.cancel, style: .cancel) { _ in
-            Analytics.track(.filterDeleteDismissed, properties: analyticsProperties)
         })
         alert.addAction(UIAlertAction(title: L10n.delete, style: .destructive) { [weak self] _ in
             self?.delete(playlist: playlist, at: indexPath, in: tableView)
@@ -150,141 +121,6 @@ extension PlaylistsViewController {
 
         var properties: [String: Sendable] = [:]
         properties["filter_type"] = playlist.manual ? "manual" : "smart"
-
-        Analytics.track(.filterDeleted, properties: properties)
-    }
-}
-
-// MARK: - Tip
-
-extension PlaylistsViewController {
-    func showNewFilterTip() {
-        guard
-            let vc = smartPlaylistsTip()
-        else {
-            return
-        }
-        newFilterTip = vc
-        Analytics.track(.filterTooltipShown)
-        present(vc, animated: true) {
-            Settings.shouldShowNewFilterTip = false
-        }
-    }
-
-    private func dismissTipView() {
-        dismiss(animated: true) { [weak self] in
-            self?.newFilterTip = nil
-        }
-        Analytics.track(.filterTooltipClosed)
-    }
-
-    func showPlaylistsTipIfNeeded() {
-        if SyncManager.isUserLoggedIn(),
-           Settings.shouldShowNewFilterTip,
-           !hasPremadePlaylists(),
-           newFilterTip == nil {
-            showNewFilterTip()
-            return
-        }
-
-        if Settings.firstTimePlaylistCreated,
-           Settings.shouldShowDragAndDropTip,
-           hasPremadePlaylists(),
-           !presentingPlaylistDetail,
-           newFilterTip == nil {
-            presentPlaylistsDragAndDropTip()
-            return
-        }
-    }
-
-    private func hasPremadePlaylists() -> Bool {
-        let premadePlaylistUuids: Set<String> = [
-            PlaylistManager.DefaultUUIDs.newReleases,
-            PlaylistManager.DefaultUUIDs.inProgress
-        ]
-        let playlistsUUID = listPlaylistItems.map { $0.playlist.uuid }
-        let playlistsUUIDSet: Set<String> = Set(playlistsUUID)
-        if playlistsUUIDSet.count > premadePlaylistUuids.count || premadePlaylistUuids != playlistsUUIDSet {
-            return true
-        }
-        return false
-    }
-
-    private func smartPlaylistsTip() -> UIHostingController<AnyView>? {
-        guard let indexPath = filtersTable.indexPathsForVisibleRows?.last, !listPlaylistItems.isEmpty else { return nil }
-        return tip(
-            title: L10n.smartPlaylistsTipViewTitle,
-            message: L10n.smartPlaylistsTipViewDescription,
-            sourceView: filtersTable,
-            sourceRect: filtersTable.rectForRow(at: indexPath)
-        )
-    }
-
-    private func presentPlaylistsDragAndDropTip() {
-        guard
-            let indexPath = filtersTable.indexPathsForVisibleRows?.first,
-            let cell = filtersTable.cellForRow(at: indexPath) as? NewPlaylistCell,
-            !listPlaylistItems.isEmpty
-        else { return }
-        let tip = tip(
-            title: L10n.playlistsTipDragAndDropTitle,
-            message: L10n.playlistsTipDragAndDropDescription,
-            sourceView: cell.artworkImageSource,
-            sourceRect: cell.artworkImageSource.bounds
-        )
-        guard let tip else { return }
-        newFilterTip = tip
-
-        //TODO: Add analytics
-
-        present(tip, animated: true) {
-            Settings.firstTimePlaylistCreated = false
-            Settings.shouldShowDragAndDropTip = false
-        }
-    }
-
-    private func tip(
-        idealSize: CGSize = CGSizeMake(290, 100),
-        title: String,
-        message: String,
-        sourceView: UIView?,
-        sourceRect: CGRect
-    ) -> UIHostingController<AnyView>? {
-        let vc = UIHostingController(rootView: AnyView (EmptyView()) )
-        let tipView = TipViewStatic(title: title,
-                                    message: message,
-                              onTap: { [weak self] in
-            self?.dismissTipView()
-        })
-            .frame(idealWidth: idealSize.width, minHeight: idealSize.height)
-            .setupDefaultEnvironment()
-        vc.rootView = AnyView(tipView)
-        vc.view.backgroundColor = .clear
-        vc.view.clipsToBounds = false
-        vc.modalPresentationStyle = .popover
-        vc.sizingOptions = [.preferredContentSize]
-        guard let popoverPresentationController = vc.popoverPresentationController else {
-            return nil
-        }
-        popoverPresentationController.delegate = self
-        popoverPresentationController.permittedArrowDirections = [.up]
-        popoverPresentationController.sourceView = sourceView
-        popoverPresentationController.sourceRect = sourceRect
-        if !LiquidGlass.isEnabled {
-            popoverPresentationController.backgroundColor = ThemeColor.primaryUi01()
-        }
-        return vc
-    }
-}
-
-extension PlaylistsViewController: UIPopoverPresentationControllerDelegate {
-    func adaptivePresentationStyle(for controller: UIPresentationController) -> UIModalPresentationStyle {
-        // Return no adaptive presentation style, use default presentation behaviour
-        return .none
-    }
-
-    func popoverPresentationControllerDidDismissPopover(_ popoverPresentationController: UIPopoverPresentationController) {
-        dismissTipView()
     }
 }
 
@@ -314,7 +150,5 @@ extension PlaylistsViewController: UITableViewDragDelegate, UITableViewDropDeleg
         }
 
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged)
-
-        Analytics.track(.filterListReordered)
     }
 }

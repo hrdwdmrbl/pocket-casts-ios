@@ -45,9 +45,6 @@ extension Podcast {
         if let frequency = podcastInfo["episode_frequency"] as? String {
             podcast.episodeFrequency = frequency
         }
-        if let paid = podcastJson["paid"] as? Int {
-            podcast.isPaid = paid > 0
-        }
         if let licensing = podcastJson["licensing"] as? Int {
             podcast.licensing = Int32(licensing)
         }

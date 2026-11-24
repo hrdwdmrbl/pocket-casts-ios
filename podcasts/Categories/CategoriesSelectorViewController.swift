@@ -16,7 +16,7 @@ class CategoriesSelectorViewController: ThemedHostingController<CategoriesSelect
         lazy var load: (() async -> (categories: [DiscoverCategory], prioritized: [DiscoverCategory])?) = { [weak self] in
             guard let self, let source = self.item?.source else { return ([], []) }
 
-            let categories = await self.serverHandler.discoverCategories(source: source, authenticated: self.item?.authenticated)
+            let categories = await self.serverHandler.discoverCategories(source: source)
 
             // Determine which categories to work with
             let workingCategories: [DiscoverCategory]
@@ -29,50 +29,8 @@ class CategoriesSelectorViewController: ThemedHostingController<CategoriesSelect
                 workingCategories = categories
             }
 
-            // Filter and rank categories by recommendations
-            var filteredCategories = workingCategories
-            if FeatureFlag.smartCategories.enabled,
-               let recommendations = UserDefaults.standard.visitations(for: .discoverCategory) {
-
-                let sponsoredIDs = Set(item?.sponsoredCategoryIDs?.map { String($0) } ?? [])
-
-                // Get top 6 most visited categories by user
-                let sortedByVisits = workingCategories.sorted { lhs, rhs in
-                    guard let lhsID = lhs.id.map(String.init),
-                          let rhsID = rhs.id.map(String.init) else { return false }
-
-                    let lhsVisits = recommendations[lhsID] ?? 0
-                    let rhsVisits = recommendations[rhsID] ?? 0
-                    return lhsVisits > rhsVisits
-                }
-
-                let top6Categories = Array(sortedByVisits.prefix(6))
-                let top6IDs = Set(top6Categories.compactMap { $0.id.map(String.init) })
-
-                // Only promote sponsored categories that are in user's top 6
-                let promotableSponsored = sponsoredIDs.intersection(top6IDs)
-
-                filteredCategories = top6Categories.sorted { lhs, rhs in
-                    guard let lhsID = lhs.id.map(String.init),
-                          let rhsID = rhs.id.map(String.init) else { return false }
-
-                    let lhsSponsored = promotableSponsored.contains(lhsID)
-                    let rhsSponsored = promotableSponsored.contains(rhsID)
-
-                    // Sponsored categories from top 6 come first
-                    if lhsSponsored != rhsSponsored {
-                        return lhsSponsored
-                    }
-
-                    // Within same sponsorship status, sort by visit count
-                    let lhsVisits = recommendations[lhsID] ?? 0
-                    let rhsVisits = recommendations[rhsID] ?? 0
-                    return lhsVisits > rhsVisits
-                }
-            }
-
             self.cachedCategories = categories
-            return (categories, filteredCategories)
+            return (categories, workingCategories)
         }
 
         init(serverHandler: DiscoverServerHandling = DiscoverServerHandler.shared,

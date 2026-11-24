@@ -6,13 +6,13 @@ struct PocketCastsLogoPill: View {
             Image("splashlogo")
                 .resizable()
                 .frame(width: 18, height: 18)
-            Text("Pocket Casts")
+            Text(L10n.pocketCasts)
                 .padding(.trailing, 7)
                 .font(Font.system(size: 12, weight: .semibold))
         }
         .padding(4)
         .foregroundStyle(.white)
-        .background(Theme(previewTheme: .classic).primaryIcon01)
+        .background(Theme(previewTheme: .light).primaryIcon01)
         .clipShape(Capsule())
     }
 }

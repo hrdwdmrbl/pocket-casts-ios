@@ -53,7 +53,7 @@ public enum ServerHelper {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: ServerConstants.HttpHeaders.accept)
         request.setValue("application/json; charset=UTF8", forHTTPHeaderField: ServerConstants.HttpHeaders.contentType)
-        request.setValue(ServerConfig.shared.syncDelegate?.privateUserAgent(), forHTTPHeaderField: ServerConstants.HttpHeaders.userAgent)
+        request.setValue(ServerConfig.shared.refreshDelegate?.privateUserAgent(), forHTTPHeaderField: ServerConstants.HttpHeaders.userAgent)
         request.addLocalizationHeaders()
         request.httpBody = data
 
@@ -65,7 +65,7 @@ public enum ServerHelper {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: ServerConstants.HttpHeaders.accept)
         request.setValue("application/json; charset=UTF8", forHTTPHeaderField: ServerConstants.HttpHeaders.contentType)
-        request.setValue(ServerConfig.shared.syncDelegate?.privateUserAgent(), forHTTPHeaderField: ServerConstants.HttpHeaders.userAgent)
+        request.setValue(ServerConfig.shared.refreshDelegate?.privateUserAgent(), forHTTPHeaderField: ServerConstants.HttpHeaders.userAgent)
         request.addLocalizationHeaders()
 
         do {
@@ -91,7 +91,7 @@ public enum ServerHelper {
         request.httpMethod = "POST"
         request.addValue("application/octet-stream", forHTTPHeaderField: ServerConstants.HttpHeaders.accept)
         request.setValue("application/octet-stream", forHTTPHeaderField: ServerConstants.HttpHeaders.contentType)
-        request.setValue(ServerConfig.shared.syncDelegate?.privateUserAgent(), forHTTPHeaderField: ServerConstants.HttpHeaders.userAgent)
+        request.setValue(ServerConfig.shared.refreshDelegate?.privateUserAgent(), forHTTPHeaderField: ServerConstants.HttpHeaders.userAgent)
         request.addLocalizationHeaders()
 
         return request

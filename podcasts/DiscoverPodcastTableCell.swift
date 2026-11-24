@@ -68,8 +68,6 @@ class DiscoverPodcastTableCell: ThemeableCell {
         super.setSelected(selected, animated: animated)
     }
 
-    var subscribeSource: AnalyticsSource?
-
     func populateFrom(_ discoverPodcast: DiscoverPodcast, number: Int) {
         self.discoverPodcast = discoverPodcast
 
@@ -125,9 +123,6 @@ class DiscoverPodcastTableCell: ThemeableCell {
         } else if let uuid = discoverPodcast.uuid {
             ServerPodcastManager.shared.subscribe(to: uuid, completion: nil)
         }
-
-        let uuid = discoverPodcast.uuid ?? discoverPodcast.iTunesId ?? "unknown"
-        Analytics.track(.podcastSubscribed, properties: ["source": subscribeSource ?? "unknown", "uuid": uuid])
     }
 
     override func handleThemeDidChange() {

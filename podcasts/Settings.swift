@@ -1,6 +1,5 @@
 import PocketCastsDataModel
 #if !os(watchOS)
-import Firebase
 #endif
 import PocketCastsServer
 import UIKit
@@ -9,9 +8,18 @@ import PocketCastsUtils
 
 class Settings: NSObject {
 
-#if !os(watchOS)
+    static func reset() {
+        UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
+        SharedConstants.GroupUserDefaults.defaults.removePersistentDomain(forName: SharedConstants.GroupUserDefaults.groupContainerId)
+        cachedlibrarySortType = nil
+        cachedPrimaryRowAction = nil
+        cachedPodcastGrouping = nil
+        cachedPrimaryUpNextSwipeAction = nil
+    }
+
+    #if !os(watchOS)
     static var debugPlaylistsLimit = Constants.Limits.maxFilterItems
-#endif
+    #endif
 
     static var isLockScreenScrubbingDisabled: Bool {
         set {
@@ -84,7 +92,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Settings.autoDownloadUpNext)
-            trackValueToggled(.settingsAutoDownloadUpNextToggled, enabled: newValue)
         }
     }
 
@@ -99,7 +106,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(allow, forKey: Settings.allowCellularDownloadKey)
 
         guard userInitiated else { return }
-        trackValueToggled(.settingsStorageWarnBeforeUsingDataToggled, enabled: allow)
     }
 
     // MARK: - Auto Download Mobile Data
@@ -113,7 +119,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(allow, forKey: Settings.allowCellularAutoDownloadKey)
 
         guard userInitiated else { return }
-        trackValueToggled(.settingsAutoDownloadOnlyOnWifiToggled, enabled: !allow)
     }
 
     // MARK: - Auto Download
@@ -121,7 +126,7 @@ class Settings: NSObject {
     private static let autoDownloadEnabledKey = "AutoDownloadEnabled"
     class func autoDownloadEnabled() -> Bool {
         guard UserDefaults.standard.object(forKey: Settings.autoDownloadEnabledKey) != nil else {
-            return FeatureFlag.autoDownloadOnSubscribe.enabled
+            return true
         }
         return UserDefaults.standard.bool(forKey: Settings.autoDownloadEnabledKey)
     }
@@ -130,7 +135,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(allow, forKey: Settings.autoDownloadEnabledKey)
 
         guard userInitiated else { return }
-        trackValueToggled(.settingsAutoDownloadNewEpisodesToggled, enabled: allow)
     }
 
     private static let autoDownloadOnFollowKey = "AutoDownloadOnFollow"
@@ -145,7 +149,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(allow, forKey: Settings.autoDownloadOnFollowKey)
 
         guard userInitiated else { return }
-        trackValueToggled(.settingsAutoDownloadOnFollowPodcastToggled, enabled: allow)
     }
 
     private static let autoDownloadLimitKey = "AutoDownloadLimit"
@@ -155,7 +158,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: Settings.autoDownloadLimitKey)
-            trackValueChanged(.settingsAutoDownloadLimitDownloadsChanged, value: newValue.rawValue)
         }
     }
 
@@ -174,8 +176,6 @@ class Settings: NSObject {
         }
         set(showArchived) {
             UserDefaults.standard.set(showArchived, forKey: defaultArchiveBehaviour)
-
-            trackValueChanged(.settingsGeneralArchivedEpisodesChanged, value: showArchived ? "show" : "hide")
         }
     }
 
@@ -197,14 +197,12 @@ class Settings: NSObject {
                 forKey: primaryRowActionKey
             )
             cachedPrimaryRowAction = action
-
-            trackValueChanged(.settingsGeneralRowActionChanged, value: action)
         }
     }
 
     // MARK: - Podcast Sort Order
 
-    static var homeFolderSortOrder: LibrarySort {
+    static var librarySortOrder: LibrarySort {
         get {
             let sortInt = ServerSettings.homeGridSortOrder()
             if let librarySort = LibrarySort(oldValue: sortInt) {
@@ -214,7 +212,7 @@ class Settings: NSObject {
             return .dateAddedNewestToOldest
         }
         set(order) {
-            ServerSettings.setHomeGridSortOrder(order.old.rawValue, syncChange: true)
+            ServerSettings.setHomeGridSortOrder(order.old.rawValue)
         }
     }
 
@@ -235,8 +233,6 @@ class Settings: NSObject {
         set(grouping) {
             UserDefaults.standard.set(grouping.rawValue, forKey: podcastGroupingDefaultKey)
             cachedPodcastGrouping = grouping
-
-            trackValueChanged(.settingsGeneralEpisodeGroupingChanged, value: grouping)
         }
     }
 
@@ -257,8 +253,6 @@ class Settings: NSObject {
         set(action) {
             UserDefaults.standard.set(action.rawValue, forKey: primaryUpNextSwipeActionKey)
             cachedPrimaryUpNextSwipeAction = action
-
-            trackValueChanged(.settingsGeneralUpNextSwipeChanged, value: action)
         }
     }
 
@@ -272,21 +266,6 @@ class Settings: NSObject {
         set(isOn) {
             UserDefaults.standard.set(isOn, forKey: Settings.playUpNextOnTapKey)
         }
-    }
-
-    static let upNextShuffleKey = "SJUpNextShuffleKey"
-    class func upNextShuffleToggle() {
-        let isOn = upNextShuffleEnabled()
-        UserDefaults.standard.set(!isOn, forKey: Settings.upNextShuffleKey)
-
-        NotificationCenter.postOnMainThread(notification: Constants.Notifications.upNextShuffleToggle)
-    }
-
-    class func upNextShuffleEnabled() -> Bool {
-        if !SubscriptionHelper.hasActiveSubscription() || !SyncManager.isUserLoggedIn() {
-            return false
-        }
-        return UserDefaults.standard.bool(forKey: Settings.upNextShuffleKey)
     }
 
     // MARK: - Discover Region
@@ -320,10 +299,7 @@ class Settings: NSObject {
         UserDefaults.standard.set(region, forKey: chartRegion)
 
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.chartRegionChanged)
-
-        if FeatureFlag.enableLocalizationHeaders.enabled {
-            LocalizationHelper.update(userRegion: region)
-        }
+        LocalizationHelper.update(userRegion: region)
     }
 
     // MARK: - Auto Archiving
@@ -337,9 +313,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(after, forKey: Settings.autoArchivePlayedAfterKey)
 
         guard userInitiated else { return }
-        if let archiveTime = AutoArchiveAfterTime(rawValue: after) {
-            trackValueChanged(.settingsAutoArchivePlayedChanged, value: archiveTime)
-        }
     }
 
     static let autoArchiveInactiveAfterKey = "AutoArchiveInactiveAfer"
@@ -351,9 +324,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(after, forKey: Settings.autoArchiveInactiveAfterKey)
 
         guard userInitiated else { return }
-        if let archiveTime = AutoArchiveAfterTime(rawValue: after) {
-            trackValueChanged(.settingsAutoArchiveInactiveChanged, value: archiveTime)
-        }
     }
 
     static let archiveStarredEpisodesKey = "ArchiveStarredEpisodes"
@@ -365,7 +335,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(archive, forKey: Settings.archiveStarredEpisodesKey)
 
         guard userInitiated else { return }
-        trackValueToggled(.settingsAutoArchiveIncludeStarredToggled, enabled: archive)
     }
 
     // MARK: - App Info
@@ -379,11 +348,11 @@ class Settings: NSObject {
     }
 
     class func displayableVersion() -> String {
-#if STAGING
+        #if STAGING
         return L10n.appVersion(Settings.appVersion(), Settings.buildNumber()) + " - STAGING"
-#else
+        #else
         return L10n.appVersion(Settings.appVersion(), Settings.buildNumber())
-#endif
+        #endif
     }
 
     class func buildNumber() -> String {
@@ -430,8 +399,6 @@ class Settings: NSObject {
             UserDefaults.standard.set(newValue, forKey: Settings.mediaSessionActionsKey)
 
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.extraMediaSessionActionsChanged)
-
-            Settings.trackValueToggled(.settingsGeneralExtraPlaybackActionsToggled, enabled: newValue)
         }
     }
 
@@ -444,7 +411,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Settings.legacyBtSupportKey)
-            Settings.trackValueToggled(.settingsGeneralLegacyBluetoothToggled, enabled: newValue)
         }
     }
 
@@ -477,13 +443,9 @@ class Settings: NSObject {
     }
 
     private static let userEpisodeAutoUploadKey = "UserEpisodeAutoUpload"
-    class func userFilesAutoUpload() -> Bool {
-        UserDefaults.standard.bool(forKey: userEpisodeAutoUploadKey)
-    }
 
     class func setUserEpisodeAutoUpload(_ value: Bool) {
         UserDefaults.standard.set(value, forKey: userEpisodeAutoUploadKey)
-        trackValueToggled(.settingsFilesAutoUploadToCloudToggled, enabled: value)
     }
 
     static let userEpisodeAutoAddToUpNextKey = "UserEpisodeAutoAddToUpNext"
@@ -493,7 +455,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: userEpisodeAutoAddToUpNextKey)
-            trackValueToggled(.settingsFilesAutoAddUpNextToggled, enabled: newValue)
         }
     }
 
@@ -504,102 +465,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: userEpisodeRemoveFileAfterPlayingKey)
-            trackValueToggled(.settingsFilesDeleteLocalFileAfterPlayingToggled, enabled: newValue)
-        }
-    }
-
-    static let userEpisodeRemoveFromCloudAfterPlayingKey = "UserEpisodeRemoveFromCloudAfterPlaying"
-    class func userEpisodeRemoveFromCloudAfterPlaying() -> Bool {
-        UserDefaults.standard.bool(forKey: userEpisodeRemoveFromCloudAfterPlayingKey)
-    }
-
-    class func setUserEpisodeRemoveFromCloudAfterPlayingKey(_ value: Bool) {
-        UserDefaults.standard.set(value, forKey: userEpisodeRemoveFromCloudAfterPlayingKey)
-        trackValueToggled(.settingsFilesDeleteCloudFileAfterPlayingToggled, enabled: value)
-    }
-
-    // MARK: Subscription Cancelled Acknowledgement
-
-    private static let subscriptionCancelledAcknowledgedKey = "SJCancelledAcknowledged"
-    static var subscriptionCancelledAcknowledged: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: subscriptionCancelledAcknowledgedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: subscriptionCancelledAcknowledgedKey)
-        }
-    }
-
-    private static let subscriptionCancelledSurveyShowedKey = "SJCancelledSurveyShowed"
-    static var subscriptionCancelledSurveyShown: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: subscriptionCancelledSurveyShowedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: subscriptionCancelledSurveyShowedKey)
-        }
-    }
-
-    // MARK: Promotion Finished Acknowledgement
-
-    static var promotionFinishedAcknowledged: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: Constants.UserDefaults.promotionFinishedAcknowledged)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.promotionFinishedAcknowledged)
-        }
-    }
-
-    // MARK: Plus Info Closed
-
-    private static let plusInfoFilesSettingsClosedKey = "PlusInfoClosedFileSettings"
-    static var plusInfoDismissedOnFilesSettings: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: Settings.plusInfoFilesSettingsClosedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Settings.plusInfoFilesSettingsClosedKey)
-        }
-    }
-
-    private static let plusInfoFilesAddClosedKey = "PlusInfoClosedFileAdd"
-    static var plusInfoDismissedOnFilesAdd: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: Settings.plusInfoFilesAddClosedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Settings.plusInfoFilesAddClosedKey)
-        }
-    }
-
-    private static let plusInfoAppearanceClosedKey = "PlusInfoClosedAppearance"
-    static var plusInfoDismissedOnAppearance: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: Settings.plusInfoAppearanceClosedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Settings.plusInfoAppearanceClosedKey)
-        }
-    }
-
-    private static let plusInfoWatchClosedKey = "PlusInfoClosedWatch"
-    static var plusInfoDismissedOnWatch: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: Settings.plusInfoWatchClosedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Settings.plusInfoWatchClosedKey)
-        }
-    }
-
-    private static let plusInfoProfileClosedKey = "PlusInfoClosedProfile"
-    static var plusInfoDismissedOnProfile: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: Settings.plusInfoProfileClosedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Settings.plusInfoProfileClosedKey)
         }
     }
 
@@ -609,31 +474,6 @@ class Settings: NSObject {
         }
 
         return nil
-    }
-
-    // MARK: What's new
-
-    private static let whatsNewLastAcknowledgedKey = "SJWhatsNewLastAcknowledged"
-
-    static var whatsNewLastAcknowledged: Int {
-        get {
-            UserDefaults.standard.integer(forKey: whatsNewLastAcknowledgedKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: whatsNewLastAcknowledgedKey)
-        }
-    }
-
-
-    private static let lastWhatsNewShownKey = "LastWhatsNewShown"
-    class var lastWhatsNewShown: String? {
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: lastWhatsNewShownKey)
-        }
-
-        get {
-            UserDefaults.standard.string(forKey: lastWhatsNewShownKey)
-        }
     }
 
     static var shouldFollowSystemTheme: Bool {
@@ -674,7 +514,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(enabled, forKey: multiSelectGestureKey)
 
         guard userInitiated else { return }
-        Settings.trackValueToggled(.settingsGeneralMultiSelectGestureToggled, enabled: enabled)
     }
 
     // MARK: Multi Select Actions
@@ -749,116 +588,6 @@ class Settings: NSObject {
         UserDefaults.standard.set(actionInts, forKey: Settings.upNextMultiSelectActionsKey)
     }
 
-    // MARK: - Password changed and watch requires update
-
-    class func loginDetailsUpdated() -> Bool {
-        UserDefaults.standard.bool(forKey: Constants.UserDefaults.loginDetailsUpdated)
-    }
-
-    class func clearLoginDetailsUpdated() {
-        UserDefaults.standard.set(false, forKey: Constants.UserDefaults.loginDetailsUpdated)
-    }
-
-    class func setLoginDetailsUpdated() {
-        UserDefaults.standard.set(true, forKey: Constants.UserDefaults.loginDetailsUpdated)
-    }
-
-    // MARK: - Watch number of episodes to auto sync from the Up Next queue
-
-    static var watchAutoDownloadUpNextEnabled: Bool {
-        get {
-            guard let isEnabled = UserDefaults.standard.object(forKey: Constants.UserDefaults.watchAutoDownloadUpNextEnabled) as? Bool else {
-                return false
-            }
-
-            return isEnabled
-        }
-        set(isEnabled) {
-            UserDefaults.standard.set(isEnabled, forKey: Constants.UserDefaults.watchAutoDownloadUpNextEnabled)
-
-            trackValueToggled(.settingsAppleWatchAutoDownloadUpNextToggled, enabled: isEnabled)
-        }
-    }
-
-    static var watchAutoDownloadUpNextCount: Int {
-        get {
-            guard let numEpisodes = UserDefaults.standard.object(forKey: Constants.UserDefaults.watchAutoDownloadUpNextCount) as? Int else {
-                return 3
-            }
-
-            return numEpisodes
-        }
-        set(numEpisodes) {
-            UserDefaults.standard.set(numEpisodes, forKey: Constants.UserDefaults.watchAutoDownloadUpNextCount)
-            trackValueChanged(.settingsAppleWatchAutoDownloadEpisodesChanged, value: numEpisodes)
-        }
-    }
-
-    static var watchAutoDeleteUpNext: Bool {
-        get {
-            guard let isEnabled = UserDefaults.standard.object(forKey: Constants.UserDefaults.watchAutoDeleteUpNext) as? Bool else {
-                return true
-            }
-
-            return isEnabled
-        }
-        set(isEnabled) {
-            UserDefaults.standard.set(isEnabled, forKey: Constants.UserDefaults.watchAutoDeleteUpNext)
-            trackValueToggled(.settingsAppleWatchAutoDownloadDeleteDownloadsToggled, enabled: isEnabled)
-        }
-    }
-
-    // MARK: - App Store Review Requests
-
-    class func addReviewRequested() {
-        var reviewRequestDates = Self.reviewRequestDates()
-        reviewRequestDates.append(Date())
-        UserDefaults.standard.set(reviewRequestDates, forKey: Constants.UserDefaults.reviewRequestDates)
-    }
-
-    class func reviewRequestDates() -> [Date] {
-        UserDefaults.standard.array(forKey: Constants.UserDefaults.reviewRequestDates) as? [Date] ?? [Date]()
-    }
-
-    class func resetReviewRequests() {
-        UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.reviewRequestDates)
-    }
-
-    // MARK: - User Satisfaction Survey
-
-    class func addSurveyPresented() {
-        var surveyDates = Self.surveyPresentationDates()
-        surveyDates.append(Date())
-        UserDefaults.standard.set(surveyDates, forKey: Constants.UserDefaults.surveyPresentationDates)
-    }
-
-    class func surveyPresentationDates() -> [Date] {
-        UserDefaults.standard.array(forKey: Constants.UserDefaults.surveyPresentationDates) as? [Date] ?? [Date]()
-    }
-
-    class func lastSurveyNotReallyDate() -> Date? {
-        UserDefaults.standard.object(forKey: Constants.UserDefaults.lastSurveyNotReallyDate) as? Date
-    }
-
-    class func setSurveyNotReallyResponse() {
-        UserDefaults.standard.set(Date(), forKey: Constants.UserDefaults.lastSurveyNotReallyDate)
-    }
-
-    class func resetSurveyData() {
-        UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.surveyPresentationDates)
-        UserDefaults.standard.removeObject(forKey: Constants.UserDefaults.lastSurveyNotReallyDate)
-    }
-
-    // MARK: - Tracks
-
-    class func setAnalytics(optOut: Bool) {
-        UserDefaults.standard.set(optOut, forKey: Constants.UserDefaults.analyticsOptOut)
-    }
-
-    class func analyticsOptOut() -> Bool {
-        UserDefaults.standard.bool(forKey: Constants.UserDefaults.analyticsOptOut)
-    }
-
     // MARK: - Sleep Timer (internal)
 
     class var sleepTimerFinishedDate: Date? {
@@ -881,74 +610,6 @@ class Settings: NSObject {
         }
     }
 
-    // MARK: - End of Year 2022
-
-    class func showBadgeForEndOfYear(_ year: Int) -> Bool {
-        let key = String(format: Constants.UserDefaults.showBadgeForEndOfYear, year)
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
-    class func setShowBadgeForEndOfYear(_ newValue: Bool, year: Int) {
-        let key = String(format: Constants.UserDefaults.showBadgeForEndOfYear, year)
-        UserDefaults.standard.set(newValue, forKey: key)
-    }
-
-    class func hasShownModalForEndOfYear(_ year: Int) -> Bool {
-        let key = String(format: Constants.UserDefaults.modalHasBeenShown, year)
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
-    class func setHasShownModalForEndOfYear(_ newValue: Bool, year: Int) {
-        let key = String(format: Constants.UserDefaults.modalHasBeenShown, year)
-        UserDefaults.standard.set(newValue, forKey: key)
-    }
-
-    class func hasSyncedEpisodesForPlayback(year: Int) -> Bool {
-        let key = String(format: Constants.UserDefaults.hasSyncedEpisodesForPlayback, year)
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
-    class func setHasSyncedEpisodesForPlayback(_ newValue: Bool, year: Int) {
-        let key = String(format: Constants.UserDefaults.hasSyncedEpisodesForPlayback, year)
-        UserDefaults.standard.set(newValue, forKey: key)
-    }
-
-    class func hasSyncedEpisodesForPlaybackAsPlusUser(year: Int) -> Bool {
-        let key = String(format: Constants.UserDefaults.hasSyncedEpisodesForPlaybackAsPlusUser, year)
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
-    /// Whether the user was plus or not by the time the sync happened
-    class func setHasSyncedEpisodesForPlaybackAsPlusUser(_ newValue: Bool, year: Int) {
-        let key = String(format: Constants.UserDefaults.hasSyncedEpisodesForPlaybackAsPlusUser, year)
-        UserDefaults.standard.set(newValue, forKey: key)
-    }
-
-    class var top5PodcastsListLink: String? {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.top5PodcastsListLink)
-        }
-
-        get {
-            UserDefaults.standard.string(forKey: Constants.UserDefaults.top5PodcastsListLink)
-        }
-    }
-
-    static var shouldShowInitialOnboardingFlow: Bool {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.shouldShowInitialOnboardingFlow)
-        }
-        get {
-            UserDefaults.standard.bool(forKey: Constants.UserDefaults.shouldShowInitialOnboardingFlow)
-        }
-    }
-
-    static var hasSeenInitialOnboardingBefore: Bool {
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.shouldShowInitialOnboardingFlow) != nil
-        }
-    }
-
     // MARK: - Embedded Artwork
 
     static var loadEmbeddedImages: Bool {
@@ -957,7 +618,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.loadEmbeddedImages)
-            Settings.trackValueToggled(.settingsAppearanceUseEmbeddedArtworkToggled, enabled: newValue)
         }
     }
 
@@ -974,39 +634,13 @@ class Settings: NSObject {
 
     // MARK: - Audio only
 
-    /// When enabled, video episodes play as audio only. Backed by `ServerSettings` so it syncs with the server.
+    /// When enabled, video episodes play as audio only.
     static var audioOnly: Bool {
         set {
             ServerSettings.setAudioOnly(newValue)
         }
         get {
             ServerSettings.audioOnly()
-        }
-    }
-
-    // MARK: - Generated chapters
-
-    /// When enabled, AI-generated chapters are hidden from the player. Stored as the inverse of the positive
-    /// "Generated chapters" toggle and backed by `ServerSettings` so it syncs globally with the server.
-    static var disableAiChapters: Bool {
-        set {
-            ServerSettings.setDisableAiChapters(newValue)
-        }
-        get {
-            ServerSettings.disableAiChapters()
-        }
-    }
-
-    // MARK: - What's New
-
-    /// Whether Profile shows a dot when What's New has unread messages. Turning it off leaves the messages
-    /// unread. Backed by `ServerSettings` so it syncs globally with the server.
-    static var showWhatsNewDot: Bool {
-        set {
-            ServerSettings.setShowWhatsNewDot(newValue)
-        }
-        get {
-            ServerSettings.showWhatsNewDot()
         }
     }
 
@@ -1034,7 +668,7 @@ class Settings: NSObject {
 
     static var headphonesPreviousAction: HeadphoneControlAction {
         get {
-            Constants.UserDefaults.headphones.previousAction.unlockedValue
+            Constants.UserDefaults.headphones.previousAction.value
         }
 
         set {
@@ -1044,32 +678,11 @@ class Settings: NSObject {
 
     static var headphonesNextAction: HeadphoneControlAction {
         get {
-            Constants.UserDefaults.headphones.nextAction.unlockedValue
+            Constants.UserDefaults.headphones.nextAction.value
         }
 
         set {
             Constants.UserDefaults.headphones.nextAction.save(newValue)
-        }
-    }
-
-
-    /// Returns whether the bookmark creation sound option is enabled
-    static var isPlayBookmarkCreationSoundAvailable: Bool {
-        [Settings.headphonesNextAction, Settings.headphonesPreviousAction].contains(.addBookmark)
-    }
-
-    /// Determines if we should play the sound when a bookmark is created
-    static var shouldPlayBookmarkSound: Bool {
-        isPlayBookmarkCreationSoundAvailable && playBookmarkCreationSound
-    }
-
-    static var playBookmarkCreationSound: Bool {
-        get {
-            Constants.UserDefaults.bookmarks.creationSound.value
-        }
-
-        set {
-            Constants.UserDefaults.bookmarks.creationSound.save(newValue)
         }
     }
 
@@ -1106,38 +719,6 @@ class Settings: NSObject {
         }
     }
 
-    static var playerBookmarksSort: Binding<BookmarkSortOption> {
-        Binding {
-            Constants.UserDefaults.bookmarks.playerSort.value
-        } set: { newValue in
-            Constants.UserDefaults.bookmarks.playerSort.save(newValue)
-        }
-    }
-
-    static var episodeBookmarksSort: Binding<BookmarkSortOption> {
-        Binding {
-            Constants.UserDefaults.bookmarks.episodeSort.value
-        } set: { newValue in
-            Constants.UserDefaults.bookmarks.episodeSort.save(newValue)
-        }
-    }
-
-    static var podcastBookmarksSort: Binding<BookmarkSortOption> {
-        Binding {
-            Constants.UserDefaults.bookmarks.podcastSort.value
-        } set: { newValue in
-            Constants.UserDefaults.bookmarks.podcastSort.save(newValue)
-        }
-    }
-
-    static var profileBookmarksSort: Binding<BookmarkSortOption> {
-        Binding {
-            Constants.UserDefaults.bookmarks.profileSort.value
-        } set: { newValue in
-            Constants.UserDefaults.bookmarks.profileSort.save(newValue)
-        }
-    }
-
     static var appBadge: AppBadge? {
         get {
             AppBadge(rawValue: Int32(UserDefaults.standard.integer(forKey: Constants.UserDefaults.appBadge)))
@@ -1167,28 +748,6 @@ class Settings: NSObject {
         }
     }
 
-    // MARK: - Referrals Show Tip
-
-    static var referralURL: String? {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.referrals.claimURL) as? String
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.referrals.claimURL)
-        }
-    }
-
-    // MARK: - Podcast Feed Reload
-
-    static var shouldShowPodcastFeeReloadTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.podcastFeedReload.showTip) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.podcastFeedReload.showTip)
-        }
-    }
-
     // MARK: - Manage Downloads
 
     class var manageDownloadsLastCheckDate: Date? {
@@ -1201,129 +760,6 @@ class Settings: NSObject {
         }
     }
 
-    // MARK: - Smart Folders Upsell display
-    class var suggestedFoldersLastUpsellDate: Date? {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.suggestedFolders.lastUpsellDate)
-        }
-
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.suggestedFolders.lastUpsellDate) as? Date
-        }
-    }
-
-    class var suggestedFoldersUpsellCount: Int {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.suggestedFolders.upsellCount)
-        }
-
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.suggestedFolders.upsellCount) as? Int ?? 0
-        }
-    }
-
-    class var suggestedFoldersLastPodcastsUsed: String? {
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.suggestedFolders.lastPodcastsUsed)
-        }
-
-        get {
-            UserDefaults.standard.object(forKey: Constants.UserDefaults.suggestedFolders.lastPodcastsUsed) as? String
-        }
-    }
-
-    // MARK: - Podcast View Changes Tip
-
-    static var shouldShowPodcastViewChangesTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.podcastViewChanges.showTip) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.podcastViewChanges.showTip)
-        }
-    }
-
-    // MARK: - Recent Played Sorting Tip
-
-    static var shouldShowRecentlyPlayedSortingTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.shouldShowRecentlyPlayedSortingTip) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.shouldShowRecentlyPlayedSortingTip)
-        }
-    }
-
-    // MARK: - Up Next Sort by Duration Tip
-
-    // Defaults to true so upgrading users are told about the new duration sort once; AppDelegate suppresses it for fresh installs.
-    static var shouldShowUpNextSortDurationTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.shouldShowUpNextSortDurationTip) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.shouldShowUpNextSortDurationTip)
-        }
-    }
-
-    // MARK: - Smart Bookmarks Promo
-
-    static var shouldShowBookmarksPlayerTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.bookmarks.showPlayerTip) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.bookmarks.showPlayerTip)
-        }
-    }
-
-    // MARK: - Playlists
-
-    static var shouldShowNewFilterTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.newFilterTip) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.newFilterTip)
-        }
-    }
-
-    static var shouldShowNewFilterTipInCreationView: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.newFilterTipCreationView) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.newFilterTipCreationView)
-        }
-    }
-
-    static var shouldShowDragAndDropTip: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.playlistDragAndDropTip) as? Bool ?? false
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.playlistDragAndDropTip)
-        }
-    }
-
-    static var shouldShowPlaylistsOnboarding: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.playlistsOnboarding) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.playlistsOnboarding)
-        }
-    }
-
-    static var firstTimePlaylistCreated: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.firstTimePlaylistCreated) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.firstTimePlaylistCreated)
-        }
-    }
-
     static var saveCurrentUpNextQueueIntoPlaylist: Bool {
         get {
             UserDefaults.standard.value(forKey: Constants.UserDefaults.saveCurrentUpNextQueueIntoPlaylist) as? Bool ?? true
@@ -1333,29 +769,9 @@ class Settings: NSObject {
         }
     }
 
-    static var shouldResultEndOfYearSyncStatus: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.shouldResultEndOfYearSyncStatus) as? Bool ?? true
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.shouldResultEndOfYearSyncStatus)
-        }
-    }
-
-    // MARK: - Debug IAP in TF builds
-
-    static var shouldEnableIAPInTestFlightBuilds: Bool = false
-
     // MARK: - Informational Banner
-#if !os(watchOS) && !APPCLIP && !os(tvOS)
-    static func dismissBanner(for type: InformationalBannerType) {
-        UserDefaults.standard.set(true, forKey: "kInformational\(type.rawValue.capitalized)Banner")
-    }
-
-    static func shouldShowBanner(for type: InformationalBannerType) -> Bool {
-        return !UserDefaults.standard.bool(forKey: "kInformational\(type.rawValue.capitalized)Banner")
-    }
-#endif
+    #if !os(watchOS) && !APPCLIP && !os(tvOS)
+    #endif
 
     // MARK: - Notifications
     static var notificationsNewEpisodes: Bool {
@@ -1364,42 +780,6 @@ class Settings: NSObject {
         }
         set {
             UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.notifications.newEpisodes)
-        }
-    }
-
-    static var notificationsDailyReminders: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.notifications.dailyReminders) as? Bool ?? false
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.notifications.dailyReminders)
-        }
-    }
-
-    static var notificationsNewFeaturesAndTips: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.notifications.newFeaturesAndTips) as? Bool ?? false
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.notifications.newFeaturesAndTips)
-        }
-    }
-
-    static var notificationsRecommendations: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.notifications.recommendations) as? Bool ?? false
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.notifications.recommendations)
-        }
-    }
-
-    static var notificationsOffers: Bool {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.notifications.offers) as? Bool ?? false
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.notifications.offers)
         }
     }
 
@@ -1412,45 +792,10 @@ class Settings: NSObject {
         }
     }
 
-    // MARK: - Encourage Account Creation
-
-    /// Anchor for the Encourage Account Creation modal cadence; reset when shown. Not reset on
-    /// sign-out (targets any logged-out user); set once on fresh install for a full grace interval.
-    static var encourageAccountCreationReferenceDate: Date? {
-        get {
-            UserDefaults.standard.value(forKey: Constants.UserDefaults.encourageAccountCreationReferenceDate) as? Date
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: Constants.UserDefaults.encourageAccountCreationReferenceDate)
-        }
-    }
-
-    /// How long to wait between showings of the Encourage Account Creation modal (60 days).
-    static let encourageAccountCreationInterval: TimeInterval = 60.days
-
-    /// Whether to show the modal this launch: on the first eligible launch, once the interval elapses,
-    /// or when the anchor is ahead of `now` (a restored future date). Params injectable for tests.
-    static func shouldShowEncourageAccountCreationModal(
-        now: Date = Date(),
-        isEligible: Bool = FeatureFlag.encourageAccountCreation.enabled && !SyncManager.isUserLoggedIn(),
-        referenceDate: Date? = encourageAccountCreationReferenceDate,
-        interval: TimeInterval = encourageAccountCreationInterval
-    ) -> Bool {
-        guard isEligible else { return false }
-        guard let referenceDate else { return true }
-        let elapsed = now.timeIntervalSince(referenceDate)
-        return elapsed >= interval || elapsed < 0 // anchor ahead of now (clock/backup skew)
-    }
-
     // MARK: - VoiceBoostN
 
     static var isVoiceBoostNEnabled: Bool {
-        get {
-            guard FeatureFlag.voiceBoostN.enabled else { return false }
-            if UserDefaults.standard.object(forKey: Constants.UserDefaults.voiceBoostNEnabled) == nil {
-                return true
-            }
-            return UserDefaults.standard.bool(forKey: Constants.UserDefaults.voiceBoostNEnabled)
+        get {return false
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.UserDefaults.voiceBoostNEnabled)
@@ -1480,86 +825,25 @@ class Settings: NSObject {
         }
     }
 
-    // MARK: - Variables that are loaded/changed through Firebase
+    // MARK: - Playback and search timing
 
     #if !os(watchOS)
-        class func minTimeBetweenProgressSaves() -> TimeInterval {
-            remoteMsToTime(key: Constants.RemoteParams.periodicSaveTimeMs)
-        }
+    class func minTimeBetweenProgressSaves() -> TimeInterval { 60 }
 
-        class func podcastSearchDebounceTime() -> TimeInterval {
-            if FeatureFlag.searchPredictive.enabled {
-                return 0.2
-            } else {
-                return remoteMsToTime(key: Constants.RemoteParams.podcastSearchDebounceMs)
-            }
-        }
-
-        class func episodeSearchDebounceTime() -> TimeInterval {
-            remoteMsToTime(key: Constants.RemoteParams.episodeSearchDebounceMs)
-        }
-
-        static var endOfYearRequireAccount: Bool {
-            let remote = RemoteConfig.remoteConfig().configValue(forKey: Constants.RemoteParams.endOfYearRequireAccount)
-            return remote.boolValue
-        }
-
-        static var addMissingEpisodes: Bool {
-            let remote = RemoteConfig.remoteConfig().configValue(forKey: Constants.RemoteParams.addMissingEpisodes)
-            return remote.boolValue
-        }
-
-        static var plusCloudStorageLimit: Int {
-            RemoteConfig.remoteConfig().configValue(forKey: Constants.RemoteParams.customStorageLimitGB).numberValue.intValue
-        }
-
-        static var patronCloudStorageLimit: Int {
-            RemoteConfig.remoteConfig().configValue(forKey: Constants.RemoteParams.patronCloudStorageGB).numberValue.intValue
-        }
-
-        static var errorLogoutHandling: Bool {
-            return RemoteConfig.remoteConfig().configValue(forKey: Constants.RemoteParams.errorLogoutHandling).boolValue
-        }
-
-    static var slumberPromoCode: String? {
-        RemoteConfig.remoteConfig().configValue(forKey: Constants.RemoteParams.slumberStudiosPromoCode).stringValue
+    class func podcastSearchDebounceTime() -> TimeInterval {
+        return 0.2
     }
 
-        private class func remoteMsToTime(key: String) -> TimeInterval {
-            let remoteMs = RemoteConfig.remoteConfig().configValue(forKey: key)
-
-            return TimeInterval(remoteMs.numberValue.doubleValue / 1000)
-        }
+    class func episodeSearchDebounceTime() -> TimeInterval { 0.8 }
     #endif
 }
 
-extension Settings {
-    static func trackValueChanged(_ event: AnalyticsEvent, value: Any) {
-        Analytics.track(event, properties: ["value": value])
-    }
-
-    static func trackValueToggled(_ event: AnalyticsEvent, enabled: Bool) {
-        Analytics.track(event, properties: ["enabled": enabled])
-    }
-}
-
 #if !os(watchOS) && !os(tvOS)
-extension L10n {
-    static var plusCloudStorageLimit: String {
-        plusCloudStorageLimitFormat(Settings.plusCloudStorageLimit.localized())
-    }
-
-    static var patronCloudStorageLimit: String {
-        plusCloudStorageLimitFormat(Settings.patronCloudStorageLimit.localized())
-    }
-}
 #endif
 
 extension HeadphoneControl {
     init(action: HeadphoneControlAction) {
         switch action {
-        case .addBookmark:
-            self = .addBookmark
         case .nextChapter:
             self = .nextChapter
         case .previousChapter:
@@ -1573,8 +857,6 @@ extension HeadphoneControl {
 
     var action: HeadphoneControlAction {
         switch self {
-        case .addBookmark:
-            return .addBookmark
         case .nextChapter:
             return .nextChapter
         case .previousChapter:

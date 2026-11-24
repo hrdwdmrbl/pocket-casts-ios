@@ -75,23 +75,6 @@ class PodcastChapterParser {
         }
     }
 
-    func parseGeneratedChapters(_ generatedChapters: [GeneratedChapter], episodeDuration: TimeInterval) -> [ChapterInfo] {
-        let sortedChapters = generatedChapters.sorted { $0.startTime < $1.startTime }
-
-        return sortedChapters.enumerated().map { index, chapter in
-            let chapterInfo = ChapterInfo()
-            chapterInfo.title = chapter.title
-            chapterInfo.index = index
-            chapterInfo.startTime = CMTime(seconds: chapter.startTime, preferredTimescale: 1000000)
-            if let nextChapterStartTime = sortedChapters[safe: index + 1]?.startTime {
-                chapterInfo.duration = nextChapterStartTime - chapter.startTime
-            } else {
-                chapterInfo.duration = episodeDuration - chapter.startTime
-            }
-            return chapterInfo
-        }
-    }
-
     private func parseChapters(url: URL, episodeDuration: TimeInterval, completion: @escaping (([ChapterInfo]) -> Void)) {
         DispatchQueue.global().async { [weak self] in
             guard let strongSelf = self else {
@@ -119,7 +102,7 @@ class PodcastChapterParser {
                         let convertedChapter = ChapterInfo()
                         convertedChapter.title = chapter.title ?? ""
                         #if !os(watchOS)
-                            convertedChapter.image = chapter.artwork
+                        convertedChapter.image = chapter.artwork
                         #endif
 
                         convertedChapter.startTime = chapter.time

@@ -1,13 +1,5 @@
 import Foundation
 
-public enum SubscriptionPlatform: Int {
-    case none = 0, iOS = 1, android = 2, web = 3, gift = 4
-}
-
-public enum SubscriptionFrequency: Int {
-    case none = 0, monthly = 1, yearly = 2
-}
-
 public enum UpdateStatus: Int {
     case notStarted, failed, cancelled, successNoNewData, successNewData, success
 }
@@ -20,32 +12,6 @@ public enum RefreshFetchResult: UInt {
 
 public enum AutoAddLimitReachedAction: Int32, Codable {
     case stopAdding = 0, addToTopOnly = 1
-}
-
-// MARK: - SubscriptionType
-public enum SubscriptionType: Int {
-    case none = 0, plus = 1, supporter = 2
-}
-
-// MARK: - SubscriptionTier
-public enum SubscriptionTier: String {
-    // The none state doesn't come from the server, but it instead may send an empty string
-    // This is used as the fallback value
-    case none = ""
-
-    // The values here come from the server and are case sensitive
-    case plus = "Plus", patron = "Patron"
-}
-
-extension SubscriptionTier: Comparable {
-    private static var tierOrder: [Self] = [.none, .plus, .patron]
-
-    public static func < (lhs: SubscriptionTier, rhs: SubscriptionTier) -> Bool {
-        let lhsIndex = Self.tierOrder.firstIndex(of: lhs) ?? -1
-        let rhsIndex = Self.tierOrder.firstIndex(of: rhs) ?? -1
-
-        return lhsIndex < rhsIndex
-    }
 }
 
 public enum PrimaryRowAction: Int32, Codable {
@@ -61,7 +27,6 @@ public enum AppBadge: Int32, Codable {
 }
 
 public enum HeadphoneControl: Int32, Codable {
-    case addBookmark = 0
     case skipBack = 1
     case skipForward = 2
     case nextChapter = 3
@@ -73,8 +38,6 @@ public enum ThemeType: Int32, CaseIterable, Codable {
     case light = 0
     case dark = 1
     case extraDark = 2
-    case electric = 7
-    case classic = 8
     case indigo = 4
     case rosé = 3
     case contrastLight = 6
@@ -88,10 +51,6 @@ public enum ThemeType: Int32, CaseIterable, Codable {
             self = .dark
         case .extraDark:
             self = .extraDark
-        case .electric:
-            self = .electric
-        case .classic:
-            self = .classic
         case .indigo:
             self = .indigo
         case .rosé:
@@ -111,10 +70,6 @@ public enum ThemeType: Int32, CaseIterable, Codable {
             return .dark
         case .extraDark:
             return .extraDark
-        case .electric:
-            return .electric
-        case .classic:
-            return .classic
         case .indigo:
             return .indigo
         case .rosé:
@@ -128,7 +83,7 @@ public enum ThemeType: Int32, CaseIterable, Codable {
 
     /// This Old enum provides the original Int values so we can restore and continue to save the original values.
     public enum Old: Int {
-        case light = 0, dark = 1, extraDark = 2, electric = 3, classic = 4, indigo = 5, rosé = 7, contrastLight = 8, contrastDark = 9
+        case light = 0, dark = 1, extraDark = 2, indigo = 5, rosé = 7, contrastLight = 8, contrastDark = 9
     }
 }
 

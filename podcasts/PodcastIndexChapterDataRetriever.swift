@@ -19,6 +19,14 @@ public actor PodcastIndexChapterDataRetriever {
 
     private var dataRequestMap: [String: Task<PodcastIndexEvelope, Error>] = [:]
 
+    func clearCache() async {
+        let requests = Array(dataRequestMap.values)
+        for task in requests { task.cancel() }
+        for task in requests { _ = await task.result }
+        dataRequestMap.removeAll()
+        podcastIndexChaptersCache.removeAllCachedResponses()
+    }
+
     public init() {
         podcastIndexChaptersCache = URLCache(memoryCapacity: 1.megabytes, diskCapacity: 10.megabytes, diskPath: "podcast_index_chapters")
     }

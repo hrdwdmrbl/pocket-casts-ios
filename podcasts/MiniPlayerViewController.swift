@@ -45,18 +45,11 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     var panUpRecognizer: UIPanGestureRecognizer!
     var longPressRecognizer: UILongPressGestureRecognizer!
 
-    /// Tracks whether the user tapped an action from the long-press context
-    /// menu (Liquid Glass path). Used to decide whether to fire the
-    /// "menu dismissed" analytics event when the menu closes.
-    var longPressContextMenuActionSelected = false
-
     var heightConstraint: NSLayoutConstraint?
 
     weak var hostTabBarController: UITabBarController?
 
     var upNextViewController: UpNextViewController?
-
-    private let analyticsPlaybackHelper = AnalyticsPlaybackHelper.shared
 
     private var episodeTitleLabel: MiniPlayerScrollingTitleView?
     private var timeLeftModel: MiniPlayerTimeLeftModel?
@@ -77,7 +70,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
             content.leadingAnchor.constraint(equalTo: wrapper.contentView.leadingAnchor),
             content.trailingAnchor.constraint(equalTo: wrapper.contentView.trailingAnchor),
             content.topAnchor.constraint(equalTo: wrapper.contentView.topAnchor),
-            content.bottomAnchor.constraint(equalTo: wrapper.contentView.bottomAnchor),
+            content.bottomAnchor.constraint(equalTo: wrapper.contentView.bottomAnchor)
         ])
         return wrapper
     }
@@ -215,7 +208,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
 
             buttonStack.topAnchor.constraint(equalTo: view.topAnchor),
             buttonStack.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            buttonStack.heightAnchor.constraint(equalToConstant: 56),
+            buttonStack.heightAnchor.constraint(equalToConstant: 56)
         ])
 
         view.registerForTraitChanges([UITraitTabAccessoryEnvironment.self]) { (view: UIView, _) in
@@ -233,7 +226,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
             NSLayoutConstraint.deactivate(accessoryEnvironmentConstraints)
             accessoryEnvironmentConstraints = [
                 glassProgressView.widthAnchor.constraint(equalToConstant: isInline ? 34 : 52),
-                glassButtonStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
+                glassButtonStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4)
             ]
             NSLayoutConstraint.activate(accessoryEnvironmentConstraints)
         }
@@ -275,7 +268,6 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     }
 
     @IBAction func playPauseTapped(_ sender: Any) {
-        analyticsPlaybackHelper.currentSource = analyticsSource
         HapticsHelper.triggerPlayPauseHaptic()
         PlaybackManager.shared.playPause()
     }
@@ -285,7 +277,6 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     }
 
     @IBAction func skipBackTapped(_ sender: Any) {
-        analyticsPlaybackHelper.currentSource = analyticsSource
         HapticsHelper.triggerSkipBackHaptic()
         if let timeLeftModel {
             timeLeftModel.countsDown = false
@@ -296,7 +287,6 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
     }
 
     @IBAction func skipForwardTapped(_ sender: Any) {
-        analyticsPlaybackHelper.currentSource = analyticsSource
         HapticsHelper.triggerSkipForwardHaptic()
         if let timeLeftModel {
             timeLeftModel.countsDown = true
@@ -333,7 +323,7 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
         scale.duration = duration
         scale.timingFunctions = [
             CAMediaTimingFunction(name: .easeInEaseOut),
-            CAMediaTimingFunction(name: .easeInEaseOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
         ]
         imageView.layer.add(scale, forKey: "skipScale")
     }
@@ -682,12 +672,6 @@ class MiniPlayerViewController: SimpleNotificationsViewController {
         let navWrapper = SJUIUtils.navController(for: upNextController, iconStyle: .secondaryText01, themeOverride: upNextController.themeOverride)
         navWrapper.modalPresentationStyle = .formSheet
         rootViewController()?.present(navWrapper, animated: true, completion: nil)
-    }
-}
-
-extension MiniPlayerViewController: AnalyticsSourceProvider {
-    var analyticsSource: AnalyticsSource {
-        .miniplayer
     }
 }
 

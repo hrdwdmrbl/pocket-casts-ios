@@ -5,17 +5,6 @@ import XCTest
 
 final class PlaylistQueryBuilderTests: XCTestCase {
 
-    override func setUp() {
-        super.setUp()
-        // Clear any feature flag overrides before each test
-        FeatureFlagOverrideStore().resetOverrides()
-    }
-
-    override func tearDown() {
-        FeatureFlagOverrideStore().resetOverrides()
-        super.tearDown()
-    }
-
     private func createTestDatabase() throws -> DatabasePool {
         var config = Configuration()
         config.busyMode = .timeout(10)
@@ -256,256 +245,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         XCTAssertNoThrow(try SQLiteValidator.validate(sql: query, values: ["1234"]))
     }
 
-    // MARK: - Result Comparison Tests
-
-    func testManualEpisodeQueryReturnsIdenticalResults() throws {
-        let dbPool = try createTestDatabase()
-        let playlistUUID = "test-playlist-episodes"
-        try insertTestData(in: dbPool, playlistUUID: playlistUUID)
-
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = playlistUUID
-
-        // Query with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimized = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: false)
-        let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
-
-        // Query with feature flag disabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginal = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: false)
-        let resultsOriginal = try executeQuery(queryOriginal, in: dbPool)
-
-        // Normalize and compare results
-        let normalizedOptimized = normalizeResults(resultsOptimized)
-        let normalizedOriginal = normalizeResults(resultsOriginal)
-
-        XCTAssertEqual(normalizedOptimized.count, normalizedOriginal.count, "Result counts should match")
-        XCTAssertEqual(normalizedOptimized, normalizedOriginal, "Results should be identical")
-    }
-
-    func testManualEpisodeCountReturnsIdenticalResults() throws {
-        let dbPool = try createTestDatabase()
-        let playlistUUID = "test-playlist-count"
-        try insertTestData(in: dbPool, playlistUUID: playlistUUID)
-
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = playlistUUID
-
-        // Query with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimized = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter, shouldShowArchived: false)
-        let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
-
-        // Query with feature flag disabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginal = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter, shouldShowArchived: false)
-        let resultsOriginal = try executeQuery(queryOriginal, in: dbPool)
-
-        XCTAssertEqual(resultsOptimized.count, resultsOriginal.count, "Should have same number of result rows")
-        if let countOptimized = resultsOptimized.first?.values.first,
-           let countOriginal = resultsOriginal.first?.values.first {
-            XCTAssertEqual(countOptimized, countOriginal, "Episode counts should match")
-        } else {
-            XCTFail("Could not extract count values")
-        }
-    }
-
-    func testManualAllEpisodeCountReturnsIdenticalResults() throws {
-        let dbPool = try createTestDatabase()
-        let playlistUUID = "test-playlist-allcount"
-        try insertTestData(in: dbPool, playlistUUID: playlistUUID)
-
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = playlistUUID
-
-        // Test with archived hidden
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimizedHidden = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter, shouldShowArchived: false)
-        let resultsOptimizedHidden = try executeQuery(queryOptimizedHidden, in: dbPool)
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginalHidden = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter, shouldShowArchived: false)
-        let resultsOriginalHidden = try executeQuery(queryOriginalHidden, in: dbPool)
-
-        if let countOptimized = resultsOptimizedHidden.first?.values.first,
-           let countOriginal = resultsOriginalHidden.first?.values.first {
-            XCTAssertEqual(countOptimized, countOriginal, "All episode counts (archived hidden) should match")
-        } else {
-            XCTFail("Could not extract count values for archived hidden")
-        }
-
-        // Test with archived shown
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimizedShown = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter, shouldShowArchived: true)
-        let resultsOptimizedShown = try executeQuery(queryOptimizedShown, in: dbPool)
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginalShown = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter, shouldShowArchived: true)
-        let resultsOriginalShown = try executeQuery(queryOriginalShown, in: dbPool)
-
-        if let countOptimized = resultsOptimizedShown.first?.values.first,
-           let countOriginal = resultsOriginalShown.first?.values.first {
-            XCTAssertEqual(countOptimized, countOriginal, "All episode counts (archived shown) should match")
-        } else {
-            XCTFail("Could not extract count values for archived shown")
-        }
-    }
-
-    // NOTE: Test removed - optimized and legacy paths now correctly have different behavior
-    // The optimized path properly deduplicates by UUID before filtering, while the legacy
-    // path does not. This is expected and correct behavior.
-
-    func testArchivedEpisodeFilteringReturnsIdenticalResults() throws {
-        let dbPool = try createTestDatabase()
-        let playlistUUID = "test-playlist-archived"
-        try insertTestData(in: dbPool, playlistUUID: playlistUUID)
-
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = playlistUUID
-
-        // Test episode query with archived hidden
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimizedHidden = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: false)
-        let resultsOptimizedHidden = try executeQuery(queryOptimizedHidden, in: dbPool)
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginalHidden = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: false)
-        let resultsOriginalHidden = try executeQuery(queryOriginalHidden, in: dbPool)
-
-        XCTAssertEqual(normalizeResults(resultsOptimizedHidden), normalizeResults(resultsOriginalHidden),
-                       "Episode results with archived hidden should be identical")
-
-        // Test episode query with archived shown
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimizedShown = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: true)
-        let resultsOptimizedShown = try executeQuery(queryOptimizedShown, in: dbPool)
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginalShown = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: true)
-        let resultsOriginalShown = try executeQuery(queryOriginalShown, in: dbPool)
-
-        XCTAssertEqual(normalizeResults(resultsOptimizedShown), normalizeResults(resultsOriginalShown),
-                       "Episode results with archived shown should be identical")
-    }
-
-    // MARK: - Feature Flag Optimization Tests
-
-    func testManualEpisodeQueryValidWithBothFeatureFlagStates() throws {
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = "test-playlist"
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimized = PlaylistQueryBuilder.query(clause: .episode, for: filter)
-        XCTAssertNoThrow(try SQLiteValidator.validate(sql: queryOptimized))
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginal = PlaylistQueryBuilder.query(clause: .episode, for: filter)
-        XCTAssertNoThrow(try SQLiteValidator.validate(sql: queryOriginal))
-    }
-
-    func testManualEpisodeCountValidWithBothFeatureFlagStates() throws {
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = "test-playlist"
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimized = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter)
-        XCTAssertNoThrow(try SQLiteValidator.validate(sql: queryOptimized))
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginal = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter)
-        XCTAssertNoThrow(try SQLiteValidator.validate(sql: queryOriginal))
-    }
-
-    func testManualAllEpisodeCountValidWithBothFeatureFlagStates() throws {
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = "test-playlist"
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-        let queryOptimized = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter)
-        XCTAssertNoThrow(try SQLiteValidator.validate(sql: queryOptimized))
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-        let queryOriginal = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter)
-        XCTAssertNoThrow(try SQLiteValidator.validate(sql: queryOriginal))
-    }
-
-    func testManualFirstDistinctEpisodesValidWithBothFeatureFlagStates() throws {
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = "test-playlist"
-
-        let sortTypes: [PlaylistSort] = [.newestToOldest, .oldestToNewest, .shortestToLongest, .longestToShortest, .dragAndDrop]
-
-        for sortType in sortTypes {
-            try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-            let queryOptimized = PlaylistQueryBuilder.query(
-                clause: .firstDistinctEpisodes,
-                for: filter,
-                limit: 10,
-                sortType: sortType
-            )
-            XCTAssertNoThrow(
-                try SQLiteValidator.validate(sql: queryOptimized),
-                "Optimized query should be valid for sort type: \(sortType)"
-            )
-
-            try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-            let queryOriginal = PlaylistQueryBuilder.query(
-                clause: .firstDistinctEpisodes,
-                for: filter,
-                limit: 10,
-                sortType: sortType
-            )
-            XCTAssertNoThrow(
-                try SQLiteValidator.validate(sql: queryOriginal),
-                "Original query should be valid for sort type: \(sortType)"
-            )
-        }
-    }
-
-    func testArchivedEpisodeHandlingValidWithBothFeatureFlagStates() throws {
-        let filter = EpisodeFilter()
-        filter.manual = true
-        filter.uuid = "test-playlist"
-
-        let archivedStates = [true, false]
-        let clauses: [PlaylistQueryBuilder.SelectClause] = [.episode, .episodeCount, .allEpisodeCount]
-
-        for shouldShowArchived in archivedStates {
-            for clause in clauses {
-                try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
-                let queryOptimized = PlaylistQueryBuilder.query(
-                    clause: clause,
-                    for: filter,
-                    shouldShowArchived: shouldShowArchived
-                )
-                XCTAssertNoThrow(
-                    try SQLiteValidator.validate(sql: queryOptimized),
-                    "Optimized query should be valid for clause \(clause) with archived=\(shouldShowArchived)"
-                )
-
-                try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: false)
-                let queryOriginal = PlaylistQueryBuilder.query(
-                    clause: clause,
-                    for: filter,
-                    shouldShowArchived: shouldShowArchived
-                )
-                XCTAssertNoThrow(
-                    try SQLiteValidator.validate(sql: queryOriginal),
-                    "Original query should be valid for clause \(clause) with archived=\(shouldShowArchived)"
-                )
-            }
-        }
-    }
-
     // MARK: - shouldShowArchived Tests
 
     func testManualPlaylistEpisodeCountWithShouldShowArchivedFalse() throws {
@@ -518,7 +257,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter, shouldShowArchived: false)
         let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
 
@@ -548,7 +286,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter, shouldShowArchived: true)
         let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
 
@@ -576,7 +313,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter, shouldShowArchived: false)
         let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
 
@@ -603,7 +339,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(clause: .allEpisodeCount, for: filter, shouldShowArchived: true)
         let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
 
@@ -630,7 +365,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: false)
         let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
 
@@ -661,7 +395,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(clause: .episode, for: filter, shouldShowArchived: true)
         let resultsOptimized = try executeQuery(queryOptimized, in: dbPool)
 
@@ -683,7 +416,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(
             clause: .firstDistinctEpisodes,
             for: filter,
@@ -716,7 +448,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = playlistUUID
 
         // Test with feature flag enabled
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
         let queryOptimized = PlaylistQueryBuilder.query(
             clause: .firstDistinctEpisodes,
             for: filter,
@@ -748,7 +479,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = "search-archived-hidden"
 
         for flagValue in [true, false] {
-            try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: flagValue)
             let query = PlaylistQueryBuilder.query(
                 clause: .episode, for: filter, searchTerm: "hello", shouldShowArchived: false
             )
@@ -773,7 +503,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = "search-archived-shown"
 
         for flagValue in [true, false] {
-            try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: flagValue)
             let query = PlaylistQueryBuilder.query(
                 clause: .episode, for: filter, searchTerm: "hello", shouldShowArchived: true
             )
@@ -798,7 +527,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         filter.uuid = "search-single-quote"
 
         for flagValue in [true, false] {
-            try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: flagValue)
             for shouldShowArchived in [true, false] {
                 let query = PlaylistQueryBuilder.query(
                     clause: .episode, for: filter, searchTerm: "O'Brien", shouldShowArchived: shouldShowArchived
@@ -833,8 +561,6 @@ final class PlaylistQueryBuilderTests: XCTestCase {
         let filter = EpisodeFilter()
         filter.manual = true
         filter.uuid = playlistUUID
-
-        try FeatureFlagOverrideStore().override(FeatureFlag.optimizeManualPlaylistQueries, withValue: true)
 
         // Get counts for shouldShowArchived = false
         let episodeCountFalse = PlaylistQueryBuilder.query(clause: .episodeCount, for: filter, shouldShowArchived: false)

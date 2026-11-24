@@ -9,18 +9,16 @@ import SwiftUI
 
 class MainTabBarController: UITabBarController, NavigationProtocol {
 
-    enum Tab: Int { case podcasts, filter, discover, profile, upNext }
+    enum Tab: Int { case podcasts, filter, discover, settings, upNext }
 
     var pcTabs = [Tab]()
 
     let playPauseCommand = UIKeyCommand(title: L10n.keycommandPlayPause, action: #selector(handlePlayPauseKey), input: " ", modifierFlags: [])
 
-    lazy var endOfYear = EndOfYear()
-
     /// Styles its badge as a plain red dot on the item itself, since Liquid Glass ignores the tab bar
     /// appearance that does it for the older tab bar.
-    private lazy var profileTabBarItem: UITabBarItem = {
-        let item = UITabBarItem(title: L10n.profile, image: UIImage(named: "profile_tab"), tag: pcTabs.firstIndex(of: .profile) ?? -1)
+    private lazy var settingsTabBarItem: UITabBarItem = {
+        let item = UITabBarItem(title: L10n.settings, image: UIImage(systemName: "gearshape"), tag: pcTabs.firstIndex(of: .settings) ?? -1)
         item.badgeColor = .clear
         item.setBadgeTextAttributes([.foregroundColor: UIColor.systemRed], for: .normal)
         item.setBadgeTextAttributes([.foregroundColor: UIColor.systemRed], for: .selected)
@@ -33,44 +31,17 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     /// when the queue actually changes (not on every refresh notification).
     private var previousUpNextCount: Int?
 
-    /// Keeps the account-creation modal off the same launch that just showed initial onboarding.
-    private var didPresentInitialOnboardingThisLaunch = false
-
     /// `true` while the Up Next "pulse" spring is in flight, so a burst of
     /// rapid adds doesn't stack overlapping transforms on the target (the tab
     /// button, or the mini player artwork when minimized).
     /// Not `private`: set from the pulse code in `+Animations`.
     var isPulsingUpNextTarget = false
 
-
     /// The viewDidAppear can trigger more than once per lifecycle, setting this flag on the first did appear prevents use from prompting more than once per lifecycle. But still wait until the tab bar has appeared to do so.
     var viewDidAppearBefore: Bool = false
 
-    /// Whether we're actively presenting the what's new
-    var isShowingWhatsNew: Bool = false
-
     /// Displayed during database migrations
     var alert: ShiftyLoadingAlert?
-
-    func loginAgain() {
-        // Ensure the new sync is a full sync (so podcasts and episodes are retrieved)
-        SyncManager.syncReason = .login
-        ServerSettings.clearLastSyncTime()
-        UserDefaults.standard.removeObject(forKey: "PCLastModifiedServerDate")
-
-        // Copy data from the previous corrupted database (if possible)
-        alert = ShiftyLoadingAlert(title: "Corrupted database. Recovering...")
-        alert?.showAlert(self, hasProgress: false, completion: nil)
-        DataManager.shared.copyAllData()
-
-        alert?.hideAlert(true, completion: {
-            // Start the full sync
-            let controller = SyncSigninViewController()
-            controller.loginAgain = true
-            SceneHelper.rootViewController()?.dismiss(animated: true)
-            SceneHelper.rootViewController()?.present(controller, animated: true, completion: nil)
-        })
-    }
 
     private let errorBanner: UIView = {
         let view = UIView()
@@ -114,7 +85,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
         fixTarBarTraitCollectionOnIpadForiOS18()
 
-        pcTabs = [.podcasts, .filter, .discover, .upNext, .profile]
+        pcTabs = [.podcasts, .filter, .discover, .upNext, .settings]
 
         var vcsInTab = [UIViewController]()
 
@@ -128,20 +99,15 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
         discoverViewController.tabBarItem = UITabBarItem(title: L10n.discover, image: UIImage(named: "discover_tab"), tag: pcTabs.firstIndex(of: .discover)!)
 
-        let profileViewController = ProfileViewController()
-        profileViewController.tabBarItem = profileTabBarItem
+        let settingsViewController = SettingsViewController()
+        settingsViewController.tabBarItem = settingsTabBarItem
 
         let upNextViewController = UpNextViewController(source: .tabBar, showingInTab: true)
         upNextViewController.tabBarItem = upNextTabBarItem
-        vcsInTab = [podcastsController, filtersViewController, discoverViewController, upNextViewController, profileViewController]
-
-        displayEndOfYearBadgeIfNeeded()
+        vcsInTab = [podcastsController, filtersViewController, discoverViewController, upNextViewController, settingsViewController]
 
         viewControllers = vcsInTab.map { SJUIUtils.navController(for: $0) }
         selectedIndex = UserDefaults.standard.integer(forKey: Constants.UserDefaults.lastTabOpened)
-
-        // Track the initial tab opened event
-        trackTabOpened(pcTabs[selectedIndex], isInitial: true)
 
         NavigationManager.shared.mainViewControllerDidLoad(controller: self)
         setupMiniPlayer()
@@ -153,10 +119,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         NotificationCenter.default.addObserver(self, selector: #selector(textEditingDidEnd), name: Constants.Notifications.textEditingDidEnd, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleFollowSystemThemeTurnedOn), name: Constants.Notifications.followSystemThemeTurnedOn, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(willEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(profileSeen), name: Constants.Notifications.profileSeen, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(refreshProfileTabAvatar), name: .userLoginDidChange, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(refreshProfileTabAvatarForcingReload), name: Constants.Notifications.avatarNeedsRefreshing, object: nil)
-        refreshProfileTabAvatar()
 
         NotificationCenter.default.addObserver(self, selector: #selector(refreshUpNextTabBadge), name: Constants.Notifications.upNextQueueChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(refreshUpNextTabBadge), name: Constants.Notifications.upNextEpisodeRemoved, object: nil)
@@ -164,16 +126,8 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         // `upNextEpisodeAdded` refreshes the badge via the genie animation's tail, not here.
         NotificationCenter.default.addObserver(self, selector: #selector(animateEpisodeAddedToUpNext(_:)), name: Constants.Notifications.upNextEpisodeAdded, object: nil)
         refreshUpNextTabBadge()
-
-        observeWhatsNewFeed()
-
-        observersForEndOfYearStats()
-        addBookmarkCreatedToastHandler()
-        addBookmarkEnrichmentHandler()
-        if FeatureFlag.displayErrorsOnPlayer.enabled {
-            setupErrorBanner()
-            setupErrorObservers()
-        }
+        setupErrorBanner()
+        setupErrorObservers()
     }
 
     private var cancellables = Set<AnyCancellable>()
@@ -199,15 +153,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
         updateDatabaseIndexes()
         optimizeDatabaseIfNeeded()
-
-        let isFirstAppearance = !viewDidAppearBefore
-        viewDidAppearBefore = true
-
-        // This can run inside the deferred-commit flush of a modal dismissal, where
-        // presenting or dismissing runs into the transition that is still tearing down.
-        DispatchQueue.main.async { [weak self] in
-            self?.showLaunchPromptsIfNeeded(isFirstAppearance: isFirstAppearance)
-        }
     }
 
     /// Update database indexes and delete unused columns
@@ -231,52 +176,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     }
 
     private func optimizeDatabaseIfNeeded() {
-        guard
-            let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
-            appVersion != Settings.lastAppVersionThatRunVacuum,
-            FeatureFlag.runVacuumOnVersionUpdate.enabled
-        else {
-            return
-        }
-        Settings.lastAppVersionThatRunVacuum = appVersion
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            guard let self else { return }
-            if DataManager.shared.podcastCount() > 100 {
-                presentLoader()
-            }
-            DataManager.shared.vacuumDatabase()
-            dismissLoader()
-        }
-    }
-
-    private func showInitialOnboardingIfNeeded() {
-        if SyncManager.isUserLoggedIn() {
-            return
-        }
-
-        // Recurring account-creation modal targets logged-out users who completed initial onboarding:
-        // first eligible launch, then every 60 days.
-        let hasCompletedInitialOnboarding = Settings.shouldShowInitialOnboardingFlow == false && Settings.hasSeenInitialOnboardingBefore == true
-        if hasCompletedInitialOnboarding {
-            // Don't chain into the modal on the same launch we showed onboarding — it'd re-trigger
-            // here since `shouldShowInitialOnboardingFlow` flips false immediately. Shows next launch.
-            guard !didPresentInitialOnboardingThisLaunch else { return }
-
-            // Don't dismiss a presented modal (e.g. What's New) to show EAC — that would burn its
-            // announcement. Skips EAC for this launch; the next launch retries.
-            guard presentedViewController == nil else { return }
-
-            if Settings.shouldShowEncourageAccountCreationModal() {
-                NavigationManager.shared.navigateTo(NavigationManager.onboardingFlow, data: ["flow": OnboardingFlow.Flow.encourageAccountCreation])
-            }
-            return
-        }
-
-        didPresentInitialOnboardingThisLaunch = true
-        NavigationManager.shared.navigateTo(NavigationManager.onboardingFlow, data: ["flow": OnboardingFlow.Flow.initialOnboarding])
-
-        // Set the flag so the user won't see the on launch flow again
-        Settings.shouldShowInitialOnboardingFlow = false
+        return
     }
 
     // TODO: This workaround is planned to be replaced later.
@@ -334,16 +234,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.tappedOnSelectedTab, object: tabIndex)
         }
 
-        if tabIndex != selectedIndex {
-            let tab = pcTabs[tabIndex]
-            trackTabOpened(tab)
-            AnalyticsHelper.tabSelected(tab: tab)
-        }
-
-        if item === profileTabBarItem, FeatureFlag.whatsNewFeed.enabled {
-            WhatsNewManager.shared.markFeedAsSeen()
-        }
-
         UserDefaults.standard.set(tabIndex, forKey: Constants.UserDefaults.lastTabOpened)
     }
 
@@ -362,29 +252,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         if let navController = selectedViewController as? UINavigationController {
             navController.popToRootViewController(animated: true)
         }
-    }
-
-    func navigateToFolder(_ folder: Folder, popToRootViewController: Bool = true) {
-        guard let navController = selectedViewController as? UINavigationController else { return }
-
-        if popToRootViewController {
-            navController.popToRootViewController(animated: false)
-        }
-
-        let folderController = FolderViewController(folder: folder)
-        navController.pushViewController(folderController, animated: true)
-    }
-
-    func navigateToSuggestedFolders() {
-        guard let navController = selectedViewController as? UINavigationController else { return }
-
-        navController.popToRootViewController(animated: false)
-
-        guard let podcastListController = navController.topViewController as? PodcastListViewController else {
-            return
-        }
-
-        podcastListController.showSuggestedFolders()
     }
 
     func navigateToPodcast(_ podcast: Podcast, source: PodcastScreenSource) {
@@ -421,7 +288,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         })
     }
 
-    func navigateTo(podcast searchResult: PodcastFolderSearchResult, source: PodcastScreenSource) {
+    func navigateTo(podcast searchResult: PodcastSearchResult, source: PodcastScreenSource) {
         if let navController = selectedViewController as? UINavigationController {
             let podcastController = PodcastViewController(podcastInfo: PodcastInfo(from: searchResult), existingImage: nil)
             podcastController.screenSource = source
@@ -497,17 +364,17 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         switchToTab(.upNext)
     }
 
-    func navigateToProfile(row: ProfileViewController.TableRow? = nil, animated: Bool) {
-        switchToTab(.profile)
+    func navigateToSettings(row: SettingsViewController.TableRow? = nil, animated: Bool) {
+        switchToTab(.settings)
         guard let navController = selectedViewController as? UINavigationController else {
             return
         }
         navController.popToRootViewController(animated: animated)
-        guard let profileViewController = navController.topViewController as? ProfileViewController,
-            let row else {
+        guard let settingsViewController = navController.topViewController as? SettingsViewController,
+              let row else {
             return
         }
-        profileViewController.navigateToRow(row)
+        settingsViewController.selectRow(row)
     }
 
     func navigateToFilter(_ filter: EpisodeFilter?, animated: Bool) {
@@ -539,7 +406,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         guard let navController = selectedViewController as? UINavigationController else {
             return
         }
-        let manualPlaylistsChooser = ManualPlaylistsChooserViewController(episode: episode, analyticsSource: source)
+        let manualPlaylistsChooser = ManualPlaylistsChooserViewController(episode: episode)
         let navVC = SJUIUtils.navController(for: manualPlaylistsChooser)
         if presentedViewController is PlayerContainerViewController {
             presentedViewController?.present(navVC, animated: true, completion: nil)
@@ -551,7 +418,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
 
     func navigateToAddCustom(_ url: URL) {
         appDelegate()?.miniPlayer()?.closeUpNextAndFullPlayer(completion: {
-            self.switchToTab(.profile)
+            self.switchToTab(.settings)
 
             if let navController = self.selectedViewController as? UINavigationController {
                 if let existingUploadedViewController = (navController.viewControllers.last as? UploadedViewController) {
@@ -567,7 +434,7 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     }
 
     func navigateToFiles() {
-        switchToTab(.profile)
+        switchToTab(.settings)
 
         if let navController = selectedViewController as? UINavigationController {
             navController.popToRootViewController(animated: false)
@@ -575,42 +442,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
             let filesController = UploadedViewController()
             navController.pushViewController(filesController, animated: true)
         }
-    }
-
-    func showSubscriptionCancelledAcknowledge() {
-        let cancelledVC = CancelledAcknowledgeViewController()
-        let controller = view.window?.rootViewController
-        controller?.present(SJUIUtils.popupNavController(for: cancelledVC), animated: true, completion: nil)
-    }
-
-    func showSubscriptionRequired(_ upgradeRootViewController: UIViewController, source: PlusUpgradeViewSource, context: OnboardingFlow.Context? = nil, flow: OnboardingFlow.Flow = .plusUpsell) {
-        // If we're already presenting a view, then present from that view if possible
-        let presentingController = presentedViewController ?? view.window?.rootViewController
-
-        let controller = OnboardingFlow.shared.begin(flow: flow, source: source, context: context, traitCollection: traitCollection)
-        presentingController?.present(controller, animated: true, completion: nil)
-    }
-
-    func showPlusMarketingPage() {
-        showInSafariViewController(urlString: ServerConstants.Urls.plusInfo)
-    }
-
-    func showPromotionPage(promoCode: String?) {
-        switchToTab(.profile)
-        if let navController = selectedViewController as? UINavigationController {
-            navController.popToRootViewController(animated: false)
-
-            if let profileVC = navController.topViewController as? ProfileViewController {
-                profileVC.presentedViewController?.dismiss(animated: true, completion: nil)
-                profileVC.promoCode = promoCode
-            }
-        }
-    }
-
-    func showPromotionFinishedAcknowledge() {
-        let promoFinishedVC = PromotionFinishedViewController()
-        let controller = view.window?.rootViewController
-        controller?.present(SJUIUtils.popupNavController(for: promoFinishedVC), animated: true, completion: nil)
     }
 
     func showPrivacyPolicy() {
@@ -621,33 +452,12 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         showInSafariViewController(urlString: ServerConstants.Urls.termsOfUse)
     }
 
-    func showWhatsNew(whatsNewInfo: WhatsNewInfo) {
-        guard let controller = view.window?.rootViewController else { return }
-
-        let whatsNewVC = SJUIUtils.popupNavController(for: WhatsNewViewController(whatsNewInfo: whatsNewInfo))
-        whatsNewVC.modalPresentationStyle = .formSheet
-
-        if controller.presentedViewController != nil {
-            controller.dismiss(animated: true) {
-                controller.present(whatsNewVC, animated: true, completion: nil)
-            }
-        } else {
-            controller.present(whatsNewVC, animated: true, completion: nil)
-        }
-    }
-
-    func showApproveDevice(code: String?) {
-        guard let controller = view.window?.rootViewController else { return }
-        let vc = ThemedHostingController(rootView: DeviceApproveView(userCode: code, model: DeviceApproveViewModel(presentingViewController: controller)))
-        controller.present(vc, animated: true)
-    }
-
     func navigateToFilterTab() {
         switchToTab(.filter)
     }
 
     func showSettings(row: SettingsViewController.TableRow?) {
-        switchToTab(.profile)
+        switchToTab(.settings)
         guard let navController = selectedViewController as? UINavigationController else { return }
 
         if navController.presentedViewController != nil {
@@ -664,11 +474,10 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
     }
 
     func showSettingsAppearance(showThemeSelection: Bool = false) {
-        switchToTab(.profile)
+        switchToTab(.settings)
         if let navController = selectedViewController as? UINavigationController {
             navController.popToRootViewController(animated: false)
 
-            navController.pushViewController(SettingsViewController(), animated: false)
             let appearanceViewController = AppearanceViewController()
             navController.pushViewController(appearanceViewController, animated: !showThemeSelection)
             if showThemeSelection {
@@ -679,19 +488,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         }
     }
 
-    func showRedeemGuestPass(url: URL) {
-        switchToTab(.profile)
-
-        guard let navController = selectedViewController as? UINavigationController else {
-            return
-        }
-
-        navController.popToRootViewController(animated: false)
-        navController.dismiss(animated: true)
-
-        ReferralsCoordinator.shared.startClaimFlow(from: navController, referralURL: url)
-    }
-
     func showHeadphoneSettings() {
         let state = NavigationManager.shared.miniPlayer?.playerOpenState
 
@@ -700,10 +496,9 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
             dismissPresentedViewController()
         }
 
-        switchToTab(.profile)
+        switchToTab(.settings)
         if let navController = selectedViewController as? UINavigationController {
             navController.popToRootViewController(animated: false)
-            navController.pushViewController(SettingsViewController(), animated: false)
             navController.pushViewController(HeadphoneSettingsViewController(), animated: true)
         }
     }
@@ -716,76 +511,17 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
             dismissPresentedViewController()
         }
 
-        switchToTab(.profile)
+        switchToTab(.settings)
         if let navController = selectedViewController as? UINavigationController {
             navController.popToRootViewController(animated: false)
-            navController.pushViewController(SettingsViewController(), animated: false)
             let generalSettingsController = GeneralSettingsViewController()
             generalSettingsController.scrollToRow = row
             navController.pushViewController(generalSettingsController, animated: true)
         }
     }
 
-    func showSignUp() {
-        switchToTab(.podcasts)
-        selectedViewController?.dismiss(animated: false)
-        if let controller = view.window?.rootViewController {
-            showSubscriptionRequired(controller, source: .unknown, context: nil, flow: .none)
-        }
-    }
-
-    func showSupporterSignIn(podcastInfo: PodcastInfo) {
-        let supporterVC = SupporterGratitudeViewController(podcastInfo: podcastInfo)
-        let controller = view.window?.rootViewController
-        controller?.present(SJUIUtils.popupNavController(for: supporterVC), animated: true, completion: nil)
-    }
-
-    func showSupporterSignIn(bundleUuid: String) {
-        let supporterVC = SupporterGratitudeViewController(bundleUuid: bundleUuid)
-        let controller = view.window?.rootViewController
-        controller?.present(SJUIUtils.popupNavController(for: supporterVC), animated: true, completion: nil)
-    }
-
-    func showSupporterBundleDetails(bundleUuid: String?) {
-        switchToTab(.profile)
-        if let navController = selectedViewController as? UINavigationController {
-            navController.popToRootViewController(animated: false)
-            let supporterVC = SupporterContributionsViewController()
-            supporterVC.bundleUuidToOpen = bundleUuid
-            navController.pushViewController(AccountViewController(), animated: false)
-            navController.pushViewController(supporterVC, animated: true)
-        }
-    }
-
-    func showEndOfYearStories() {
-        guard let presentedViewController else {
-            endOfYear.showStories(in: self, from: .modal)
-            return
-        }
-
-        presentedViewController.dismiss(animated: true) {
-            self.endOfYear.showStories(in: self, from: .modal)
-        }
-    }
-
     func dismissPresentedViewController(completion: (() -> Void)? = nil) {
         presentedViewController?.dismiss(animated: true, completion: completion)
-    }
-
-    func showOnboardingFlow(flow: OnboardingFlow.Flow?, source: PlusUpgradeViewSource?) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-
-            let controller = OnboardingFlow.shared.begin(flow: flow ?? .initialOnboarding, source: source ?? .onboarding, traitCollection: self.traitCollection)
-            guard let presentedViewController = self.presentedViewController else {
-                self.present(controller, animated: true)
-                return
-            }
-
-            presentedViewController.dismiss(animated: true) {
-                self.present(controller, animated: true)
-            }
-        }
     }
 
     private func topController() -> UIViewController {
@@ -812,53 +548,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         selectedIndex = pcTabs.firstIndex(of: tab)!
 
         return true
-    }
-
-    // MARK: - End of Year
-
-    /// Whether End of Year has a badge waiting on the Profile tab, which it shares with What's New.
-    private var showsEndOfYearBadge = false
-
-    @objc private func profileSeen() {
-        showsEndOfYearBadge = false
-        updateProfileTabBadge()
-        if let year = endOfYear.storyModelType?.year {
-            Settings.setShowBadgeForEndOfYear(false, year: year)
-        }
-    }
-
-    func observersForEndOfYearStats() {
-        guard FeatureFlag.endOfYear.enabled || FeatureFlag.endOfYear2024.enabled || FeatureFlag.endOfYear2025.enabled else {
-            return
-        }
-
-        NotificationCenter.default.addObserver(forName: .userSignedIn, object: nil, queue: .main) { _ in
-            self.endOfYear.resetStateIfNeeded()
-        }
-
-        // When the What's New is dismissed, check to see if we should also show the end of year prompt
-        NotificationCenter.default.addObserver(forName: .whatsNewDismissed, object: nil, queue: .main) { _ in
-            self.isShowingWhatsNew = false
-            self.showEndOfYearPromptIfNeeded()
-        }
-
-        NotificationCenter.default.addObserver(forName: .onboardingFlowDidDismiss, object: nil, queue: .main) { _ in
-            self.endOfYear.showPromptBasedOnState(in: self)
-
-            self.displayEndOfYearBadgeIfNeeded()
-        }
-
-        // If the requirement for EOY changes and registration is not required anymore
-        // Show the modal
-        NotificationCenter.default.addObserver(forName: .eoyRegistrationNotRequired, object: nil, queue: .main) { [weak self] _ in
-            guard let self else {
-                return
-            }
-
-            if self.presentedViewController == nil {
-                self.endOfYear.showPrompt(in: self)
-            }
-        }
     }
 
     // MARK: - Orientation
@@ -897,16 +586,8 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         tabBar.scrollEdgeAppearance = appearance
     }
 
-    private func displayEndOfYearBadgeIfNeeded() {
-        if EndOfYear.isEligible, let year = endOfYear.storyModelType?.year, Settings.showBadgeForEndOfYear(year) {
-            showsEndOfYearBadge = true
-            updateProfileTabBadge()
-        }
-    }
-
     @objc private func willEnterForeground() {
         fireSystemThemeMayHaveChanged()
-        checkSubscriptionStatusChanged()
     }
 
     // The window's `overrideUserInterfaceStyle` masks system appearance changes
@@ -941,39 +622,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         fireSystemThemeMayHaveChanged()
     }
 
-    private func checkSubscriptionStatusChanged() {
-        checkSubscriptionCancelledAcknowledgement()
-    }
-
-    private func checkSubscriptionCancelledAcknowledgement() {
-        let renewing = SubscriptionHelper.hasRenewingSubscription()
-        let cancelAcknowledged = Settings.subscriptionCancelledAcknowledged
-        let giftDays = SubscriptionHelper.subscriptionGiftDays()
-        let timeToSubscriptionExpiry = SubscriptionHelper.timeToSubscriptionExpiry() ?? 0
-
-        if !renewing, !cancelAcknowledged, giftDays == 0, timeToSubscriptionExpiry < 0 {
-            NavigationManager.shared.navigateTo(NavigationManager.subscriptionCancelledAcknowledgePageKey, data: nil)
-        }
-    }
-
-    private func checkWhatsNewAcknowledged() {
-        guard let whatsNewInfo = WhatsNewHelper.extractWhatsNewInfo(), whatsNewInfo.versionCode > Settings.whatsNewLastAcknowledged else { return }
-
-        if ProcessInfo().isOperatingSystemAtLeast(OperatingSystemVersion(majorVersion: whatsNewInfo.minOSVersion, minorVersion: 0, patchVersion: 0)) {
-            NavigationManager.shared.navigateTo(NavigationManager.showWhatsNewPageKey, data: [NavigationManager.whatsNewInfoKey: whatsNewInfo])
-        } else {
-            Settings.whatsNewLastAcknowledged = whatsNewInfo.versionCode
-        }
-    }
-
-    private func checkPromotionFinishedAcknowledged() {
-        let promoFinishedAcknowledged = Settings.promotionFinishedAcknowledged
-        let giftDays = SubscriptionHelper.subscriptionGiftDays()
-        let timeToSubscriptionExpiry = SubscriptionHelper.timeToSubscriptionExpiry() ?? 0
-        if giftDays > 0, !promoFinishedAcknowledged, timeToSubscriptionExpiry < 0 { NavigationManager.shared.navigateTo(NavigationManager.showPromotionFinishedPageKey, data: nil)
-        }
-    }
-
     // There are different areas of the app that relies on presenting VCs from the tab bar
     // However, sometimes the tab bar is already displaying the player.
     // This code simple checks if the tab bar is already presenting something and, if yes,
@@ -992,175 +640,6 @@ class MainTabBarController: UITabBarController, NavigationProtocol {
         if motion == .motionShake && Settings.shakeToRestartSleepTimer {
             PlaybackManager.shared.restartSleepTimer()
         }
-    }
-}
-
-// MARK: - Bookmarks
-
-private extension MainTabBarController {
-    /// The edit sheet, where a bookmark is normally titled, only opens over the full screen player
-    /// with the app in the foreground — see `BookmarksPlayerTabController`. A bookmark made from a
-    /// transcript selection is the exception: the transcript opens the sheet itself, wherever it's
-    /// shown from, so those are filtered out below rather than covered here.
-    static var showsBookmarkEditSheet: Bool {
-        UIApplication.shared.applicationState == .active
-        && !CarPlayHelper.isConnectedToCarPlay
-        && NavigationManager.shared.miniPlayer?.playerOpenState != .closed
-    }
-
-    /// Generates the title and passage for the bookmarks that are never shown the edit sheet:
-    /// the ones made with a headphone button, in CarPlay, or while the app is in the background
-    func addBookmarkEnrichmentHandler() {
-        let bookmarkManager = PlaybackManager.shared.bookmarkManager
-
-        bookmarkManager.onBookmarkCreated
-            .receive(on: RunLoop.main)
-            .filter { !$0.isDuplicate && $0.source != .transcript && !Self.showsBookmarkEditSheet }
-            .compactMap { event in
-                bookmarkManager.bookmark(for: event.uuid).map { ($0, event.source) }
-            }
-            .sink { (bookmark: Bookmark, source: BookmarkAnalyticsSource) in
-                Task {
-                    await bookmarkManager.enrich(bookmark, source: source)
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    // Shows a toast notification when a bookmark is created and we're not in the full screen player
-    func addBookmarkCreatedToastHandler() {
-        let bookmarkManager = PlaybackManager.shared.bookmarkManager
-
-        bookmarkManager.onBookmarkCreated
-            .receive(on: RunLoop.main)
-            .filter { event in
-                event.source != .transcript
-                && UIApplication.shared.applicationState == .active
-                && !CarPlayHelper.isConnectedToCarPlay
-                && NavigationManager.shared.miniPlayer?.playerOpenState == .closed
-            }
-            .compactMap { event in
-                bookmarkManager.bookmark(for: event.uuid).map { ($0, event.source) }
-            }
-            .sink { [weak self] bookmark, source in
-                self?.showToast(for: bookmark, source: source)
-            }
-            .store(in: &cancellables)
-    }
-
-    func showToast(for bookmark: Bookmark, source: BookmarkAnalyticsSource) {
-        let bookmarkManager = PlaybackManager.shared.bookmarkManager
-
-        let title = bookmark.title
-        let message = title == L10n.bookmarkDefaultTitle ? L10n.bookmarkAdded : L10n.bookmarkAddedNotification(title)
-
-        let action = Toast.Action(title: L10n.changeBookmarkTitle) { [weak self] in
-            // Re-read: a generated title may have been saved since the toast was shown
-            let bookmark = bookmarkManager.bookmark(for: bookmark.uuid) ?? bookmark
-            let title = bookmark.title
-
-            let controller = BookmarkEditTitleViewController(manager: bookmarkManager, bookmark: bookmark, state: .updating, style: .themed, source: source, onDismiss: { [weak self] outcome in
-                guard case .saved(let updatedTitle) = outcome, title != updatedTitle else { return }
-
-                self?.handleBookmarkTitleUpdated(updatedTitle: updatedTitle)
-            })
-
-            self?.presentFromRootController(controller)
-        }
-
-        Toast.show(message, actions: [action], theme: .playerTheme)
-    }
-
-    func handleBookmarkTitleUpdated(updatedTitle: String) {
-        Toast.show(L10n.bookmarkUpdatedNotification(updatedTitle), actions: [
-            .init(title: L10n.bookmarkAddedButtonTitle, action: { [weak self] in
-                self?.showBookmarksInPlayer()
-            })
-        ], theme: .playerTheme)
-    }
-
-    func showBookmarksInPlayer() {
-        dismissIfNeeded {
-            NavigationManager.shared.miniPlayer?.openFullScreenPlayer {
-                NavigationManager.shared.miniPlayer?.fullScreenPlayer?.scrollToBookmarks()
-            }
-        }
-    }
-}
-
-// MARK: - Analytics
-
-private extension MainTabBarController {
-    /// Tracks when a tab is switched to.
-    /// - Parameters:
-    ///   - tab: Which tab we're switching to
-    ///   - isInitial: Whether this is the tab that is being loaded on first launch
-    func trackTabOpened(_ tab: Tab, isInitial: Bool = false) {
-        let event: AnalyticsEvent
-        switch tab {
-        case .podcasts:
-            event = .podcastsTabOpened
-        case .filter:
-            event = .filtersTabOpened
-        case .discover:
-            event = .discoverTabOpened
-        case .profile:
-            event = .profileTabOpened
-        case .upNext:
-            event = .upNextTabOpened
-        }
-
-        Analytics.track(event, properties: ["initial": isInitial])
-    }
-}
-
-// MARK: - App Launch Prompts
-
-private extension MainTabBarController {
-    func showLaunchPromptsIfNeeded(isFirstAppearance: Bool) {
-        checkSubscriptionStatusChanged()
-        checkPromotionFinishedAcknowledged()
-        checkWhatsNewAcknowledged()
-
-        // Show any app launch announcements/prompts only once
-        if isFirstAppearance {
-            showWhatsNewIfNeeded()
-            showEndOfYearPromptIfNeeded()
-        }
-
-        showInitialOnboardingIfNeeded()
-
-        if DataManager.loginAgain {
-            loginAgain()
-        }
-    }
-
-    func showEndOfYearPromptIfNeeded() {
-        // Only show the prompt if there isn't an active announcement flow
-        guard !isShowingWhatsNew, AnnouncementFlow.current == .none else { return }
-
-        endOfYear.showPromptBasedOnState(in: self)
-    }
-
-    func showWhatsNewIfNeeded() {
-        guard let controller = view.window?.rootViewController else { return }
-
-        if let whatsNewViewController = appDelegate()?.whatsNew.viewControllerToShow() {
-            controller.present(whatsNewViewController, animated: true)
-            isShowingWhatsNew = true
-        }
-    }
-}
-
-// MARK: - Notifications
-
-extension MainTabBarController {
-
-    func showNotificationsPermissions() {
-        // Present inline so it beats the `.onboardingFlowDidDismiss` EOY prompt; skip only when
-        // another flow is already presenting, since we can't stack on it.
-        guard presentedViewController == nil else { return }
-        present(NotificationsPermissionsViewModel.makeController(), animated: true)
     }
 }
 
@@ -1192,7 +671,7 @@ extension MainTabBarController {
             errorLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
             errorLabel.centerXAnchor.constraint(equalTo: errorBanner.centerXAnchor),
             errorLabel.topAnchor.constraint(equalTo: errorBanner.topAnchor, constant: 0),
-            errorLabel.bottomAnchor.constraint(equalTo: errorBanner.bottomAnchor, constant: 0),
+            errorLabel.bottomAnchor.constraint(equalTo: errorBanner.bottomAnchor, constant: 0)
         ])
     }
 
@@ -1206,7 +685,7 @@ extension MainTabBarController {
 
     @objc private func updateError(notification: NSNotification) {
         DispatchQueue.main.async { [weak self] in
-            guard FeatureFlag.displayErrorsOnPlayer.enabled,
+            guard
                 let error = PlaybackManager.shared.activeError else {
                 self?.hideError()
                 return
@@ -1218,10 +697,6 @@ extension MainTabBarController {
     }
 
     private func showError(_ error: PlaybackManager.PlaybackError, autoDismissAfter seconds: TimeInterval? = nil) {
-        if !(presentedViewController is PlayerContainerViewController) {
-            // do not track this if the full screen player is visible
-            AnalyticsPlaybackHelper.shared.playbackErrorShown(playerSource: .miniPlayer)
-        }
         errorLabel.attributedText = error.shortUserAttributedMessage(mainColor: AppTheme.mainTextColor(), interactiveColor: ThemeColor.primaryInteractive01())
         errorBanner.isUserInteractionEnabled = error.userAction != nil
         errorBanner.layoutIfNeeded()
@@ -1277,7 +752,6 @@ extension MainTabBarController {
         else {
             return
         }
-        AnalyticsPlaybackHelper.shared.playbackErrorTapped(playerSource: .miniPlayer)
         #if !APPCLIP
         let safariViewController = SFSafariViewController(with: url)
         safariViewController.modalPresentationStyle = .formSheet
@@ -1288,48 +762,6 @@ extension MainTabBarController {
     private func updateErrorColor() {
         errorBanner.backgroundColor = LiquidGlass.isEnabled ? UIColor.clear : AppTheme.tabBarBackgroundColor
         errorLabel.textColor = AppTheme.mainTextColor()
-    }
-}
-
-// MARK: - Profile tab avatar
-
-private extension MainTabBarController {
-    static let profileTabIconSize: CGFloat = 26
-
-    @objc func refreshProfileTabAvatar() {
-        loadProfileTabAvatar(forceRefresh: false)
-    }
-
-    @objc func refreshProfileTabAvatarForcingReload() {
-        loadProfileTabAvatar(forceRefresh: true)
-    }
-
-    func loadProfileTabAvatar(forceRefresh: Bool) {
-        guard #available(iOS 26.0, *) else { return }
-
-        guard let email = ServerSettings.syncingEmail(), !email.isEmpty,
-              let url = URL(string: "https://www.gravatar.com/avatar/\(email.sha256)?d=404&s=256") else {
-            resetProfileTabImage()
-            return
-        }
-
-        let resource = KF.ImageResource(downloadURL: url, cacheKey: email)
-        var options: KingfisherOptionsInfo = []
-        if forceRefresh {
-            options.append(.forceRefresh)
-        }
-
-        KingfisherManager.shared.retrieveImage(with: resource, options: options) { [weak self] result in
-            guard let self, case .success(let value) = result else { return }
-            let icon = value.image.gravatarIcon(size: Self.profileTabIconSize)
-            self.profileTabBarItem.image = icon
-            self.profileTabBarItem.selectedImage = icon
-        }
-    }
-
-    func resetProfileTabImage() {
-        profileTabBarItem.image = UIImage(named: "profile_tab")
-        profileTabBarItem.selectedImage = nil
     }
 }
 
@@ -1365,51 +797,5 @@ extension MainTabBarController {
     func resetUpNextTabImage() {
         upNextTabBarItem.image = UIImage(named: "upnext_tab")
         upNextTabBarItem.selectedImage = nil
-    }
-}
-
-// MARK: - What's New
-
-private extension MainTabBarController {
-    /// Keeps the dot on the Profile tab in step with the feed: it shows while the feed has an unread
-    /// message the tab hasn't pointed the user at, unless the user turned the dot off in Settings, and
-    /// tapping the tab takes it off.
-    func observeWhatsNewFeed() {
-        guard FeatureFlag.whatsNewFeed.enabled else { return }
-
-        let manager = WhatsNewManager.shared
-        Publishers.Merge4(
-            manager.$catalog.map { _ in },
-            manager.$readState.map { _ in },
-            NotificationCenter.default.publisher(for: ServerNotifications.subscriptionStatusChanged).map { _ in },
-            NotificationCenter.default.publisher(for: ServerNotifications.showWhatsNewDotChanged).map { _ in }
-        )
-        .receive(on: DispatchQueue.main)
-        .sink { [weak self] _ in
-            self?.updateProfileTabBadge()
-        }
-        .store(in: &cancellables)
-
-        // Signing in is the first chance to reconcile with the account, and the messages the user
-        // read on their other devices shouldn't wait for the next foreground to be cleared here.
-        NotificationCenter.default.publisher(for: .userSignedIn)
-            .receive(on: DispatchQueue.main)
-            .sink { _ in
-                manager.syncReadState()
-            }
-            .store(in: &cancellables)
-
-        NotificationCenter.default.publisher(for: .serverUserWillBeSignedOut)
-            .receive(on: DispatchQueue.main)
-            .sink { _ in
-                manager.forgetReadMessages()
-            }
-            .store(in: &cancellables)
-    }
-
-    /// Shows the dot while End of Year or What's New has something waiting on Profile.
-    func updateProfileTabBadge() {
-        let showsWhatsNewBadge = FeatureFlag.whatsNewFeed.enabled && WhatsNewManager.shared.showsDotOnProfileTab()
-        profileTabBarItem.badgeValue = showsEndOfYearBadge || showsWhatsNewBadge ? "●" : nil
     }
 }

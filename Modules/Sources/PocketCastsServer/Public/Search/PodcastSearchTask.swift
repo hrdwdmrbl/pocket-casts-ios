@@ -9,16 +9,16 @@ struct PodcastsSearchEnvelope: Decodable {
 
 struct PodcastsSearchEnvelopeResult: Decodable {
     /// Podcast returned when the user searches directly for a URL
-    let podcast: PodcastFolderSearchResult?
+    let podcast: PodcastSearchResult?
 
     /// Regular search results based on a search term
-    let searchResults: [PodcastFolderSearchResult]?
+    let searchResults: [PodcastSearchResult]?
 
     /// The poll uuid if the result is still being processed on the server
     let pollUuid: String?
 }
 
-public struct PodcastFolderSearchResult: Codable, Hashable {
+public struct PodcastSearchResult: Codable, Hashable {
     public let uuid: String
     public let title: String?
     public let author: String?
@@ -52,28 +52,18 @@ public struct PodcastFolderSearchResult: Codable, Hashable {
         self.isVideo = nil
     }
 
-    public init?(from folder: Folder) {
-        self.uuid = folder.uuid
-        self.title = folder.name
-        self.author = ""
-        self.isLocal = true
-        self.kind = .folder
-        self.explicit = false
-        self.isVideo = false
-    }
-
     public init?(from predictiveResult: PredictiveSearchResult) {
         switch predictiveResult.type {
-            case .podcast(let podcast):
-                self.uuid = podcast.uuid
-                self.author = podcast.author
-                self.title = podcast.title
-                self.kind = .podcast
-                self.isLocal = false
-                self.explicit = podcast.isExplicit
-                self.isVideo = nil
-            default:
-                return nil
+        case .podcast(let podcast):
+            self.uuid = podcast.uuid
+            self.author = podcast.author
+            self.title = podcast.title
+            self.kind = .podcast
+            self.isLocal = false
+            self.explicit = podcast.isExplicit
+            self.isVideo = nil
+        default:
+            return nil
         }
     }
 
@@ -91,10 +81,10 @@ public struct PodcastFolderSearchResult: Codable, Hashable {
     }
 
     public enum Kind: Codable {
-        case podcast, folder
+        case podcast
     }
 
-    public static func ==(lhs: PodcastFolderSearchResult, rhs: PodcastFolderSearchResult) -> Bool {
+    public static func ==(lhs: PodcastSearchResult, rhs: PodcastSearchResult) -> Bool {
         lhs.kind == rhs.kind && lhs.uuid == rhs.uuid
     }
 
@@ -104,7 +94,7 @@ public struct PodcastFolderSearchResult: Codable, Hashable {
     }
 }
 
-extension PodcastFolderSearchResult: Identifiable {
+extension PodcastSearchResult: Identifiable {
     public var id: String {
         "\(kind)-\(uuid)"
     }
@@ -117,7 +107,7 @@ public class PodcastSearchTask {
         self.session = session
     }
 
-    public func search(term: String) async throws -> [PodcastFolderSearchResult] {
+    public func search(term: String) async throws -> [PodcastSearchResult] {
         var envelope: PodcastsSearchEnvelope?
         var retry = true
         var pollCount = 0
@@ -137,7 +127,7 @@ public class PodcastSearchTask {
         if let podcast = envelope?.result.podcast {
             return [podcast]
         } else {
-            var seen = Set<PodcastFolderSearchResult>()
+            var seen = Set<PodcastSearchResult>()
             return (envelope?.result.searchResults ?? []).filter { seen.insert($0).inserted }
         }
     }

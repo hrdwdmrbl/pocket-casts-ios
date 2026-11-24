@@ -43,10 +43,6 @@ public enum PlayingStatus: Int32 {
     case notPlayed = 1, inProgress = 2, completed = 3, old = 4
 }
 
-public enum UploadStatus: Int32 {
-    case notUploaded = 1, queued = 2, uploading = 3, uploadFailed = 4, uploaded = 5, waitingForWifi = 6, missing = 7, deleteFromCloudPending = 8, deleteFromCloudAndLocalPending = 9
-}
-
 public enum PodcastGrouping: Int32, CaseIterable, Codable {
     case none = 0, downloaded = 1, unplayed = 2, season = 3, starred = 4
 }
@@ -76,7 +72,6 @@ public struct EpisodeBasicData {
     public var playedUpTo: Int?
     public var isArchived: Bool?
     public var starred: Bool?
-    public var deselectedChapters: String?
 }
 
 public enum LibrarySort: Int32, CaseIterable, Codable {
@@ -143,12 +138,6 @@ public enum PodcastEpisodeSortOrder: Int32, Codable, CaseIterable {
     }
 }
 
-public enum BookmarksSort: Int32, Codable {
-    case newestToOldest = 0
-    case oldestToNewest = 1
-    case timestamp = 2
-}
-
 public enum AutoArchiveAfterPlayed: Int32, Codable {
     case never = 0
     case afterPlaying = 1
@@ -198,16 +187,16 @@ extension AutoArchiveAfterPlayed {
 
     public var time: AutoArchiveAfterTime {
         switch self {
-            case .never:
-                return .never
-            case .afterPlaying:
-                return .afterPlaying
-            case .after24Hours:
-                return .after1Day
-            case .after2Days:
-                return .after2Days
-            case .after1Week:
-                return .after1Week
+        case .never:
+            return .never
+        case .afterPlaying:
+            return .afterPlaying
+        case .after24Hours:
+            return .after1Day
+        case .after2Days:
+            return .after2Days
+        case .after1Week:
+            return .after1Week
         }
     }
 }
@@ -236,20 +225,20 @@ extension AutoArchiveAfterInactive {
 
     public var time: AutoArchiveAfterTime {
         switch self {
-            case .never:
-                return .never
-            case .after24Hours:
-                return .after1Day
-            case .after2Days:
-                return .after2Days
-            case .after1Week:
-                return .after1Week
-            case .after2Weeks:
-                return .after2Weeks
-            case .after30Days:
-                return .after30Days
-            case .after3Months:
-                return .after90Days
+        case .never:
+            return .never
+        case .after24Hours:
+            return .after1Day
+        case .after2Days:
+            return .after2Days
+        case .after1Week:
+            return .after1Week
+        case .after2Weeks:
+            return .after2Weeks
+        case .after30Days:
+            return .after30Days
+        case .after3Months:
+            return .after90Days
         }
     }
 }
@@ -302,7 +291,6 @@ public enum PlayerAction: String, Codable, Equatable {
     case chromecast = "case"
     case markPlayed = "played"
     case archive = "archive"
-    case addBookmark = "bookmark"
     case transcript = "transcript"
     case download = "download"
     case addToPlaylist = "playlist"

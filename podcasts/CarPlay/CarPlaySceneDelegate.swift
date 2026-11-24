@@ -70,7 +70,7 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
             // User Episodes
             Constants.Notifications.userEpisodeUpdated,
             Constants.Notifications.userEpisodeDeleted,
-            ServerNotifications.userEpisodesRefreshed,
+            ServerNotifications.userEpisodesRefreshed
         ]
 
         for notification in notifications {
@@ -130,7 +130,6 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
         if let image = UIImage(named: "car_markasplayed") {
             let markPlayedBtn = CPNowPlayingImageButton(image: image) { _ in
                 guard let episode = PlaybackManager.shared.currentEpisode else { return }
-                AnalyticsEpisodeHelper.shared.currentSource = .carPlay
 
                 EpisodeManager.markAsPlayed(episode: episode, fireNotification: true)
             }
@@ -170,9 +169,7 @@ class CarPlaySceneDelegate: CustomObserver, CPTemplateApplicationSceneDelegate, 
         let starButton = CPNowPlayingImageButton(image: image) { _ in
             guard let episode else { return }
 
-            AnalyticsEpisodeHelper.shared.currentSource = .carPlay
-
-            EpisodeManager.setStarred(!episode.keepEpisode, episode: episode, updateSyncStatus: SyncManager.isUserLoggedIn())
+            EpisodeManager.setStarred(!episode.keepEpisode, episode: episode)
         }
 
         // This shouldn't happen, but disable the button if it does since the action won't do anything

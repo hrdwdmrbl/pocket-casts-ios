@@ -101,10 +101,6 @@ class LargeListSummaryViewController: DiscoverPeekViewController, DiscoverSummar
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        if let listId = item?.uuid {
-            let categoryId = category?.id.map(String.init)
-            AnalyticsHelper.listImpression(listId: listId, category: categoryId)
-        }
         NotificationCenter.default.addObserver(self, selector: #selector(podcastStatusChanged), name: Constants.Notifications.podcastAdded, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(podcastStatusChanged), name: Constants.Notifications.podcastDeleted, object: nil)
     }
@@ -122,10 +118,7 @@ class LargeListSummaryViewController: DiscoverPeekViewController, DiscoverSummar
         let thisPodcast = podcasts[indexPath.row]
         if let delegate {
             cell.populateFrom(thisPodcast, isSubscribed: delegate.isSubscribed(podcast: thisPodcast))
-            cell.onSubscribe = { [weak self] in
-                if let listId = self?.item?.uuid, let podcastUuid = thisPodcast.uuid {
-                    AnalyticsHelper.podcastSubscribedFromList(listId: listId, podcastUuid: podcastUuid, listDateTime: self?.datetime)
-                }
+            cell.onSubscribe = {
                 delegate.subscribe(podcast: thisPodcast)
             }
         }
@@ -143,10 +136,6 @@ class LargeListSummaryViewController: DiscoverPeekViewController, DiscoverSummar
 
         delegate?.show(discoverPodcast: podcast, placeholderImage: nil, isFeatured: false, listUuid: item.uuid)
         collectionView.deselectItem(at: indexPath, animated: true)
-
-        if let listId = item.uuid, let podcastUuid = podcast.uuid {
-            AnalyticsHelper.podcastTappedFromList(listId: listId, podcastUuid: podcastUuid, listDateTime: datetime)
-        }
     }
 
     func registerDiscoverDelegate(_ delegate: DiscoverDelegate) {
@@ -198,7 +187,7 @@ class LargeListSummaryViewController: DiscoverPeekViewController, DiscoverSummar
 
         switch item.cellType() {
         case .largeListWithPodcast:
-            serverHandler.discoverPodcastCollection(source: source, authenticated: item.authenticated, completion: { [weak self] podcastCollection in
+            serverHandler.discoverPodcastCollection(source: source, completion: { [weak self] podcastCollection in
                 guard let strongSelf = self, let discoverPodcast = podcastCollection?.podcasts else { return }
 
                 strongSelf.appendPodcasts(discoverPodcast, item: item)
@@ -212,7 +201,7 @@ class LargeListSummaryViewController: DiscoverPeekViewController, DiscoverSummar
                 }
             })
         default:
-            serverHandler.discoverPodcastList(source: source, authenticated: item.authenticated, completion: { [weak self] podcastList in
+            serverHandler.discoverPodcastList(source: source, completion: { [weak self] podcastList in
                 guard let strongSelf = self, let discoverPodcast = podcastList?.podcasts else { return }
 
                 strongSelf.appendPodcasts(discoverPodcast, item: item)
@@ -245,18 +234,6 @@ class LargeListSummaryViewController: DiscoverPeekViewController, DiscoverSummar
         guard let delegate, let item else { return }
 
         delegate.showExpanded(item: item, podcasts: podcasts, podcastCollection: nil, datetime: datetime)
-    }
-
-    // MARK: - Page Changed
-
-    override func pageDidChange(to currentPage: Int, totalPages: Int) {
-        guard let item else {
-            return
-        }
-
-        Analytics.track(.discoverLargeListPageChanged, properties: ["current_page": currentPage,
-                                                                    "total_pages": totalPages,
-                                                                    "list_id": item.inferredListId])
     }
 
     // MARK: - Dynamic Type support

@@ -212,10 +212,6 @@ enum DiscoverPreviewData {
         ])
     }
 
-    static func sponsoredPodcast(position: Int, source: String) -> CarouselSponsoredPodcast {
-        decode(CarouselSponsoredPodcast.self, from: ["position": position, "source": source])
-    }
-
     // MARK: - Discover items
 
     /// A layout entry that `cellType()` resolves to `cellType`.
@@ -225,7 +221,6 @@ enum DiscoverPreviewData {
         source: String = "https://lists.pocketcasts.com/preview.json",
         expandedStyle: String? = "plain_list",
         summaryItemCount: Int? = nil,
-        sponsoredPodcasts: [CarouselSponsoredPodcast]? = nil,
         isSponsored: Bool? = nil,
         popular: [Int]? = nil
     ) -> DiscoverItem {
@@ -239,7 +234,6 @@ enum DiscoverPreviewData {
             summaryItemCount: summaryItemCount,
             expandedStyle: expandedStyle,
             source: source,
-            sponsoredPodcasts: sponsoredPodcasts,
             regions: ["us"],
             isSponsored: isSponsored,
             popular: popular,

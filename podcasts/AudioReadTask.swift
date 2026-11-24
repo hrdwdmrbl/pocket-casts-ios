@@ -49,12 +49,7 @@ class AudioReadTask {
         voiceBoostNSampleRate = sampleRate
 
         let qos: DispatchQoS
-
-        if FeatureFlag.effectsPlayerQOSUpgrade.enabled {
-            qos = .userInitiated
-        } else {
-            qos = .default
-        }
+        qos = .userInitiated
 
         readQueue = DispatchQueue(label: "au.com.pocketcasts.ReadQueue", qos: qos, attributes: [], autoreleaseFrequency: .never, target: nil)
 

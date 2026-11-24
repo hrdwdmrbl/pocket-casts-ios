@@ -28,12 +28,10 @@ extension PlayerContainerViewController {
 
         let shouldShowNotes = (playingEpisode is Episode)
         let shouldShowChapters = PlaybackManager.shared.chapterCount() > 0
-        let shouldShowBookmarks = true
 
         // check to see if the visible views are already configured correctly
         if shouldShowNotes == showingNotes,
-            shouldShowChapters == showingChapters,
-            shouldShowBookmarks == showingBookmarks {
+           shouldShowChapters == showingChapters {
             return
         }
 
@@ -46,10 +44,6 @@ extension PlayerContainerViewController {
         chaptersItem.removeFromParent()
         chaptersItem.view.removeFromSuperview()
         showingChapters = false
-
-        bookmarksItem.removeFromParent()
-        bookmarksItem.view.removeFromSuperview()
-        showingBookmarks = false
 
         tabsView.tabs = [.nowPlaying]
 
@@ -69,12 +63,6 @@ extension PlayerContainerViewController {
             addTab(chaptersItem, previousTab: &previousTab)
         }
 
-        if shouldShowBookmarks {
-            showingBookmarks = true
-            tabsView.tabs += [.bookmarks]
-
-            addTab(bookmarksItem, previousTab: &previousTab)
-        }
         #endif
     }
 

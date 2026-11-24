@@ -25,13 +25,7 @@ class EpisodeFileSizeUpdater {
             let currentDuration = episode.duration
             if Int(currentDuration) == Int(calculatedDuration) { return } // we already have the correct duration
 
-            var syncChanges = true
-            if abs(currentDuration - calculatedDuration) < 30 {
-                // only a minor change so just update the db but don't bother syncing
-                syncChanges = false
-            }
-
-            DataManager.shared.saveEpisode(duration: calculatedDuration, episode: episode, updateSyncFlag: syncChanges)
+            DataManager.shared.saveEpisode(duration: calculatedDuration, episode: episode)
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.episodeDurationChanged, object: episode.uuid)
         }
     }

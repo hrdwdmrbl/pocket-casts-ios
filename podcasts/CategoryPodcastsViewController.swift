@@ -4,14 +4,11 @@ import PocketCastsUtils
 
 class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UITableViewDataSource {
     private static let cellId = "DiscoverCell"
-    private static let sponsoredCellId = "CategorySponsoredCell"
-    private static let promotionRow = 0
     @IBOutlet var podcastsTable: UITableView! {
         didSet {
             // This will remove extra separators from tableview
             podcastsTable.tableFooterView = UIView(frame: CGRect.zero)
             podcastsTable.register(UINib(nibName: "DiscoverPodcastTableCell", bundle: nil), forCellReuseIdentifier: CategoryPodcastsViewController.cellId)
-            podcastsTable.register(UINib(nibName: "CategorySponsoredCell", bundle: nil), forCellReuseIdentifier: CategoryPodcastsViewController.sponsoredCellId)
         }
     }
 
@@ -31,7 +28,6 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
     }
     private(set) var skipCount: Int
     private var podcasts = [DiscoverPodcast]()
-    private var promotion: DiscoverCategoryPromotion?
     fileprivate var region: String?
 
     init(category: DiscoverCategory? = nil, region: String?, skipCount: Int = 0) {
@@ -58,30 +54,12 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
     // MARK: - UITableView Methods
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        showPromotion() ? podcasts.count + 1 : podcasts.count
+        podcasts.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        var podcastIndexRow = indexPath.row
-        if showPromotion(), let promotion {
-            if indexPath.row == CategoryPodcastsViewController.promotionRow {
-                let cell = tableView.dequeueReusableCell(withIdentifier: CategoryPodcastsViewController.sponsoredCellId, for: indexPath) as! CategorySponsoredCell
-                var isSubscribed = false
-                if let delegate {
-                    var discoverPodcast = DiscoverPodcast()
-                    discoverPodcast.uuid = promotion.podcast_uuid
-                    isSubscribed = delegate.isSubscribed(podcast: discoverPodcast)
-                }
-                cell.populateFrom(promotion, isSubscribed: isSubscribed)
-                return cell
-            } else {
-                podcastIndexRow -= 1
-            }
-        }
-
-        let podcast = podcasts[podcastIndexRow]
+        let podcast = podcasts[indexPath.row]
         let cell = tableView.dequeueReusableCell(withIdentifier: CategoryPodcastsViewController.cellId, for: indexPath) as! DiscoverPodcastTableCell
-        cell.subscribeSource = .discoverCategory
         cell.populateFrom(podcast, number: -1)
 
         return cell
@@ -92,23 +70,13 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
         guard let delegate else { return }
 
         if let cell = tableView.cellForRow(at: indexPath) as? DiscoverPodcastTableCell {
-            let podcastIndexRow = showPromotion() ? indexPath.row - 1 : indexPath.row
+            let podcastIndexRow = indexPath.row
             let podcast = podcasts[podcastIndexRow]
 
             let categoryName = category?.name ?? "unknown"
             let listUuid = "category-\(categoryName.lowercased())-\(region ?? "unknown")"
 
             delegate.show(discoverPodcast: podcast, placeholderImage: cell.podcastImage.image, isFeatured: false, listUuid: listUuid)
-        } else if let cell = tableView.cellForRow(at: indexPath) as? CategorySponsoredCell, let promotion {
-            var podcastInfo = PodcastInfo()
-            podcastInfo.title = promotion.title
-            podcastInfo.uuid = promotion.podcast_uuid
-            let listId = promotion.promotion_uuid
-            delegate.show(podcastInfo: podcastInfo, placeholderImage: cell.podcastImage.image, isFeatured: false, listUuid: listId)
-
-            if let listId, let uuid = podcastInfo.uuid {
-                AnalyticsHelper.podcastTappedFromList(listId: listId, podcastUuid: uuid)
-            }
         }
     }
 
@@ -117,9 +85,6 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
     }
 
     func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
-        if showPromotion(), indexPath.row == CategoryPodcastsViewController.promotionRow {
-            return tableView.bounds.width > 360 ? 130 : 150
-        }
         return 65
     }
 
@@ -132,7 +97,7 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
         noNetworkView.isHidden = true
         loadingIndicator.startAnimating()
 
-        serverHandler.discoverCategoryDetails(source: source, authenticated: nil, completion: { [weak self] categoryDetails in
+        serverHandler.discoverCategoryDetails(source: source, completion: { [weak self] categoryDetails in
             DispatchQueue.main.async {
                 guard let strongSelf = self, let podcasts = categoryDetails?.podcasts else {
                     return
@@ -140,16 +105,10 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
 
                 strongSelf.loadingIndicator.stopAnimating()
                 strongSelf.podcasts = Array(podcasts.dropFirst(strongSelf.skipCount))
-                strongSelf.promotion = categoryDetails?.promotion
                 strongSelf.podcastsTable.reloadData()
 
                 if let item = strongSelf.item {
                     strongSelf.delegate?.invalidate(item: item)
-                }
-
-                if let promotionUuid = categoryDetails?.promotion?.promotion_uuid {
-                    let categoryId = strongSelf.category?.id.map(String.init)
-                    AnalyticsHelper.listImpression(listId: promotionUuid, category: categoryId)
                 }
             }
         })
@@ -171,11 +130,6 @@ class CategoryPodcastsViewController: PCViewController, UITableViewDelegate, UIT
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         AppTheme.defaultStatusBarStyle()
-    }
-
-    private func showPromotion() -> Bool {
-        guard promotion != nil, !SubscriptionHelper.hasRenewingSubscription() else { return false }
-        return true
     }
 }
 
@@ -204,23 +158,6 @@ import SwiftUI
     let section = CategoryPodcastsViewController(region: "us")
     section.serverHandler = PreviewDiscoverServerHandler(
         categoryDetails: DiscoverPreviewData.categoryDetails(title: "Technology", podcasts: DiscoverPreviewData.podcasts(12))
-    )
-    return DiscoverSectionPreview(
-        section: section,
-        item: DiscoverPreviewData.item(.categoryPodcasts, title: "Technology"),
-        category: DiscoverPreviewData.categories()[11],
-        height: 700
-    )
-}
-
-#Preview("Category podcasts · promoted") {
-    let section = CategoryPodcastsViewController(region: "us")
-    section.serverHandler = PreviewDiscoverServerHandler(
-        categoryDetails: DiscoverPreviewData.categoryDetails(
-            title: "Technology",
-            podcasts: DiscoverPreviewData.podcasts(12),
-            promotion: (title: "Hard Fork", description: "Two friends try to make sense of the week in tech.")
-        )
     )
     return DiscoverSectionPreview(
         section: section,

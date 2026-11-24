@@ -12,7 +12,7 @@ extension DownloadManager: URLSessionDelegate, URLSessionDownloadDelegate {
 
     // make sure to call the completion handler on the main queue, otherwise it will crash
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-#if os(watchOS)
+        #if os(watchOS)
         guard session.configuration.identifier == DownloadManager.cellBackgroundSessionId else { return }
 
         DispatchQueue.main.async { [weak self] in
@@ -21,16 +21,16 @@ extension DownloadManager: URLSessionDelegate, URLSessionDownloadDelegate {
             pendingWatchBackgroundTask = nil
             task.setTaskCompletedWithSnapshot(true)
         }
-#elseif APPCLIP || os(tvOS)
+        #elseif APPCLIP || os(tvOS)
         //TODO: Check this and see whether anything should be done
-#else
+        #else
         DispatchQueue.main.async { [weak self] in
             guard let self, let appDelegate = appDelegate(), let backgroundHandler = appDelegate.backgroundSessionCompletionHandler else { return }
 
             appDelegate.backgroundSessionCompletionHandler = nil
             backgroundHandler()
         }
-#endif
+        #endif
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
@@ -150,7 +150,7 @@ extension DownloadManager: URLSessionDelegate, URLSessionDownloadDelegate {
         }
 
         if response.statusCode >= 400, response.statusCode < 600 {
-            if shouldRetryWithoutUserAgent(task: downloadTask), FeatureFlag.retryWithoutUserAgent.enabled {
+            if shouldRetryWithoutUserAgent(task: downloadTask) {
                 FileLog.shared.addMessage("DownloadManager: Retrying download without User-Agent for episode: \(episode.uuid), status code: \(response.statusCode)")
                 Task {
                     await retryDownloadWithoutUserAgent(episode: episode)
@@ -220,39 +220,35 @@ extension DownloadManager: URLSessionDelegate, URLSessionDownloadDelegate {
               let episode = episode(for: downloadTask, forceReload: false) else {
             return
         }
+        let bytesReceived = task.countOfBytesReceived
+        let connectionType = NetworkDataUsageManager.connectionType(from: metrics)
 
-        // Track network data usage
-        if FeatureFlag.trackNetworkDataUsage.enabled {
-            let bytesReceived = task.countOfBytesReceived
-            let connectionType = NetworkDataUsageManager.connectionType(from: metrics)
-
-            if bytesReceived > 0 {
-                let autoDownloadStatus = AutoDownloadStatus(rawValue: episode.autoDownloadStatus)
-                let operationType: NetworkDataUsageManager.OperationType
-                switch autoDownloadStatus {
-                case .playerDownloadedForStreaming:
-                    operationType = .stream
-                default:
-                    operationType = .download
-                }
-
-                let sessionType: NetworkDataUsageManager.SessionType =
-                    session === wifiOnlyBackgroundSession ? .background :
-                    (session === cellularBackgroundSession ? .background : .foreground)
-
-                let bytesDownloaded = operationType != .stream ? bytesReceived : 0
-                let bytesStreamed = operationType == .stream ? bytesReceived : 0
-
-                dataManager.networkDataUsageManager.add(
-                    episodeUuid: episode.uuid,
-                    podcastUuid: episode.parentIdentifier(),
-                    bytesDownloaded: bytesDownloaded,
-                    bytesStreamed: bytesStreamed,
-                    operationType: operationType,
-                    connectionType: connectionType,
-                    sessionType: sessionType
-                )
+        if bytesReceived > 0 {
+            let autoDownloadStatus = AutoDownloadStatus(rawValue: episode.autoDownloadStatus)
+            let operationType: NetworkDataUsageManager.OperationType
+            switch autoDownloadStatus {
+            case .playerDownloadedForStreaming:
+                operationType = .stream
+            default:
+                operationType = .download
             }
+
+            let sessionType: NetworkDataUsageManager.SessionType =
+                session === wifiOnlyBackgroundSession ? .background :
+                (session === cellularBackgroundSession ? .background : .foreground)
+
+            let bytesDownloaded = operationType != .stream ? bytesReceived : 0
+            let bytesStreamed = operationType == .stream ? bytesReceived : 0
+
+            dataManager.networkDataUsageManager.add(
+                episodeUuid: episode.uuid,
+                podcastUuid: episode.parentIdentifier(),
+                bytesDownloaded: bytesDownloaded,
+                bytesStreamed: bytesStreamed,
+                operationType: operationType,
+                connectionType: connectionType,
+                sessionType: sessionType
+            )
         }
 
         if let failure = taskFailure[episode.uuid] ?? failureReason(for: task.error) {

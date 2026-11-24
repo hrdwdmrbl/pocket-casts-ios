@@ -29,29 +29,6 @@ final class EpisodeManagerTests: DBTestCase {
         XCTAssertEqual(localUrl, streamingUrl, "Both calls should return the same URL when no local content exists")
     }
 
-    func testUrlForEpisodeStreamingOnlyWithUserEpisode() {
-        // Given: A user episode (uploaded content)
-        let userEpisode = UserEpisode()
-        userEpisode.uuid = "user-episode-abc"
-        userEpisode.uploadStatus = UploadStatus.uploaded.rawValue
-
-        // Mock the server settings token
-        let originalToken = ServerSettings.syncingV2Token
-        ServerSettings.syncingV2Token = "mock-token-123"
-
-        defer {
-            // Cleanup
-            ServerSettings.syncingV2Token = originalToken
-        }
-
-        // When: Calling urlForEpisode with streamingOnly: true
-        let streamingUrl = EpisodeManager.url(for: userEpisode, streamingOnly: true)
-
-        // Then: Should return API URL for user episodes
-        let expectedUrl = "\(ServerConstants.Urls.api())files/url/user-episode-abc?token=mock-token-123"
-        XCTAssertEqual(streamingUrl?.absoluteString, expectedUrl, "Should return API URL for user episodes")
-    }
-
     func testUrlForEpisodeReturnsNilForInvalidEpisode() {
         // Given: An episode with no downloadUrl and not a user episode
         let episode = Episode()
@@ -121,95 +98,73 @@ final class EpisodeManagerTests: DBTestCase {
         XCTAssertFalse(url2?.isFileURL == true, "Should not be local file")
     }
 
-    func testUrlForEpisodeUserEpisodeWithoutToken() {
-        // Given: A user episode but no sync token available
-        let userEpisode = UserEpisode()
-        userEpisode.uuid = "user-episode-no-token"
-        userEpisode.uploadStatus = UploadStatus.uploaded.rawValue
-
-        // Mock no token available
-        let originalToken = ServerSettings.syncingV2Token
-        ServerSettings.syncingV2Token = nil
-
-        defer {
-            ServerSettings.syncingV2Token = originalToken
-        }
-
-        // When: Calling urlForEpisode
-        let url = EpisodeManager.url(for: userEpisode, streamingOnly: true)
-
-        // Then: Should return nil since no token available
-        XCTAssertNil(url, "Should return nil when no sync token available for user episode")
-    }
-
     // MARK: - cleanUpTmpFolder Tests
 
     func testCleanUpTmpFolderRemovesFilesOlderThanOneWeek() throws {
-      // Given: A tmp directory with an old file (> 1 week)
-      let tmpDir = NSTemporaryDirectory() + UUID().uuidString
-      try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
-      defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+        // Given: A tmp directory with an old file (> 1 week)
+        let tmpDir = NSTemporaryDirectory() + UUID().uuidString
+        try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
 
-      let oldFilePath = (tmpDir as NSString).appendingPathComponent("old_episode.mp3")
-      FileManager.default.createFile(atPath: oldFilePath, contents: Data("old".utf8))
+        let oldFilePath = (tmpDir as NSString).appendingPathComponent("old_episode.mp3")
+        FileManager.default.createFile(atPath: oldFilePath, contents: Data("old".utf8))
 
-      let eightDaysAgo = Date.now.addingTimeInterval(-8.days)
-      try FileManager.default.setAttributes([.modificationDate: eightDaysAgo], ofItemAtPath: oldFilePath)
+        let eightDaysAgo = Date.now.addingTimeInterval(-8.days)
+        try FileManager.default.setAttributes([.modificationDate: eightDaysAgo], ofItemAtPath: oldFilePath)
 
-      // When
-      EpisodeManager.cleanUpTmpFolder(folderPath: tmpDir)
+        // When
+        EpisodeManager.cleanUpTmpFolder(folderPath: tmpDir)
 
-      // Then: File should be deleted
-      XCTAssertFalse(FileManager.default.fileExists(atPath: oldFilePath), "File older than 1 week should be removed")
+        // Then: File should be deleted
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldFilePath), "File older than 1 week should be removed")
     }
 
     func testCleanUpTmpFolderKeepsFilesNewerThanOneWeek() throws {
-      // Given: A tmp directory with a recent file (< 1 week)
-      let tmpDir = NSTemporaryDirectory() + UUID().uuidString
-      try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
-      defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+        // Given: A tmp directory with a recent file (< 1 week)
+        let tmpDir = NSTemporaryDirectory() + UUID().uuidString
+        try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
 
-      let recentFilePath = (tmpDir as NSString).appendingPathComponent("recent_episode.mp3")
-      FileManager.default.createFile(atPath: recentFilePath, contents: Data("recent".utf8))
+        let recentFilePath = (tmpDir as NSString).appendingPathComponent("recent_episode.mp3")
+        FileManager.default.createFile(atPath: recentFilePath, contents: Data("recent".utf8))
 
-      let threeDaysAgo = Date.now.addingTimeInterval(-3.days)
-      try FileManager.default.setAttributes([.modificationDate: threeDaysAgo], ofItemAtPath: recentFilePath)
+        let threeDaysAgo = Date.now.addingTimeInterval(-3.days)
+        try FileManager.default.setAttributes([.modificationDate: threeDaysAgo], ofItemAtPath: recentFilePath)
 
-      // When
-      EpisodeManager.cleanUpTmpFolder(folderPath: tmpDir)
+        // When
+        EpisodeManager.cleanUpTmpFolder(folderPath: tmpDir)
 
-      // Then: File should still exist
-      XCTAssertTrue(FileManager.default.fileExists(atPath: recentFilePath), "File newer than 1 week should be kept")
+        // Then: File should still exist
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recentFilePath), "File newer than 1 week should be kept")
     }
 
     func testCleanUpTmpFolderMixedAgesDeletesOnlyOldFiles() throws {
-      // Given: A tmp directory with both old and recent files
-      let tmpDir = NSTemporaryDirectory() + UUID().uuidString
-      try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
-      defer { try? FileManager.default.removeItem(atPath: tmpDir) }
+        // Given: A tmp directory with both old and recent files
+        let tmpDir = NSTemporaryDirectory() + UUID().uuidString
+        try FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tmpDir) }
 
-      let oldFilePath = (tmpDir as NSString).appendingPathComponent("old.mp3")
-      let recentFilePath = (tmpDir as NSString).appendingPathComponent("recent.mp3")
-      FileManager.default.createFile(atPath: oldFilePath, contents: Data("old".utf8))
-      FileManager.default.createFile(atPath: recentFilePath, contents: Data("recent".utf8))
+        let oldFilePath = (tmpDir as NSString).appendingPathComponent("old.mp3")
+        let recentFilePath = (tmpDir as NSString).appendingPathComponent("recent.mp3")
+        FileManager.default.createFile(atPath: oldFilePath, contents: Data("old".utf8))
+        FileManager.default.createFile(atPath: recentFilePath, contents: Data("recent".utf8))
 
-      try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-10.days)], ofItemAtPath:
-    oldFilePath)
-      try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-1.days)], ofItemAtPath:
-    recentFilePath)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-10.days)], ofItemAtPath:
+                                                oldFilePath)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-1.days)], ofItemAtPath:
+                                                recentFilePath)
 
-      // When
-      EpisodeManager.cleanUpTmpFolder(folderPath: tmpDir)
+        // When
+        EpisodeManager.cleanUpTmpFolder(folderPath: tmpDir)
 
-      // Then
-      XCTAssertFalse(FileManager.default.fileExists(atPath: oldFilePath), "Old file should be removed")
-      XCTAssertTrue(FileManager.default.fileExists(atPath: recentFilePath), "Recent file should be kept")
+        // Then
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldFilePath), "Old file should be removed")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recentFilePath), "Recent file should be kept")
     }
 
     // MARK: - HLS streaming
 
     override func tearDown() {
-        FeatureFlagOverrideStore().resetOverrides()
         super.tearDown()
     }
 
@@ -222,18 +177,11 @@ final class EpisodeManagerTests: DBTestCase {
         return episode
     }
 
-    func testHasHLSStreamWhenFlagEnabledAndHlsUrlPresent() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
+    func testHasHLSStreamAndHlsUrlPresent() throws {
         XCTAssertTrue(EpisodeManager.hasHLSStream(makeStreamingHLSEpisode()))
     }
 
-    func testDoesNotHaveHLSStreamWhenFlagDisabled() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: false)
-        XCTAssertFalse(EpisodeManager.hasHLSStream(makeStreamingHLSEpisode()))
-    }
-
     func testDoesNotHaveHLSStreamWhenHlsUrlMissingOrEmpty() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
 
         let noHls = makeStreamingHLSEpisode()
         noHls.hlsUrl = nil
@@ -245,12 +193,10 @@ final class EpisodeManagerTests: DBTestCase {
     }
 
     func testDoesNotHaveHLSStreamForUserEpisode() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
         XCTAssertFalse(EpisodeManager.hasHLSStream(UserEpisode()))
     }
 
-    func testUrlForEpisodeStreamsHLSWhenAvailableAndFlagEnabled() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
+    func testUrlForEpisodeStreamsHLSWhenAvailable() throws {
 
         let url = EpisodeManager.url(for: makeStreamingHLSEpisode())
 
@@ -258,23 +204,13 @@ final class EpisodeManagerTests: DBTestCase {
     }
 
     func testUrlForEpisodeStreamsHLSWhenStreamingOnly() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
 
         let url = EpisodeManager.url(for: makeStreamingHLSEpisode(), streamingOnly: true)
 
         XCTAssertEqual(url?.absoluteString, "https://example.com/stream.m3u8", "Should stream the HLS url when available")
     }
 
-    func testUrlForEpisodeUsesProgressiveWhenHLSFlagDisabled() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: false)
-
-        let url = EpisodeManager.url(for: makeStreamingHLSEpisode())
-
-        XCTAssertEqual(url?.absoluteString, "https://example.com/episode.mp3", "Should fall back to the progressive file when the flag is off")
-    }
-
     func testUrlForEpisodeUsesProgressiveWhenNoHLS() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
 
         let episode = makeStreamingHLSEpisode()
         episode.hlsUrl = nil
@@ -293,23 +229,15 @@ final class EpisodeManagerTests: DBTestCase {
         return episode
     }
 
-    func testIsVideoForNativeVideoPodcastWhenHLSFlagDisabled() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: false)
+    func testIsVideoForNativeVideoPodcast() throws {
         XCTAssertTrue(EpisodeManager.isVideo(makeVideoEpisode()), "A native video podcast should be treated as video regardless of the HLS flag")
     }
 
-    func testIsVideoForHLSStreamWhenFlagEnabled() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
+    func testIsVideoForHLSStream() throws {
         XCTAssertTrue(EpisodeManager.isVideo(makeStreamingHLSEpisode()), "An episode with a usable HLS stream should be treated as video")
     }
 
-    func testIsNotVideoForHLSStreamWhenFlagDisabled() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: false)
-        XCTAssertFalse(EpisodeManager.isVideo(makeStreamingHLSEpisode()), "An audio episode should not be treated as video when the HLS flag is off")
-    }
-
     func testIsNotVideoForAudioEpisodeWithoutHLS() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
 
         let episode = makeStreamingHLSEpisode()
         episode.hlsUrl = nil
@@ -318,7 +246,6 @@ final class EpisodeManagerTests: DBTestCase {
     }
 
     func testIsNotVideoForDownloadedHLSEpisode() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
 
         let episode = makeStreamingHLSEpisode()
         episode.episodeStatus = DownloadStatus.downloaded.rawValue
@@ -329,7 +256,6 @@ final class EpisodeManagerTests: DBTestCase {
     }
 
     func testIsVideoForDownloadedNativeVideoPodcast() throws {
-        try FeatureFlagOverrideStore().override(FeatureFlag.hls, withValue: true)
 
         let episode = makeVideoEpisode()
         episode.episodeStatus = DownloadStatus.downloaded.rawValue

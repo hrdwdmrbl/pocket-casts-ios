@@ -56,9 +56,9 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
 
     @IBOutlet var episodeName: ThemeableLabel! {
         didSet {
-#if APPCLIP
+            #if APPCLIP
             episodeName.text = ""
-#endif
+            #endif
             episodeName.style = .playerContrast01
             episodeName.adjustsFontForContentSizeCategory = true
             episodeName.font = .font(ofSize: 18, weight: .semibold, scalingWith: .largeTitle)
@@ -67,9 +67,9 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
 
     @IBOutlet var podcastName: ThemeableLabel! {
         didSet {
-#if APPCLIP
+            #if APPCLIP
             podcastName.text = ""
-#endif
+            #endif
             podcastName.style = .playerContrast02
             podcastName.adjustsFontForContentSizeCategory = true
             podcastName.font = .font(ofSize: 14, weight: .medium, scalingWith: .largeTitle)
@@ -84,9 +84,9 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
 
     @IBOutlet var chapterName: ThemeableLabel! {
         didSet {
-#if APPCLIP
+            #if APPCLIP
             chapterName.text = ""
-#endif
+            #endif
             chapterName.style = .playerContrast01
             chapterName.adjustsFontForContentSizeCategory = true
             chapterName.font = .font(ofSize: 18, weight: .semibold, scalingWith: .largeTitle)
@@ -242,27 +242,14 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
     #endif
 
     var lastShelfLoadState = ShelfLoadState()
-
-    /// The shelf button the Smart Bookmarks tip points at: the bookmark button when it's on the shelf, the overflow button otherwise.
-    weak var smartBookmarksTipAnchor: UIView?
-    var smartBookmarksTip: UIViewController?
-
-    private var bannerAdHostingController: PCHostingController<AnyView>?
-    private var bannerAdHeightConstraint: NSLayoutConstraint?
     #if !APPCLIP
-    private var bannerAdModel: BannerAdModel?
     #endif
-
-    private let analyticsPlaybackHelper = AnalyticsPlaybackHelper.shared
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (controller: NowPlayingPlayerItemViewController, _) in
             #if !APPCLIP
-            if FeatureFlag.bannerAdPlayer.enabled {
-                controller.updateBannerAdHeight()
-            }
             #endif
             controller.updateSize()
         }
@@ -270,7 +257,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         registerForTraitChanges([UITraitDisplayScale.self]) { (controller: NowPlayingPlayerItemViewController, _) in
             controller.resizeControls()
             #if !APPCLIP
-            controller.updateBannerAdDisplayZoom()
             #endif
         }
 
@@ -290,22 +276,8 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         #endif
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-
-        #if !APPCLIP
-        // Show the overflow menu
-        if AnnouncementFlow.current == .bookmarksPlayer {
-            overflowTapped()
-        } else {
-            showSmartBookmarksTipIfNeeded()
-        }
-        #endif
-    }
-
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        loadBannerAd()
     }
 
     override func viewIsAppearing(_ animated: Bool) {
@@ -314,7 +286,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         // Layout and the banner can run before the view has a window to read Display Zoom from.
         resizeControls()
         #if !APPCLIP
-        updateBannerAdDisplayZoom()
         #endif
     }
 
@@ -322,43 +293,17 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         super.viewDidDisappear(animated)
         bannerTask?.cancel()
         #if !APPCLIP
-        dismissSmartBookmarksTip()
         #endif
     }
 
     private var lastBoundsAdjustedFor = CGRect.zero
 
-    var analyticsSource: AnalyticsSource {
-        .player
-    }
-
     var displayTranscript = false {
         didSet {
-#if !APPCLIP
+            #if !APPCLIP
             toggleTranscript()
-#endif
+            #endif
         }
-    }
-
-    private func loadBannerAd() {
-#if !APPCLIP
-        if SubscriptionHelper.shouldDisplayPlayerBannerAd {
-            DiscoverServerHandler.shared.blazePromotion(for: .player) { [weak self] promotion, shouldAnimate in
-                guard let self else { return }
-
-                if shouldAnimate {
-                    self.bannerTask = Task { [weak self] in
-                        try? await Task.sleep(for: .seconds(2))
-                        await MainActor.run {
-                            self?.addAdBanner(promotion: promotion, animated: true)
-                        }
-                    }
-                } else {
-                    self.addAdBanner(promotion: promotion, animated: false)
-                }
-            }
-        }
-#endif
     }
 
     private var playerContainer: PlayerContainerViewController? {
@@ -381,9 +326,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         resizeControls()
 
         #if !APPCLIP
-        if FeatureFlag.bannerAdPlayer.enabled {
-            updateBannerAdHeight()
-        }
         #endif
     }
 
@@ -442,7 +384,7 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
             artwork.widthAnchor.constraint(lessThanOrEqualTo: episodeImage.widthAnchor),
             artwork.heightAnchor.constraint(lessThanOrEqualTo: episodeImage.heightAnchor),
             fillWidth,
-            fillHeight,
+            fillHeight
         ])
     }
 
@@ -459,13 +401,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         removeAllCustomObservers()
 
         #if !APPCLIP
-        if FeatureFlag.bannerAdPlayer.enabled {
-            removeBannerAd()
-        }
-        // Drop any in-flight generated-chapter resolve so a dismissed player can't
-        // seek later (matching ChaptersViewController), and clear a skip spinner
-        // left mid-resolve so a reused player doesn't reappear with a dimmed button.
-        FingerprintTimingManager.shared.cancelPendingChapterResolve()
         resetChapterSkipResolving()
         #endif
     }
@@ -491,72 +426,31 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
     // MARK: - Interface Actions
 
     @IBAction func skipBackTapped(_ sender: Any) {
-        analyticsPlaybackHelper.currentSource = analyticsSource
         HapticsHelper.triggerSkipBackHaptic()
         PlaybackManager.shared.skipBack()
     }
 
     @IBAction func playPauseTapped(_ sender: Any) {
-        analyticsPlaybackHelper.currentSource = analyticsSource
         HapticsHelper.triggerPlayPauseHaptic()
         PlaybackManager.shared.playPause()
     }
 
     @IBAction func skipFwdTapped(_ sender: Any) {
-        analyticsPlaybackHelper.currentSource = analyticsSource
         HapticsHelper.triggerSkipForwardHaptic()
         PlaybackManager.shared.skipForward()
     }
 
     @IBAction func chapterSkipBackTapped(_ sender: Any) {
-        PlaybackManager.shared.trackChapterEvent(.playerPreviousChapterTapped)
 
         #if !APPCLIP
-        // Generated chapters carry reference-timeline starts that dynamic ads have
-        // shifted, so resolve the true playback position by fingerprinting before
-        // seeking — matching the chapters-list tap flow.
-        if GeneratedChapterSeeker.isEnabled {
-            // Clear any spinner left over from a resolve this tap supersedes.
-            resetChapterSkipResolving()
-            if let previous = PlaybackManager.shared.previousPlayableChapter() {
-                PlaybackManager.shared.trackChapterSkippedIfNeeded(to: previous)
-                GeneratedChapterSeeker.seek(
-                    to: previous,
-                    startPlayback: false,
-                    willBeginResolving: { [weak self] in self?.setChapterSkipResolving(true, forward: false) },
-                    didEndResolving: { [weak self] in self?.setChapterSkipResolving(false, forward: false) }
-                )
-                return
-            }
-        }
         #endif
 
         PlaybackManager.shared.skipToPreviousChapter()
     }
 
     @IBAction func chapterSkipForwardTapped(_ sender: Any) {
-        PlaybackManager.shared.trackChapterEvent(.playerNextChapterTapped)
 
         #if !APPCLIP
-        if GeneratedChapterSeeker.isEnabled {
-            // Clear any spinner left over from a resolve this tap supersedes.
-            resetChapterSkipResolving()
-            guard let next = PlaybackManager.shared.nextPlayableChapter() else {
-                // No next chapter — respect the producer's end of the last chapter
-                // (the same fallback `skipToNextChapter` makes). This isn't a
-                // chapter start, so there's nothing to fingerprint-resolve.
-                PlaybackManager.shared.skipToEndOfLastChapter()
-                return
-            }
-            PlaybackManager.shared.trackChapterSkippedIfNeeded(to: next)
-            GeneratedChapterSeeker.seek(
-                to: next,
-                startPlayback: false,
-                willBeginResolving: { [weak self] in self?.setChapterSkipResolving(true, forward: true) },
-                didEndResolving: { [weak self] in self?.setChapterSkipResolving(false, forward: true) }
-            )
-            return
-        }
         #endif
 
         PlaybackManager.shared.skipToNextChapter()
@@ -612,21 +506,21 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         #if APPCLIP
         //TODO: Prompt to install app
         #else
-            if Settings.openLinks {
-                UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            } else {
-                present(SFSafariViewController(with: url), animated: true)
-            }
+        if Settings.openLinks {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        } else {
+            present(SFSafariViewController(with: url), animated: true)
+        }
         #endif
     }
 
     @objc private func imageTapped() {
-#if !APPCLIP
+        #if !APPCLIP
         guard let artwork = artworkImageView.image else { return }
 
         let agrume = Agrume(image: artwork, background: .blurred(.regular))
         agrume.show(from: self)
-#endif
+        #endif
     }
 
     @objc private func videoTapped() {
@@ -659,7 +553,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
     }
 
     @objc private func podcastNameTapped() {
-        Analytics.track(.playerPodcastNameTapped)
         containerDelegate?.navigateToPodcast()
     }
 
@@ -669,7 +562,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
         let options = OptionsPicker(title: nil, themeOverride: .dark)
 
         let markPlayedOption = OptionAction(label: L10n.markPlayedShort, icon: nil) {
-            AnalyticsEpisodeHelper.shared.currentSource = .playerSkipForwardLongPress
             EpisodeManager.markAsPlayed(episode: episode, fireNotification: true)
         }
         options.addAction(action: markPlayedOption)
@@ -756,97 +648,6 @@ class NowPlayingPlayerItemViewController: PlayerItemViewController {
             skipBackBtn.finishedTransition()
             skipFwdBtn.finishedTransition()
         })
-    }
-
-    // MARK: Banner Ad
-
-    func addAdBanner(promotion: BlazePromotion, animated: Bool = true) {
-        removeBannerAd()
-
-        guard let stackView = episodeImage.superview as? UIStackView else { return }
-
-        let model = BannerAdModel(promotion: promotion) {
-            UIApplication.shared.openSafariVCIfPossible(promotion.urlApple)
-        }
-
-        let hostingController = PCHostingController(rootView: bannerAdView(model: model))
-
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        hostingController.view.backgroundColor = .clear
-
-        let targetSize = CGSize(width: stackView.bounds.width, height: UIView.layoutFittingCompressedSize.height)
-        let size = hostingController.sizeThatFits(in: targetSize)
-
-        addChild(hostingController)
-        let adUiView = hostingController.view!
-
-        stackView.insertArrangedSubview(adUiView, at: 0)
-
-        adUiView.alpha = 0
-        let topConstraint = adUiView.topAnchor.constraint(equalTo: view.topAnchor, constant: -120)
-
-        let heightConstraint = hostingController.view.heightAnchor.constraint(equalToConstant: size.height)
-        NSLayoutConstraint.activate([
-            heightConstraint,
-            topConstraint,
-        ])
-
-        hostingController.didMove(toParent: self)
-        bannerAdHostingController = hostingController
-        bannerAdHeightConstraint = heightConstraint
-        bannerAdModel = model
-
-        view.layoutIfNeeded()
-
-        if animated {
-            // Animate move first
-            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
-                topConstraint.constant = 0
-                self.view.layoutIfNeeded()
-            }
-
-            // Animate opacity second so it's more noticeable
-            UIView.animate(withDuration: 0.2, delay: 0.05) {
-                adUiView.alpha = 1
-            }
-        } else {
-            topConstraint.constant = 0
-            adUiView.alpha = 1
-        }
-    }
-
-    private func removeBannerAd() {
-        guard let hostingController = bannerAdHostingController else { return }
-
-        hostingController.willMove(toParent: nil)
-        hostingController.view.removeFromSuperview()
-        hostingController.removeFromParent()
-        bannerAdHostingController = nil
-        bannerAdHeightConstraint = nil
-        bannerAdModel = nil
-    }
-
-    private func bannerAdView(model: BannerAdModel) -> AnyView {
-        AnyView(BannerAdView(model: model, colors: .playerColors(Theme.shared), isDisplayZoomed: isZoomed).padding(16))
-    }
-
-    private func updateBannerAdDisplayZoom() {
-        guard let hostingController = bannerAdHostingController, let bannerAdModel else { return }
-
-        hostingController.rootView = .init(content: bannerAdView(model: bannerAdModel), modifier: hostingController.rootView.modifier)
-        updateBannerAdHeight()
-    }
-
-    private func updateBannerAdHeight() {
-        guard let hostingController = bannerAdHostingController,
-              let heightConstraint = bannerAdHeightConstraint,
-              let stackView = episodeImage.superview as? UIStackView else { return }
-
-        let targetSize = CGSize(width: stackView.bounds.width, height: UIView.layoutFittingCompressedSize.height)
-        let size = hostingController.sizeThatFits(in: targetSize)
-
-        heightConstraint.constant = size.height
-        view.layoutIfNeeded()
     }
 
     #endif

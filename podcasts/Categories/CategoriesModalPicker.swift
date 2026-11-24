@@ -3,11 +3,9 @@ import PocketCastsServer
 import Kingfisher
 
 struct CategoriesModalPicker: View {
-    let categories: [Category]
+    let categories: [DiscoverCategory]
 
     @Binding var selectedCategory: DiscoverCategory?
-
-    let region: String?
 
     @EnvironmentObject var theme: Theme
 
@@ -43,7 +41,7 @@ struct CategoriesModalPicker: View {
             title
                 .padding(Constants.Padding.title)
             List {
-                ForEach(categories, id: \.category.id) { category in
+                ForEach(categories, id: \.id) { category in
                     cell(category)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(background)
@@ -68,8 +66,7 @@ struct CategoriesModalPicker: View {
             .foregroundStyle(titleForeground)
     }
 
-    @ViewBuilder func cell(_ categoryWithMetadata: Category) -> some View {
-        let category = categoryWithMetadata.category
+    @ViewBuilder func cell(_ category: DiscoverCategory) -> some View {
         HStack(spacing: Constants.cellSpacing) {
             if let icon = category.icon, let url = URL(string: icon) {
                 KFImage(url)
@@ -84,7 +81,6 @@ struct CategoriesModalPicker: View {
         .padding(Constants.Padding.cell)
         .buttonize {
             selectedCategory = category
-            Analytics.track(.discoverCategoriesPickerPick, properties: ["id": category.id ?? -1, "name": category.name ?? "all", "region": region ?? "none", "sponsored": categoryWithMetadata.isSponsored, "visits": categoryWithMetadata.visits])
         } customize: { config in
             config.label
                 .foregroundStyle(cellForeground)

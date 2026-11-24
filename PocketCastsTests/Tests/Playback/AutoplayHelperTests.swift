@@ -7,11 +7,10 @@ class AutoplayHelperTests: XCTestCase {
     var autoplayHelper: AutoplayHelper!
 
     override func setUp() {
-        let userDefaults = UserDefaults(suiteName: "\(Int.random(in: 0..<1000))")!
+        let userDefaults = UserDefaults(suiteName: "\(UUID().uuidString)")!
         autoplayHelper = AutoplayHelper(
             userDefaults: userDefaults
         )
-        SettingsStore.appSettings = SettingsStore(userDefaults: userDefaults, key: "app_settings", value: AppSettings.defaults)
     }
 
     func testInitialValueIsNil() {

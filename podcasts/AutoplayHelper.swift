@@ -5,27 +5,12 @@ import PocketCastsServer
 
 /// Reponsible for handling the Autoplay of episodes
 class AutoplayHelper {
-    enum Playlist: Codable, AnalyticsDescribable, Equatable {
+    enum Playlist: Codable, Equatable {
         case podcast(uuid: String)
         case filter(uuid: String)
         case downloads
         case files
         case starred
-
-        var analyticsDescription: String {
-            switch self {
-            case .podcast:
-                return "podcast"
-            case .filter:
-                return "filter"
-            case .downloads:
-                return "downloads"
-            case .files:
-                return "files"
-            case .starred:
-                return "starred"
-            }
-        }
     }
 
     #if !os(watchOS)
@@ -62,12 +47,6 @@ class AutoplayHelper {
     /// Saves the current playlist
     func playedFrom(playlist: Playlist?) {
         save(selectedPlaylist: playlist)
-
-        // We always save the playlist no matter if Up Next is empty or not
-        // However this event should be fired only if the Up Next is empty.
-        if Settings.autoplay && upNextQueue.upNextCount() == 0 {
-            Analytics.track(.autoplayStarted, properties: ["source": playlist ?? "unknown"])
-        }
     }
 
     /// Given the current episode UUID, checks if there's any

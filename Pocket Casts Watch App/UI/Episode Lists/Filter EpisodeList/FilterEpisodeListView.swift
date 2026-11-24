@@ -29,10 +29,10 @@ struct FilterEpisodeListView: View {
     var body: some View {
         headerWithContent {
             ItemListContainer(isEmpty: $viewModel.episodes.isEmpty, loading: viewModel.isLoading) {
-                EpisodeListView(title: L10n.playlists.prefixSourceUnicode, showArtwork: true, episodes: $viewModel.episodes, playlist: .filter(uuid: viewModel.filter.uuid))
+                EpisodeListView(title: L10n.playlists, showArtwork: true, episodes: $viewModel.episodes, playlist: .filter(uuid: viewModel.filter.uuid))
             }
         }
-        .navigationTitle(L10n.playlists.prefixSourceUnicode)
+        .navigationTitle(L10n.playlists)
         .onAppear {
             viewModel.loadFilterEpisodes()
         }

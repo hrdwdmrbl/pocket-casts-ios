@@ -16,21 +16,18 @@ class SearchResultsViewController: UIHostingController<AnyView> {
     private let displaySearch = SearchVisibilityModel()
     private let searchHistoryModel = SearchHistoryModel.shared
     private let searchResults: SearchResultsModel
-    private let searchAnalyticsHelper: SearchAnalyticsHelper
     private let networkNavigator: NetworkNavigator
 
-    init(source: AnalyticsSource, showLocalResults: Bool = false) {
-        searchAnalyticsHelper = SearchAnalyticsHelper(source: source)
-        self.searchResults = SearchResultsModel(analyticsHelper: searchAnalyticsHelper, showLocalResults: showLocalResults)
-        self.networkNavigator = NetworkNavigator(source: source)
+    init(showLocalResults: Bool = false) {
+        self.searchResults = SearchResultsModel(showLocalResults: showLocalResults)
+        self.networkNavigator = NetworkNavigator()
         super.init(rootView: AnyView(
-            SearchView()
-            .setupDefaultEnvironment()
-            .environmentObject(searchAnalyticsHelper)
-            .environmentObject(searchResults)
-            .environmentObject(searchHistoryModel)
-            .environmentObject(networkNavigator)
-            .environmentObject(displaySearch))
+                    SearchView()
+                        .setupDefaultEnvironment()
+                        .environmentObject(searchResults)
+                        .environmentObject(searchHistoryModel)
+                        .environmentObject(networkNavigator)
+                        .environmentObject(displaySearch))
         )
 
         networkNavigator.presenter = self
@@ -41,11 +38,9 @@ class SearchResultsViewController: UIHostingController<AnyView> {
     }
 
     func searchShown() {
-        searchAnalyticsHelper.trackShown()
     }
 
     func searchDismissed() {
-        searchAnalyticsHelper.trackDismissed()
     }
 }
 
@@ -66,7 +61,7 @@ extension SearchResultsViewController: SearchResultsDelegate {
             completion()
         }
 
-        if FeatureFlag.searchPredictive.enabled, triggeredByTimer {
+        if triggeredByTimer {
             searchResults.predictiveSearch(term: searchTerm)
         } else {
             searchResults.search(term: searchTerm)

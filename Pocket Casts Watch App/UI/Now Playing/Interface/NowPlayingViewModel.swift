@@ -15,7 +15,7 @@ class NowPlayingViewModel: ObservableObject {
     @Published var upNextCount: Int
     @Published var hasChapters: Bool
 
-    private var playSource = PlaySourceHelper.playSourceViewModel
+    private var playSource = PhoneSourceViewModel()
     private var cancellables = Set<AnyCancellable>()
 
     private var playbackChanged: AnyPublisher<BaseEpisode?, Never> {

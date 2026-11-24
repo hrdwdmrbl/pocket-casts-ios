@@ -41,7 +41,7 @@ class DiscoverEpisodeViewModel: ObservableObject {
         self.serverHandler = serverHandler
         $discoverItem
             .dropFirst()
-            .flatMap { serverHandler.discoverItem($0?.source, authenticated: $0?.authenticated ?? false, type: PodcastCollection?.self) }
+            .flatMap { serverHandler.discoverItem($0?.source, type: PodcastCollection?.self) }
             .replaceError(with: nil)
             .receive(on: DispatchQueue.main)
             .assign(to: &$discoverCollection)
@@ -89,16 +89,9 @@ class DiscoverEpisodeViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    public func registerListImpression(category: String?) {
-        guard let listId = discoverItem?.uuid else { return }
-        AnalyticsHelper.listImpression(listId: listId, category: category)
-    }
-
     public func didSelectPlayEpisode(from button: BasePlayPauseButton) {
         guard let episodeUuid = discoverEpisode?.uuid,
               let podcastUuid = discoverEpisode?.podcastUuid else { return }
-
-        let listId = discoverItem?.uuid ?? listId
 
         DiscoverEpisodeViewModel.loadPodcast(podcastUuid, episodeUuid: episodeUuid)
             .receive(on: DispatchQueue.main)
@@ -113,9 +106,6 @@ class DiscoverEpisodeViewModel: ObservableObject {
                 if self.playbackManager.isActivelyPlaying(episodeUuid: episodeUuid) {
                     PlaybackActionHelper.pause()
                 } else if let baseEpisode = DataManager.shared.findEpisode(uuid: episodeUuid) {
-                    if let listId {
-                        AnalyticsHelper.podcastEpisodePlayedFromList(listId: listId, podcastUuid: podcastUuid)
-                    }
                     PlaybackActionHelper.play(episode: baseEpisode, podcastUuid: podcastUuid)
                 }
             }
@@ -126,10 +116,6 @@ class DiscoverEpisodeViewModel: ObservableObject {
         guard let episode = discoverEpisode,
               let podcastUuid = episode.podcastUuid,
               let episodeUuid = episode.uuid else { return }
-
-        if let listId = discoverItem?.uuid ?? listId {
-            AnalyticsHelper.podcastEpisodeTapped(fromList: listId, podcastUuid: podcastUuid, episodeUuid: episodeUuid)
-        }
 
         DiscoverEpisodeViewModel.loadPodcast(podcastUuid, episodeUuid: episodeUuid)
             .receive(on: DispatchQueue.main)

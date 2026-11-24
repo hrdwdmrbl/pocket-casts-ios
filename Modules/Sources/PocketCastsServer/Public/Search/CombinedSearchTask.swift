@@ -6,7 +6,7 @@ struct CombinedSearchEnvelope: Decodable {
 
 public enum CombinedSearchResultType: Hashable {
     case episode(EpisodeSearchResult)
-    case podcast(PodcastFolderSearchResult)
+    case podcast(PodcastSearchResult)
     case network(NetworkSearchResult)
 }
 
@@ -30,7 +30,7 @@ public struct CombinedSearchResult: Decodable, Hashable {
     public var resolvedResultType: CombinedSearchResultType? {
         switch type {
         case "podcast":
-            guard let podcast = PodcastFolderSearchResult(from: self) else {
+            guard let podcast = PodcastSearchResult(from: self) else {
                 return nil
             }
             return .podcast(podcast)

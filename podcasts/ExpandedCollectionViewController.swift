@@ -37,7 +37,7 @@ class ExpandedCollectionViewController: PCViewController, CollectionHeaderLinkDe
             collectionView.register(UINib(nibName: "LargeListCell", bundle: nil), forCellWithReuseIdentifier: ExpandedCollectionViewController.gridCellId)
             collectionView.register(UINib(nibName: "DescriptiveCollectionCell", bundle: nil), forCellWithReuseIdentifier: ExpandedCollectionViewController.descriptiveCellId)
             collectionView.register(UINib(nibName: "DiscoverCollectionHeader", bundle: nil), forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: ExpandedCollectionViewController.headerId)
-                collectionView.style = .primaryUi02
+            collectionView.style = .primaryUi02
         }
     }
 
@@ -205,8 +205,6 @@ class ExpandedCollectionViewController: PCViewController, CollectionHeaderLinkDe
     func linkTapped() {
         guard let link = podcastCollection?.webUrl, let url = URL(string: link) else { return }
 
-        Analytics.track(.discoverCollectionLinkTapped, properties: ["list_id": item.inferredListId])
-
         if Settings.openLinks || !URLHelper.isValidScheme(url.scheme) {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         } else {
@@ -220,7 +218,6 @@ class ExpandedCollectionViewController: PCViewController, CollectionHeaderLinkDe
 
     @objc func handleShare() {
         guard let source = item.source, let url = URL(string: source)?.deletingPathExtension() else { return }
-        Analytics.track(.discoverListShareTapped)
         let activityViewController = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         present(activityViewController, animated: true)
     }

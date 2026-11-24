@@ -28,10 +28,8 @@ class NewPlaylistViewController: PCViewController {
     }
 
     private let creationType: CreationType
-    private let analyticsSource: String?
 
     private var creationView: UIView?
-    private var smartPlaylistsTip: UIViewController? = nil
 
     weak var delegate: FilterCreatedDelegate?
 
@@ -84,9 +82,8 @@ class NewPlaylistViewController: PCViewController {
         }
     }
 
-    init(creationType: CreationType = .default, analyticsSource: String? = nil) {
+    init(creationType: CreationType = .default) {
         self.creationType = creationType
-        self.analyticsSource = analyticsSource
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -107,20 +104,12 @@ class NewPlaylistViewController: PCViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        Analytics.track(.filterCreateShown)
-
-        showSmartPlaylistTooltip()
-
         playlistNameTextField.becomeFirstResponder()
         playlistNameTextField.selectAll(nil)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-
-        if isMovingFromParent {
-            Analytics.track(.filterCreateCancelled)
-        }
     }
 
     private func setupNavBar() {
@@ -245,22 +234,13 @@ class NewPlaylistViewController: PCViewController {
                 return
             }
 
-            Analytics.track(.addToPlaylistsCreateNewPlaylistTapped, properties: ["source": analyticsSource ?? "unknown"])
-
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged, object: playlist)
-
-            Analytics.track(.filterCreated)
-            Analytics.track(.filterCreateAsManualPlaylistTapped)
-
-            if Settings.firstTimePlaylistCreated {
-                Settings.shouldShowDragAndDropTip = true
-            }
 
             // Dismiss all presented view controllers and show snackbar with navigation action
             if let rootVC = SceneHelper.rootViewController(includeTopMost: false) {
                 rootVC.dismiss(animated: true) {
                     Toast.show(L10n.playlistEpisodesAddedToSinglePlaylist(playlist.playlistName), actions: [
-                        .init(title: L10n.bookmarkAddedButtonTitle) {
+                        .init(title: L10n.view) {
                             NavigationManager.shared.navigateTo(
                                 NavigationManager.filterPageKey,
                                 data: [
@@ -285,22 +265,13 @@ class NewPlaylistViewController: PCViewController {
                 return
             }
 
-            Analytics.track(.addToPlaylistsCreateNewPlaylistTapped, properties: ["source": analyticsSource ?? "unknown"])
-
             NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged, object: playlist)
-
-            Analytics.track(.filterCreated)
-            Analytics.track(.filterCreateAsManualPlaylistTapped)
-
-            if Settings.firstTimePlaylistCreated {
-                Settings.shouldShowDragAndDropTip = true
-            }
 
             // Dismiss all presented view controllers and show snackbar with navigation action
             if let rootVC = SceneHelper.rootViewController(includeTopMost: false) {
                 rootVC.dismiss(animated: true) {
                     Toast.show(L10n.playlistEpisodesAddedToSinglePlaylist(playlist.playlistName), actions: [
-                        .init(title: L10n.bookmarkAddedButtonTitle) {
+                        .init(title: L10n.view) {
                             NavigationManager.shared.navigateTo(
                                 NavigationManager.filterPageKey,
                                 data: [
@@ -314,18 +285,10 @@ class NewPlaylistViewController: PCViewController {
             return
         }
 
-        Analytics.track(.filterCreated)
-        Analytics.track(.filterCreateAsManualPlaylistTapped)
-
-        if Settings.firstTimePlaylistCreated {
-            Settings.shouldShowDragAndDropTip = true
-        }
-
         dismiss(animated: true, completion: nil)
     }
 
     private func createSmartPlaylist() {
-        Analytics.track(.filterCreateAsSmartPlaylistTapped)
 
         let playlistName = self.playlistName.isEmpty ? L10n.playlistsDefaultNewPlaylist : self.playlistName
         let createPlaylistVC = PlaylistPreviewViewController(playlistName: playlistName)
@@ -335,66 +298,12 @@ class NewPlaylistViewController: PCViewController {
     }
 
     @objc private func closeTapped(_ sender: Any) {
-        Analytics.track(.filterCreateCancelled)
         delegate?.presentingPlaylistDetail = false
         dismiss(animated: true, completion: nil)
     }
 
     @objc private func textFieldDidChange() {
         playlistName = playlistNameTextField.text ?? ""
-    }
-
-    private func showSmartPlaylistTooltip() {
-        if creationType != .default || !Settings.shouldShowNewFilterTipInCreationView {
-            return
-        }
-
-        guard
-            let source = creationView,
-            let vc = tip(
-                title: L10n.smartPlaylistsTipViewCreationTitle,
-                message: L10n.smartPlaylistsTipViewCreationDescription,
-                sourceView: source,
-                sourceRect: source.bounds
-            )
-        else {
-            return
-        }
-        smartPlaylistsTip = vc
-
-        present(vc, animated: true) {
-            Settings.shouldShowNewFilterTipInCreationView = false
-        }
-    }
-
-    private func dismissTipView() {
-        smartPlaylistsTip?.dismiss(animated: true) { [weak self] in
-            self?.smartPlaylistsTip = nil
-        }
-    }
-
-    private func tip(
-        width: CGFloat = 290,
-        title: String,
-        message: String,
-        sourceView: UIView?,
-        sourceRect: CGRect
-    ) -> UIViewController? {
-        let vc = SmartPlaylistTipViewController(title: title, message: message, width: width) { [weak self] in
-            self?.dismissTipView()
-        }
-        vc.modalPresentationStyle = .popover
-        guard let popoverPresentationController = vc.popoverPresentationController else {
-            return nil
-        }
-        popoverPresentationController.delegate = self
-        popoverPresentationController.permittedArrowDirections = [.up]
-        popoverPresentationController.sourceView = sourceView
-        popoverPresentationController.sourceRect = sourceRect
-        if !LiquidGlass.isEnabled {
-            popoverPresentationController.backgroundColor = ThemeColor.primaryUi01()
-        }
-        return vc
     }
 }
 
@@ -412,68 +321,5 @@ extension NewPlaylistViewController: UIPopoverPresentationControllerDelegate {
     }
 
     func popoverPresentationControllerDidDismissPopover(_ popoverPresentationController: UIPopoverPresentationController) {
-        dismissTipView()
-    }
-}
-
-private final class SmartPlaylistTipViewController: UIViewController {
-    private let tipTitle: String
-    private let message: String
-    private let width: CGFloat
-    private let onTap: () -> Void
-
-    init(title: String, message: String, width: CGFloat, onTap: @escaping () -> Void) {
-        self.tipTitle = title
-        self.message = message
-        self.width = width
-        self.onTap = onTap
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        let titleLabel = UILabel()
-        titleLabel.text = tipTitle
-        titleLabel.font = .font(ofSize: 15, weight: .bold, scalingWith: .body)
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.textColor = ThemeColor.primaryText01()
-        titleLabel.numberOfLines = 2
-
-        let messageLabel = UILabel()
-        messageLabel.text = message
-        messageLabel.font = .font(ofSize: 14, scalingWith: .body)
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.textColor = ThemeColor.primaryText02()
-        messageLabel.numberOfLines = 4
-
-        let stackView = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
-        stackView.axis = .vertical
-        stackView.spacing = 10
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stackView)
-
-        NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
-            stackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            stackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            stackView.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -16)
-        ])
-
-        view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTap)))
-
-        preferredContentSize = view.systemLayoutSizeFitting(
-            CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        )
-    }
-
-    @objc private func didTap() {
-        onTap()
     }
 }

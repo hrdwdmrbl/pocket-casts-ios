@@ -74,7 +74,7 @@ func downloadTranslation(
             sema.signal()
         }
 
-        guard let data = data else {
+        guard let data else {
             print("  Invalid data downloaded.")
             return
         }

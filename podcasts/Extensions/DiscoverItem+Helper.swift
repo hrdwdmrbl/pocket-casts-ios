@@ -23,17 +23,4 @@ extension DiscoverItem {
             return "none"
         }
     }
-
-    // Filter items for recommendations - authenticated items won't be included if logged out
-    func shouldShowAuthenticated() -> Bool {
-        if FeatureFlag.recommendations.enabled {
-            if SyncManager.isUserLoggedIn() {
-                return true
-            } else {
-                return authenticated != true // this handles both `false` and `nil` values
-            }
-        } else {
-            return true
-        }
-    }
 }

@@ -16,7 +16,6 @@ class PodcastChooserViewController: PCViewController, UITableViewDelegate, UITab
     var selectedUuids = [String]()
     var selectAllOnLoad = false
     var allowSelectAll = true
-    var analyticsSource: AnalyticsSource = .unknown
 
     private var didChange = false
 
@@ -46,7 +45,6 @@ class PodcastChooserViewController: PCViewController, UITableViewDelegate, UITab
         insetAdjuster.setupInsetAdjustmentsForMiniPlayer(scrollView: podcastTable)
 
         loadPodcasts()
-        Analytics.track(.settingsSelectPodcastsShown, properties: ["source": analyticsSource])
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -60,7 +58,6 @@ class PodcastChooserViewController: PCViewController, UITableViewDelegate, UITab
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        Analytics.track(.settingsSelectPodcastsDismissed, properties: ["source": analyticsSource])
         if didChange {
             delegate?.didChangePodcasts(numberSelected: selectedUuids.count)
         }
@@ -96,7 +93,6 @@ class PodcastChooserViewController: PCViewController, UITableViewDelegate, UITab
         let index = selectedUuids.firstIndex(of: podcastUuid)
         if let index {
             selectedUuids.remove(at: index)
-            Analytics.track(.settingsSelectPodcastsPodcastToggled, properties: ["uuid": podcastUuid, "enabled": false, "source": analyticsSource])
             // to support things like playlist editting that need to know about all/none selected events send a different event when it gets to 0
             if selectedUuids.isEmpty, allowSelectAll {
                 delegate?.bulkSelectionChange(selected: false)
@@ -105,7 +101,6 @@ class PodcastChooserViewController: PCViewController, UITableViewDelegate, UITab
             }
         } else {
             selectedUuids.append(podcastUuid)
-            Analytics.track(.settingsSelectPodcastsPodcastToggled, properties: ["uuid": podcastUuid, "enabled": true, "source": analyticsSource])
             // to support things like playlist editting that need to know about all/none selected events send a different event when all are manually selected
             if selectedUuids.count == allPodcasts.count, allowSelectAll {
                 delegate?.bulkSelectionChange(selected: true)
@@ -142,11 +137,9 @@ class PodcastChooserViewController: PCViewController, UITableViewDelegate, UITab
     @objc private func selectBtnTapped() {
         if shouldSelectAll() {
             let podcasts = currentPodcastsSource()
-            Analytics.track(.settingsSelectPodcastsSelectAllTapped, properties: ["source": analyticsSource])
             selectedUuids = podcasts.map(\.uuid)
             delegate?.bulkSelectionChange(selected: true)
         } else {
-            Analytics.track(.settingsSelectPodcastsSelectNoneTapped, properties: ["source": analyticsSource])
             selectedUuids.removeAll()
             delegate?.bulkSelectionChange(selected: false)
         }

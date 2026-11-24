@@ -8,23 +8,10 @@ extension CarPlaySceneDelegate {
     var podcastTabSections: [CPListSection] {
         var podcastItems = [CPListTemplateItem]()
 
-        let gridItems = HomeGridDataHelper.gridItems(orderedBy: Settings.homeFolderSortOrder)
+        let gridItems = HomeGridDataHelper.gridItems(orderedBy: Settings.librarySortOrder)
 
         for item in gridItems {
-            if let podcast = item.podcast {
-                let item = convertPodcastToListItem(podcast)
-                podcastItems.append(item)
-            } else if let folder = item.folder {
-                let podcastCount = DataManager.shared.countOfPodcastsInFolder(folder: folder)
-                let item = CPListItem(text: folder.name, detailText: L10n.podcastCount(podcastCount), image: CarPlayImageHelper.image(for: folder))
-
-                item.accessoryType = .disclosureIndicator
-                item.handler = { [weak self] _, completion in
-                    self?.folderTapped(folder)
-                    completion()
-                }
-                podcastItems.append(item)
-            }
+            podcastItems.append(convertPodcastToListItem(item.podcast))
         }
 
         // the podcast tab is always what CarPlay opens first, however it doesn't show the Now Playing tab unless something is actively playing

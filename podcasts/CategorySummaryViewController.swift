@@ -45,7 +45,7 @@ class CategorySummaryViewController: UIViewController, UITableViewDataSource, UI
     func populateFrom(item: DiscoverItem, region: String?, category: DiscoverCategory?) {
         guard let source = item.source else { return }
 
-        serverHandler.discoverCategories(source: source, authenticated: item.authenticated, completion: { [weak self] discoverCategories in
+        serverHandler.discoverCategories(source: source, completion: { [weak self] discoverCategories in
             DispatchQueue.main.async {
                 guard let strongSelf = self, let discoverCategories else { return }
 
@@ -79,12 +79,6 @@ class CategorySummaryViewController: UIViewController, UITableViewDataSource, UI
         if let delegate {
             categoryPodcastsController.registerDiscoverDelegate(delegate)
             delegate.navController()?.pushViewController(categoryPodcastsController, animated: true)
-
-            if let categoryId = category.id, let categoryName = category.name {
-                AnalyticsHelper.openedCategory(categoryId: categoryId, region: regionCode)
-
-                Analytics.track(.discoverCategoryShown, properties: ["name": categoryName, "region": regionCode, "id": categoryId])
-            }
         }
         tableView.deselectRow(at: indexPath, animated: false)
     }

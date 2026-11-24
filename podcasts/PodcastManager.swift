@@ -38,29 +38,28 @@ class PodcastManager: NSObject {
     // MARK: - Notifications
 
     #if !os(watchOS) && !APPCLIP && !os(tvOS)
-        func setNotificationsEnabled(podcast: Podcast, enabled: Bool) {
-            if enabled {
-                if !NotificationsGroup.newEpisodes.isEnabled {
-                    // this is the first podcast to enable push, to work around the fact that we defaulted that to on at the data layer, turn it off for every podcast
-                    // this means it just ends up being on for this one podcast, not all of them
-                    let podcasts = dataManager.allPodcasts(includeUnsubscribed: false)
-                    var foundPushOff = false
-                    for podcast in podcasts {
-                        if !podcast.pushEnabled {
-                            foundPushOff = true
-                            break
-                        }
+    func setNotificationsEnabled(podcast: Podcast, enabled: Bool) {
+        if enabled {
+            if !Settings.notificationsNewEpisodes {
+                // this is the first podcast to enable push, to work around the fact that we defaulted that to on at the data layer, turn it off for every podcast
+                // this means it just ends up being on for this one podcast, not all of them
+                let podcasts = dataManager.allPodcasts(includeUnsubscribed: false)
+                var foundPushOff = false
+                for podcast in podcasts {
+                    if !podcast.pushEnabled {
+                        foundPushOff = true
+                        break
                     }
+                }
 
-                    if !foundPushOff {
-                        dataManager.setPushForAllPodcasts(pushEnabled: false)
-                    }
-                    NotificationsCoordinator.shared.setupNotifications(for: .newEpisodes)
+                if !foundPushOff {
+                    dataManager.setPushForAllPodcasts(pushEnabled: false)
                 }
             }
-
-            dataManager.savePushSetting(podcast: podcast, pushEnabled: enabled)
         }
+
+        dataManager.savePushSetting(podcast: podcast, pushEnabled: enabled)
+    }
     #endif
 
     func allPodcastsSorted(in sortOrder: LibrarySort, reloadFromDatabase: Bool = false) -> [Podcast] {
@@ -79,13 +78,13 @@ class PodcastManager: NSObject {
 
     func didReceiveToken(_ token: String) {
         #if !os(watchOS)
-            let currentToken = ServerSettings.pushToken()
+        let currentToken = ServerSettings.pushToken()
 
-            if currentToken == token { return } // they are the same, no need to do anything
+        if currentToken == token { return } // they are the same, no need to do anything
 
-            ServerSettings.setPushToken(token: token)
+        ServerSettings.setPushToken(token: token)
 
-            RefreshManager.shared.refreshPodcasts(forceEvenIfRefreshedRecently: true)
+        RefreshManager.shared.refreshPodcasts(forceEvenIfRefreshedRecently: true)
         #endif
     }
 
@@ -140,7 +139,7 @@ class PodcastManager: NSObject {
 
     private func checkForEpisodesToDownload(podcast: Podcast) {
         if !podcast.autoDownloadOn() { return }
-        let episodesLimit = FeatureFlag.autoDownloadOnSubscribe.enabled ? Settings.autoDownloadLimits.rawValue : 4
+        let episodesLimit = Settings.autoDownloadLimits.rawValue
         let latestEpisodes = dataManager.findEpisodesWhere(customWhere: "podcast_id == ? ORDER BY publishedDate DESC, addedDate DESC LIMIT ?", arguments: [podcast.id, episodesLimit])
         guard let latestEpisode = latestEpisodes.first else { return } // no episodes to download
 
@@ -167,21 +166,21 @@ class PodcastManager: NSObject {
     // MARK: - Import
 
     #if !os(watchOS) && !os(tvOS)
-        func importSharedItemFromUrl(_ strippedUrl: String, completion: @escaping (IncomingShareItem?) -> Void) {
-            importerQueue.cancelAllOperations()
+    func importSharedItemFromUrl(_ strippedUrl: String, completion: @escaping (IncomingShareItem?) -> Void) {
+        importerQueue.cancelAllOperations()
 
-            let importer = SharedItemImporter(strippedUrl: strippedUrl, completion: completion)
-            importerQueue.addOperation(importer)
-        }
+        let importer = SharedItemImporter(strippedUrl: strippedUrl, completion: completion)
+        importerQueue.addOperation(importer)
+    }
     #endif
 
     #if !os(watchOS) && !APPCLIP && !os(tvOS)
-        func importPodcastsFromOpml(_ opmlFile: URL, progressWindow: ShiftyLoadingAlert? = nil) {
-            importerQueue.cancelAllOperations()
+    func importPodcastsFromOpml(_ opmlFile: URL, progressWindow: ShiftyLoadingAlert? = nil) {
+        importerQueue.cancelAllOperations()
 
-            let importer = OpmlImporter(opmlFile: opmlFile, progressWindow: progressWindow)
-            importerQueue.addOperation(importer)
-        }
+        let importer = OpmlImporter(opmlFile: opmlFile, progressWindow: progressWindow)
+        importerQueue.addOperation(importer)
+    }
     #endif
 
     class func episodeCount(for podcast: Podcast, excludeArchive: Bool) -> Int {

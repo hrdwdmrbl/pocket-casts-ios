@@ -3,10 +3,20 @@ import PocketCastsDataModel
 import PocketCastsUtils
 import UIKit
 #if os(watchOS)
-    import WatchKit
+import WatchKit
 #endif
 
 public class RefreshManager {
+    public class func isRefreshInProgress() -> Bool {
+        guard let lastRefreshStartDate = UserDefaults.standard.object(forKey: ServerConstants.UserDefaults.lastRefreshStartTime) as? Date else {
+            return false
+        }
+        guard let lastRefreshEndDate = UserDefaults.standard.object(forKey: ServerConstants.UserDefaults.lastRefreshEndTime) as? Date else {
+            return true
+        }
+        return lastRefreshStartDate.compare(lastRefreshEndDate) == .orderedDescending
+    }
+
     public static let shared = RefreshManager()
 
     lazy var refreshQueue: OperationQueue = {
@@ -18,21 +28,10 @@ public class RefreshManager {
 
     // the watch has less resources than a phone, so be a bit more aggressive about not refreshing constantly
     #if os(watchOS)
-        private static let minTimeBetweenRefreshes = 1.minute
+    private static let minTimeBetweenRefreshes = 1.minute
     #else
-        private static let minTimeBetweenRefreshes = 15.seconds
+    private static let minTimeBetweenRefreshes = 15.seconds
     #endif
-
-    public func syncUpNext() {
-        if !SyncManager.isUserLoggedIn() { return }
-
-        // if the user has an active subscription, there might be custom episodes in their Up Next, so grab those first
-        if SubscriptionHelper.hasActiveSubscription() {
-            refreshQueue.addOperation(RetrieveCustomFilesTask())
-        }
-        refreshQueue.addOperation(UpNextSyncTask())
-    }
-
 
     /// Updates a podcast and all the associated information.
     ///
@@ -41,12 +40,6 @@ public class RefreshManager {
     public func refresh(podcast: Podcast, from episodeUuid: String) {
         podcast.forceRefreshEpisodeFrom = episodeUuid
         refresh(podcasts: [podcast]) {
-            if SyncManager.isUserLoggedIn() {
-                guard let episodes = ApiServerHandler.shared.retrieveEpisodeTaskSynchronouusly(podcastUuid: podcast.uuid) else { return }
-
-                DataManager.shared.saveBulkEpisodeSyncInfo(episodes: DataConverter.convert(syncInfoEpisodes: episodes))
-                podcast.forceRefreshEpisodeFrom = nil
-            }
         }
     }
 
@@ -54,12 +47,6 @@ public class RefreshManager {
         podcast.forceRefreshEpisodeFrom = episodeUuid
         await withCheckedContinuation { continuation in
             refresh(podcasts: [podcast]) {
-                if SyncManager.isUserLoggedIn() {
-                    guard let episodes = ApiServerHandler.shared.retrieveEpisodeTaskSynchronouusly(podcastUuid: podcast.uuid) else { return }
-
-                    DataManager.shared.saveBulkEpisodeSyncInfo(episodes: DataConverter.convert(syncInfoEpisodes: episodes))
-                    podcast.forceRefreshEpisodeFrom = nil
-                }
                 continuation.resume()
             }
         }
@@ -145,6 +132,13 @@ public class RefreshManager {
 
     public func cancelAllRefreshes() {
         refreshQueue.cancelAllOperations()
+    }
+
+    public func cancelAllRefreshesAndWait() async {
+        cancelAllRefreshes()
+        await withCheckedContinuation { continuation in
+            refreshQueue.addBarrierBlock { continuation.resume() }
+        }
     }
 
     private func processPodcastRefreshResponse(_ refreshResponse: PodcastRefreshResponse?, completion: ((RefreshFetchResult) -> Void)?) {

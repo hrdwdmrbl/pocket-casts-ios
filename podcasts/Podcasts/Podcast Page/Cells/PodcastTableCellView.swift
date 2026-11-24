@@ -34,7 +34,7 @@ struct PodcastTableCellView: View {
 
             Spacer()
 
-            SubscribeButtonView(podcastUuid: viewModel.uuid, source: .podcastScreenYouMightLike, onSubscribe: {
+            SubscribeButtonView(podcastUuid: viewModel.uuid, onSubscribe: {
                 viewModel.onSubscribe?(viewModel)
             })
         }

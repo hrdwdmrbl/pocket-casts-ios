@@ -21,7 +21,7 @@ extension PlaylistDetailViewModel {
                     Toast.show(
                         created > 1 ? L10n.playlistPlayAllUpNextSavedPlural : L10n.playlistPlayAllUpNextSaved,
                         actions: [
-                            .init(title: L10n.bookmarkAddedButtonTitle) {
+                            .init(title: L10n.view) {
                                 NavigationManager.shared.navigateTo(
                                     NavigationManager.filterPageKey
                                 )

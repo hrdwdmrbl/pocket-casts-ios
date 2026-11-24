@@ -54,13 +54,13 @@ final class FakeNavBarButton: UIButton, FakeNavBarStylable {
         button.isPointerInteractionEnabled = true
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: buttonSize),
-            button.heightAnchor.constraint(equalToConstant: buttonSize),
+            button.heightAnchor.constraint(equalToConstant: buttonSize)
         ])
         if let imageView = button.imageView {
             imageView.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 imageView.widthAnchor.constraint(equalToConstant: imageSize),
-                imageView.heightAnchor.constraint(equalToConstant: imageSize),
+                imageView.heightAnchor.constraint(equalToConstant: imageSize)
             ])
         }
         applyChrome(to: button, scrolled: false, animated: false)

@@ -121,61 +121,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - countOfPodcastsInFolder Tests
-
-    func testCountOfPodcastsInFolderCountsPodcastsInFolder() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "test-folder-uuid", name: "Test Folder", dataManager: dataManager)
-            _ = self.createTestPodcast(title: "In Folder 1", folderUuid: folder.uuid, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "In Folder 2", folderUuid: folder.uuid, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Not In Folder", dataManager: dataManager)
-
-            let count = dataManager.countOfPodcastsInFolder(folder: folder)
-
-            XCTAssertEqual(count, 2, "Should count only podcasts in folder")
-        }
-    }
-
-    func testCountOfPodcastsInRootFolderCountsUnfolderedPodcasts() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "test-folder", name: "Test Folder", dataManager: dataManager)
-            _ = self.createTestPodcast(title: "No Folder 1", dataManager: dataManager)
-            _ = self.createTestPodcast(title: "No Folder 2", dataManager: dataManager)
-            _ = self.createTestPodcast(title: "In Folder", folderUuid: folder.uuid, dataManager: dataManager)
-
-            let count = dataManager.countOfPodcastsInRootFolder()
-
-            XCTAssertEqual(count, 2, "Should count only podcasts not in a folder")
-        }
-    }
-
-    func testCountOfPodcastsInFolderExcludesUnsubscribed() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "test-folder", name: "Test Folder", dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Subscribed", subscribed: 1, folderUuid: folder.uuid, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Unsubscribed", subscribed: 0, folderUuid: folder.uuid, dataManager: dataManager)
-
-            let count = dataManager.countOfPodcastsInFolder(folder: folder)
-
-            XCTAssertEqual(count, 1, "Should exclude unsubscribed podcasts")
-        }
-    }
-
-    // MARK: - allUnsyncedPodcasts Tests
-
-    func testAllUnsyncedPodcastsReturnsUnsyncedPodcasts() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestPodcast(title: "Unsynced 1", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Unsynced 2", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Synced", syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            let podcasts = dataManager.allUnsyncedPodcasts()
-
-            XCTAssertEqual(podcasts.count, 2, "Should return only unsynced podcasts")
-            XCTAssertTrue(podcasts.allSatisfy { $0.syncStatus == SyncStatus.notSynced.rawValue }, "All should be unsynced")
-        }
-    }
-
     // MARK: - podcastUnfinishedCounts Tests
 
     func testPodcastUnfinishedCountsReturnsCorrectCounts() throws {
@@ -222,35 +167,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
 
             let found = dataManager.findPodcast(uuid: podcast.uuid, includeUnsubscribed: true)
             XCTAssertNil(found, "Should delete podcast")
-        }
-    }
-
-    // MARK: - markAllPodcastsSynced Tests
-
-    func testMarkAllPodcastsSyncedMarksAllAsSynced() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestPodcast(title: "Podcast 1", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Podcast 2", syncStatus: SyncStatus.notSynced.rawValue, dataManager: dataManager)
-
-            dataManager.markAllPodcastsSynced()
-
-            let unsynced = dataManager.allUnsyncedPodcasts()
-            XCTAssertTrue(unsynced.isEmpty, "All podcasts should be synced")
-        }
-    }
-
-    // MARK: - markAllPodcastsUnsynced Tests
-
-    func testMarkAllPodcastsUnsyncedMarksSubscribedAsUnsynced() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestPodcast(title: "Subscribed", subscribed: 1, syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Unsubscribed", subscribed: 0, syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            dataManager.markAllPodcastsUnsynced()
-
-            let unsynced = dataManager.allUnsyncedPodcasts()
-            XCTAssertEqual(unsynced.count, 1, "Only subscribed podcast should be unsynced")
-            XCTAssertEqual(unsynced.first?.title, "Subscribed", "Subscribed podcast should be unsynced")
         }
     }
 
@@ -311,38 +227,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
 
             XCTAssertTrue(subscribed.allSatisfy { $0.showArchived == true }, "Subscribed should show archived")
             XCTAssertTrue(unsubscribed.allSatisfy { $0.showArchived == false }, "Unsubscribed should be unchanged")
-        }
-    }
-
-    // MARK: - allPodcastsInFolder Tests
-
-    func testAllPodcastsInFolderReturnsPodcastsInFolder() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "test-folder", name: "Test Folder", dataManager: dataManager)
-            _ = self.createTestPodcast(title: "In Folder 1", folderUuid: folder.uuid, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "In Folder 2", folderUuid: folder.uuid, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Not In Folder", dataManager: dataManager)
-
-            let podcasts = dataManager.allPodcastsInFolder(folder: folder)
-
-            XCTAssertEqual(podcasts.count, 2, "Should return only podcasts in folder")
-            XCTAssertTrue(podcasts.allSatisfy { $0.folderUuid == folder.uuid }, "All should have folder UUID")
-        }
-    }
-
-    // MARK: - delete(folderUuid:) Tests
-
-    func testDeleteFolderRemovesPodcastsFromFolder() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "folder-to-delete", name: "Delete Me", dataManager: dataManager)
-            let podcast = self.createTestPodcast(title: "In Folder", folderUuid: folder.uuid, dataManager: dataManager)
-
-            dataManager.delete(folderUuid: folder.uuid, markAsDeleted: false)
-
-            // Podcast should no longer be in the folder
-            let found = dataManager.findPodcast(uuid: podcast.uuid)
-            XCTAssertNotNil(found, "Podcast should still exist")
-            XCTAssertNil(found?.folderUuid, "Podcast should no longer have folder UUID")
         }
     }
 
@@ -435,21 +319,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
 
             XCTAssertEqual(podcasts.count, 2, "Should return 2 unsubscribed podcasts")
             XCTAssertTrue(podcasts.allSatisfy { $0.subscribed == 0 }, "All should be unsubscribed")
-        }
-    }
-
-    // MARK: - allPaidPodcasts Tests
-
-    func testAllPaidPodcastsReturnsPaidOnly() throws {
-        try runWithDataManager { dataManager in
-            _ = self.createTestPodcast(title: "Free Podcast", isPaid: false, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Paid Podcast 1", isPaid: true, dataManager: dataManager)
-            _ = self.createTestPodcast(title: "Paid Podcast 2", isPaid: true, dataManager: dataManager)
-
-            let podcasts = dataManager.allPaidPodcasts()
-
-            XCTAssertEqual(podcasts.count, 2, "Should return 2 paid podcasts")
-            XCTAssertTrue(podcasts.allSatisfy { $0.isPaid }, "All should be paid")
         }
     }
 
@@ -579,43 +448,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - bulkSetFolderUuid Tests
-
-    func testBulkSetFolderUuidSetsFolderOnPodcasts() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "target-folder", name: "Target Folder", dataManager: dataManager)
-            let podcast1 = self.createTestPodcast(uuid: "podcast-1", title: "Podcast 1", dataManager: dataManager)
-            let podcast2 = self.createTestPodcast(uuid: "podcast-2", title: "Podcast 2", dataManager: dataManager)
-            _ = self.createTestPodcast(uuid: "podcast-3", title: "Podcast 3", dataManager: dataManager)
-
-            dataManager.bulkSetFolderUuid(folderUuid: folder.uuid, podcastUuids: [podcast1.uuid, podcast2.uuid])
-
-            let found1 = dataManager.findPodcast(uuid: podcast1.uuid)
-            let found2 = dataManager.findPodcast(uuid: podcast2.uuid)
-            let found3 = dataManager.findPodcast(uuid: "podcast-3")
-
-            XCTAssertEqual(found1?.folderUuid, folder.uuid, "Podcast 1 should be in folder")
-            XCTAssertEqual(found2?.folderUuid, folder.uuid, "Podcast 2 should be in folder")
-            XCTAssertNil(found3?.folderUuid, "Podcast 3 should not be in folder")
-        }
-    }
-
-    func testBulkSetFolderUuidRemovesPreviousPodcastsFromFolder() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "target-folder", name: "Target Folder", dataManager: dataManager)
-            let oldPodcast = self.createTestPodcast(uuid: "old-podcast", title: "Old Podcast", folderUuid: folder.uuid, dataManager: dataManager)
-            let newPodcast = self.createTestPodcast(uuid: "new-podcast", title: "New Podcast", dataManager: dataManager)
-
-            dataManager.bulkSetFolderUuid(folderUuid: folder.uuid, podcastUuids: [newPodcast.uuid])
-
-            let foundOld = dataManager.findPodcast(uuid: oldPodcast.uuid)
-            let foundNew = dataManager.findPodcast(uuid: newPodcast.uuid)
-
-            XCTAssertNil(foundOld?.folderUuid, "Old podcast should be removed from folder")
-            XCTAssertEqual(foundNew?.folderUuid, folder.uuid, "New podcast should be in folder")
-        }
-    }
-
     // MARK: - saveSortOrders Tests
 
     func testSaveSortOrdersUpdatesPodcastSortOrders() throws {
@@ -632,18 +464,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
 
             XCTAssertEqual(found1?.sortOrder, 10, "Podcast 1 sort order should be updated")
             XCTAssertEqual(found2?.sortOrder, 20, "Podcast 2 sort order should be updated")
-        }
-    }
-
-    func testSaveSortOrdersMarksPodcastsUnsynced() throws {
-        try runWithDataManager { dataManager in
-            let podcast = self.createTestPodcast(uuid: "podcast-1", title: "Podcast", sortOrder: 0, syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            podcast.sortOrder = 5
-            dataManager.saveSortOrders(podcasts: [podcast])
-
-            let found = dataManager.findPodcast(uuid: podcast.uuid)
-            XCTAssertEqual(found?.syncStatus, SyncStatus.notSynced.rawValue, "Podcast should be marked unsynced")
         }
     }
 
@@ -811,41 +631,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
         }
     }
 
-    // MARK: - updatePodcastFolder Tests
-
-    func testUpdatePodcastFolderUpdatesFolderAndSortOrder() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "test-folder", name: "Test Folder", dataManager: dataManager)
-            let podcast = self.createTestPodcast(uuid: "podcast-1", title: "Podcast", sortOrder: 0, dataManager: dataManager)
-
-            dataManager.updatePodcastFolder(podcastUuid: podcast.uuid, to: folder.uuid, sortOrder: 5)
-
-            let found = dataManager.findPodcast(uuid: podcast.uuid)
-            XCTAssertEqual(found?.folderUuid, folder.uuid, "Folder UUID should be updated")
-            XCTAssertEqual(found?.sortOrder, 5, "Sort order should be updated")
-        }
-    }
-
-    // MARK: - markAllPodcastsUnsyncedWhereLastSyncAtNot Tests
-
-    func testMarkAllPodcastsUnsyncedWhereLastSyncAtNotDoesNotCrash() throws {
-        try runWithDataManager { dataManager in
-            // Create some synced podcasts
-            _ = self.createTestPodcast(uuid: "podcast-1", title: "Podcast 1", syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-            _ = self.createTestPodcast(uuid: "podcast-2", title: "Podcast 2", syncStatus: SyncStatus.synced.rawValue, dataManager: dataManager)
-
-            // Call the method with a sync time - it should not crash
-            dataManager.markAllPodcastsUnsyncedWhereLastSyncAtNot("1000")
-
-            // Verify podcasts still exist
-            let found1 = dataManager.findPodcast(uuid: "podcast-1")
-            let found2 = dataManager.findPodcast(uuid: "podcast-2")
-
-            XCTAssertNotNil(found1, "Podcast 1 should still exist")
-            XCTAssertNotNil(found2, "Podcast 2 should still exist")
-        }
-    }
-
     // MARK: - allPodcastsOrderedByNewestEpisodes Tests
 
     func testAllPodcastsOrderedByNewestEpisodesReturnsSortedByLatestRelease() throws {
@@ -899,11 +684,9 @@ final class PodcastDataManagerTests: DataManagerTestCase {
             podcast.addedDate = Date()
             podcast.subscribed = 1
             podcast.sortOrder = 5
-            podcast.folderUuid = nil
             podcast.syncStatus = SyncStatus.notSynced.rawValue
             podcast.showArchived = true
             podcast.episodeGrouping = PodcastGrouping.season.rawValue
-            podcast.isPaid = true
             podcast.overrideGlobalArchive = true
             podcast.pushEnabled = true
             podcast.autoAddToUpNext = AutoAddToUpNextSetting.addFirst.rawValue
@@ -922,7 +705,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
             XCTAssertEqual(found?.syncStatus, SyncStatus.notSynced.rawValue, "syncStatus should match")
             XCTAssertEqual(found?.showArchived, true, "showArchived should match")
             XCTAssertEqual(found?.episodeGrouping, PodcastGrouping.season.rawValue, "episodeGrouping should match")
-            XCTAssertEqual(found?.isPaid, true, "isPaid should match")
             XCTAssertEqual(found?.overrideGlobalArchive, true, "overrideGlobalArchive should match")
             XCTAssertEqual(found?.pushEnabled, true, "pushEnabled should match")
             XCTAssertEqual(found?.autoAddToUpNext, AutoAddToUpNextSetting.addFirst.rawValue, "autoAddToUpNext should match")
@@ -991,23 +773,6 @@ final class PodcastDataManagerTests: DataManagerTestCase {
         }
     }
 
-    func testSaveWithFolderUuid() throws {
-        try runWithDataManager { dataManager in
-            let folder = self.createTestFolder(uuid: "folder-for-podcast", name: "Test Folder", dataManager: dataManager)
-
-            let podcast = Podcast()
-            podcast.uuid = "folder-podcast-uuid"
-            podcast.title = "Podcast in Folder"
-            podcast.addedDate = Date()
-            podcast.folderUuid = folder.uuid
-
-            dataManager.save(podcast: podcast)
-
-            let found = dataManager.findPodcast(uuid: "folder-podcast-uuid")
-            XCTAssertEqual(found?.folderUuid, folder.uuid, "folderUuid should be preserved")
-        }
-    }
-
     // MARK: - Helper to create episode for podcast tests
 
     @discardableResult
@@ -1038,11 +803,9 @@ final class PodcastDataManagerTests: DataManagerTestCase {
         author: String? = nil,
         subscribed: Int32 = 1,
         sortOrder: Int32 = 0,
-        folderUuid: String? = nil,
         syncStatus: Int32 = SyncStatus.notSynced.rawValue,
         showArchived: Bool = false,
         episodeGrouping: Int32 = 0,
-        isPaid: Bool = false,
         overrideGlobalArchive: Bool = false,
         addedDate: Date = Date(),
         pushEnabled: Bool = false,
@@ -1057,11 +820,9 @@ final class PodcastDataManagerTests: DataManagerTestCase {
         podcast.author = author
         podcast.subscribed = subscribed
         podcast.sortOrder = sortOrder
-        podcast.folderUuid = folderUuid
         podcast.syncStatus = syncStatus
         podcast.showArchived = showArchived
         podcast.episodeGrouping = episodeGrouping
-        podcast.isPaid = isPaid
         podcast.overrideGlobalArchive = overrideGlobalArchive
         podcast.addedDate = addedDate
         podcast.pushEnabled = pushEnabled

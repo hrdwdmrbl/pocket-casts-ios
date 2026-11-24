@@ -8,8 +8,6 @@ class SearchResultsModel: ObservableObject {
     private let predictiveSearch = PredictiveSearchTask()
     private let combinedSearch = CombinedSearchTask()
 
-    private let analyticsHelper: SearchAnalyticsHelper
-
     @Published var isShowingPredictiveSearch = false
     @Published var isSearchingPredictive = false
 
@@ -18,7 +16,7 @@ class SearchResultsModel: ObservableObject {
     @Published var podcastSearchError: Error?
     @Published var predictiveSearchError: Error?
 
-    @Published var podcasts: [PodcastFolderSearchResult] = []
+    @Published var podcasts: [PodcastSearchResult] = []
     @Published var predictive: [PredictiveSearchResult] = []
     @Published var combinedResults: [CombinedSearchResultType] = []
 
@@ -33,9 +31,8 @@ class SearchResultsModel: ObservableObject {
 
     let showLocalResults: Bool
 
-    init(analyticsHelper: SearchAnalyticsHelper = SearchAnalyticsHelper(source: .unknown), showLocalResults: Bool = false,
+    init(showLocalResults: Bool = false,
          dataManager: DataManager = DataManager.shared) {
-        self.analyticsHelper = analyticsHelper
         self.dataMangager = dataManager
         self.showLocalResults = showLocalResults
     }
@@ -89,7 +86,6 @@ class SearchResultsModel: ObservableObject {
                     isShowingPredictiveSearch = true
                     predictive = []
                 }
-                analyticsHelper.trackPredictiveFailed(error)
             }
             isSearchingPredictive = false
         }
@@ -121,13 +117,10 @@ class SearchResultsModel: ObservableObject {
                 show(podcastResults: results)
             } catch {
                 podcastSearchError = error
-                analyticsHelper.trackFailed(error)
             }
 
             isSearchingForPodcasts = false
         }
-
-        analyticsHelper.trackSearchPerformed()
     }
 
     @MainActor
@@ -144,20 +137,14 @@ class SearchResultsModel: ObservableObject {
             isSearchingForPodcasts = true
             do {
                 let results = try await combinedSearch.search(term: term)
-                if results.isEmpty {
-                    analyticsHelper.trackEmptyResults(for: term)
-                }
                 showCombinedResults(results)
             } catch {
                 isShowingPredictiveSearch = false
                 podcastSearchError = error
-                analyticsHelper.trackFailed(error)
             }
 
             isSearchingForPodcasts = false
         }
-
-        analyticsHelper.trackSearchPerformed()
     }
 
     @MainActor
@@ -166,23 +153,14 @@ class SearchResultsModel: ObservableObject {
 
         let allPodcasts = dataMangager.allPodcasts(includeUnsubscribed: false)
 
-        var results = [PodcastFolderSearchResult?]()
+        var results = [PodcastSearchResult?]()
         for podcast in allPodcasts {
             guard let title = podcast.title else { continue }
 
             if title.localizedCaseInsensitiveContains(searchTerm) {
-                results.append(PodcastFolderSearchResult(from: podcast))
+                results.append(PodcastSearchResult(from: podcast))
             } else if let author = podcast.author, author.localizedCaseInsensitiveContains(searchTerm) {
-                results.append(PodcastFolderSearchResult(from: podcast))
-            }
-        }
-
-        if SubscriptionHelper.hasActiveSubscription() {
-            let allFolders = dataMangager.allFolders()
-            for folder in allFolders {
-                if folder.name.localizedCaseInsensitiveContains(searchTerm) {
-                    results.append(PodcastFolderSearchResult(from: folder))
-                }
+                results.append(PodcastSearchResult(from: podcast))
             }
         }
 
@@ -192,7 +170,7 @@ class SearchResultsModel: ObservableObject {
         isShowingLocalResultsOnly = true
     }
 
-    private func show(podcastResults: [PodcastFolderSearchResult]) {
+    private func show(podcastResults: [PodcastSearchResult]) {
         isShowingPredictiveSearch = false
         if isShowingLocalResultsOnly {
             podcasts.append(contentsOf: podcastResults.filter { !podcasts.contains($0) })
@@ -209,9 +187,6 @@ class SearchResultsModel: ObservableObject {
 
     private func showCombinedResults(_ results: [CombinedSearchResultType]) {
         isShowingPredictiveSearch = false
-        combinedResults = results.filter { result in
-            guard case .network = result else { return true }
-            return FeatureFlag.networkDiscovery.enabled
-        }
+        combinedResults = results
     }
 }

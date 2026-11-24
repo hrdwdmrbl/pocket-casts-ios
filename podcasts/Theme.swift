@@ -6,23 +6,14 @@ import UIKit
 
 extension ThemeType {
     static var displayOrder: [ThemeType] {
-        [.light, .dark, .rosé, .extraDark, .indigo, .contrastDark, .contrastLight, .electric, .classic]
+        [.light, .dark, .rosé, .extraDark, .indigo, .contrastDark, .contrastLight]
     }
 
     var isDark: Bool {
         switch self {
-        case .dark, .extraDark, .electric, .contrastDark:
+        case .dark, .extraDark, .contrastDark:
             return true
-        case .light, .classic, .indigo, .rosé, .contrastLight:
-            return false
-        }
-    }
-
-    var isPlusOnly: Bool {
-        switch self {
-        case .electric, .classic:
-            return true
-        default:
+        case .light, .indigo, .rosé, .contrastLight:
             return false
         }
     }
@@ -35,10 +26,6 @@ extension ThemeType {
             return L10n.themeDark
         case .extraDark:
             return L10n.themeExtraDark
-        case .electric:
-            return L10n.themeElectricity
-        case .classic:
-            return L10n.themeClassic
         case .indigo:
             return L10n.themeIndigo
         case .rosé:
@@ -62,10 +49,6 @@ extension ThemeType {
             return "darkThemeAbstract"
         case .extraDark:
             return "extraDarkThemeAbstract"
-        case .electric:
-            return "electricityThemeAbstract"
-        case .classic:
-            return "classicThemeAbstract"
         case .indigo:
             return "indigoThemeAbstract"
         case .rosé:
@@ -151,7 +134,6 @@ class Theme: ObservableObject {
         }
 
         guard userInitiated else { return }
-        Settings.trackValueChanged(.settingsAppearanceDarkThemeChanged, value: preferredType)
     }
 
     class func preferredLightTheme() -> ThemeType {
@@ -172,10 +154,8 @@ class Theme: ObservableObject {
             if !systemIsDark {
                 Theme.shared.activeTheme = preferredType
             }
-            Settings.trackValueChanged(.settingsAppearanceLightThemeChanged, value: preferredType)
         } else {
             Theme.shared.activeTheme = preferredType
-            Settings.trackValueChanged(.settingsAppearanceThemeChanged, value: preferredType)
         }
     }
 

@@ -4,11 +4,6 @@ import UIKit
 
 class PodcastSearchCell: ThemeableCell {
     @IBOutlet var podcastImage: PodcastImageView!
-    @IBOutlet var folderPreview: FolderPreviewView! {
-        didSet {
-            folderPreview.showFolderName = false
-        }
-    }
 
     @IBOutlet var podcastName: ThemeableLabel!
     @IBOutlet var podcastAuthor: ThemeableLabel! {
@@ -25,21 +20,6 @@ class PodcastSearchCell: ThemeableCell {
 
         podcastImage.setPodcast(uuid: podcast.uuid, size: .list)
         podcastImage.isHidden = false
-
-        folderPreview.isHidden = true
-        subscribedIcon.isHidden = false
-    }
-
-    func populateFrom(folder: Folder) {
-        podcastName.text = folder.name
-
-        let count = DataManager.shared.countOfPodcastsInFolder(folder: folder)
-        podcastAuthor.text = L10n.podcastCount(count)
-
-        folderPreview.populateFromAsync(folder: folder)
-        folderPreview.isHidden = false
-
-        podcastImage.isHidden = true
         subscribedIcon.isHidden = false
     }
 

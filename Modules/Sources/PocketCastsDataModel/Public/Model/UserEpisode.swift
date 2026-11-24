@@ -27,8 +27,6 @@ public class UserEpisode: NSObject, BaseEpisode {
     @objc public var uuid = ""
     @objc public var playbackErrorDetails: String?
     @objc public var cachedFrameCount = 0 as Int64
-    @objc public var uploadStatus = 0 as Int32
-    @objc public var uploadTaskId: String?
     @objc public var imageUrl: String?
     @objc public var imageModified = 0 as Int64
     @objc public var imageColor = 0 as Int32
@@ -37,17 +35,11 @@ public class UserEpisode: NSObject, BaseEpisode {
     @objc public var hasOnlyUuid = false
     // Note: These properties exist on the model but were never added to the SJUserEpisode table.
     // The legacy SQL code doesn't persist them, so we ignore them for GRDB compatibility.
-    @objc public var deselectedChapters: String?
-    @objc public var deselectedChaptersModified = 0 as Int64
 
     // UserEpisode's are never archived or starred
     public var archived = false
     public var keepEpisode = false
     public var wasDeleted = false
-
-    public var hasBookmarks: Bool {
-        DataManager.shared.bookmarks.bookmarkCount(forEpisode: uuid) > 0
-    }
 
     public var isUserEpisode: Bool {
         true
@@ -155,26 +147,6 @@ public class UserEpisode: NSObject, BaseEpisode {
         taggableId()
     }
 
-    public func uploaded() -> Bool {
-        uploadStatus == UploadStatus.uploaded.rawValue
-    }
-
-    public func uploadFailed() -> Bool {
-        uploadStatus == UploadStatus.uploadFailed.rawValue
-    }
-
-    public func uploading() -> Bool {
-        uploadStatus == UploadStatus.uploading.rawValue
-    }
-
-    public func uploadQueued() -> Bool {
-        uploadStatus == UploadStatus.queued.rawValue
-    }
-
-    public func uploadWaitingForWifi() -> Bool {
-        uploadStatus == UploadStatus.waitingForWifi.rawValue
-    }
-
     // MARK: - GRDB
 
     public static let databaseTableName = "SJUserEpisode"
@@ -202,8 +174,6 @@ public class UserEpisode: NSObject, BaseEpisode {
         case uuid
         case playbackErrorDetails
         case cachedFrameCount
-        case uploadStatus
-        case uploadTaskId
         case imageUrl
         case imageModified
         case imageColor
@@ -236,8 +206,6 @@ public class UserEpisode: NSObject, BaseEpisode {
         uuid = try container.decodeIfPresent(String.self, forKey: .uuid) ?? ""
         playbackErrorDetails = try container.decodeIfPresent(String.self, forKey: .playbackErrorDetails)
         cachedFrameCount = try container.decodeIfPresent(Int64.self, forKey: .cachedFrameCount) ?? 0
-        uploadStatus = try container.decodeIfPresent(Int32.self, forKey: .uploadStatus) ?? 0
-        uploadTaskId = try container.decodeIfPresent(String.self, forKey: .uploadTaskId)
         imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
         imageModified = try container.decodeIfPresent(Int64.self, forKey: .imageModified) ?? 0
         imageColor = try container.decodeIfPresent(Int32.self, forKey: .imageColor) ?? 0
@@ -268,8 +236,6 @@ public class UserEpisode: NSObject, BaseEpisode {
         container["uuid"] = uuid
         container["playbackErrorDetails"] = playbackErrorDetails
         container["cachedFrameCount"] = cachedFrameCount
-        container["uploadStatus"] = uploadStatus
-        container["uploadTaskId"] = uploadTaskId
         container["imageUrl"] = imageUrl
         container["imageModified"] = imageModified
         container["imageColor"] = imageColor
@@ -300,8 +266,6 @@ public class UserEpisode: NSObject, BaseEpisode {
         public static let uuid = Column(CodingKeys.uuid)
         public static let playbackErrorDetails = Column(CodingKeys.playbackErrorDetails)
         public static let cachedFrameCount = Column(CodingKeys.cachedFrameCount)
-        public static let uploadStatus = Column(CodingKeys.uploadStatus)
-        public static let uploadTaskId = Column(CodingKeys.uploadTaskId)
         public static let imageUrl = Column(CodingKeys.imageUrl)
         public static let imageModified = Column(CodingKeys.imageModified)
         public static let imageColor = Column(CodingKeys.imageColor)

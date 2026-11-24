@@ -28,15 +28,13 @@ public struct InternationalizationProvider {
             ServerConstants.Urls.main(),
             ServerConstants.Urls.api(),
             ServerConstants.Urls.cache(),
-            ServerConstants.Urls.sharing(),
             ServerConstants.Urls.discover(),
             ServerConstants.Urls.image(),
-            ServerConstants.Urls.files(),
             ServerConstants.Urls.share(),
             ServerConstants.Urls.lists(),
             ServerConstants.Urls.search
         ]
-            .compactMap { URL(string: $0)?.host }
-            .reduce(into: Set<String>()) { $0.insert($1) }
+        .compactMap { URL(string: $0)?.host }
+        .reduce(into: Set<String>()) { $0.insert($1) }
     }
 }

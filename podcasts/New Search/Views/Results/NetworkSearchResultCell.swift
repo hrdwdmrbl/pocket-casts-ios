@@ -4,7 +4,6 @@ import SwiftUI
 /// A network in the search results: round artwork beside its name and description.
 struct NetworkSearchResultCell: View {
     @EnvironmentObject var theme: Theme
-    @EnvironmentObject var searchAnalyticsHelper: SearchAnalyticsHelper
     @EnvironmentObject var networkNavigator: NetworkNavigator
 
     let network: NetworkSearchResult
@@ -24,7 +23,6 @@ struct NetworkSearchResultCell: View {
     }
 
     private func open() {
-        searchAnalyticsHelper.trackResultTapped(network)
         networkNavigator.show(listId: network.uuid, title: network.title)
     }
 
@@ -98,8 +96,7 @@ enum NetworkSearchPreviewData {
     }
     .listStyle(.plain)
     .setupDefaultEnvironment()
-    .environmentObject(SearchAnalyticsHelper(source: .discover))
-    .environmentObject(NetworkNavigator(source: .discover))
+    .environmentObject(NetworkNavigator())
 }
 
 #endif

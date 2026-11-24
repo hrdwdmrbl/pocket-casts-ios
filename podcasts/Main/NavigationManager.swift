@@ -8,9 +8,6 @@ class NavigationManager {
     static let podcastKey = "podcast"
     /// Optional `PodcastScreenSource` saying where the podcast page is being opened from
     static let podcastSourceKey = "podcastSource"
-
-    static let folderPageKey = "folderPage"
-    static let folderKey = "folder"
     static let popToRootViewController = "popToRootViewController"
 
     static let episodePageKey = "episodePage"
@@ -33,26 +30,8 @@ class NavigationManager {
 
     static let filesPageKey = "filesPage"
 
-    static let subscriptionCancelledAcknowledgePageKey = "subscrptionCancelledAcknowledgePage"
-
-    static let subscriptionUpgradeVCKey = "subscrptionUpgradeVC"
-    static let subscriptionRequiredPageKey = "subscrptionRequiredPage"
-
-    static let showPlusMarketingPageKey = "showPlusMarketingPage"
-    static let showPromotionPageKey = "showPromotionPage"
-    static let promotionInfoKey = "promotionInfoKey"
-    static let showPromotionFinishedPageKey = "showPromotionFinishedPage"
-
-    static let supporterSignInKey = "supporterSignInKey"
-    static let supporterPodcastInfo = "supporterPodcastInfo"
-    static let supporterBundlePageKey = "suppoerterBundlePage"
-    static let supporterBundleUuid = "supporterBundleUuid"
-
     static let showPrivacyPolicyPageKey = "showPrivacyPage"
     static let showTermsOfUsePageKey = "showTermsOfUsePage"
-
-    static let showWhatsNewPageKey = "showWhatsNewPage"
-    static let whatsNewInfoKey = "WhatsNewInfo"
 
     static let openUrlInSafariVCKey = "openSafariVCUrlPage"
     static let safariVCUrlKey = "safariVCUrlKey"
@@ -61,28 +40,15 @@ class NavigationManager {
     static let settingsRowKey = "settingsRow"
     static let settingsAppearanceKey = "appearancePage"
     static let settingsAppearanceShowThemeKey = "appearanceShowThemeKey"
-    static let settingsProfileKey = "profilePage"
-    static let profileRowKey = "profileRow"
-    static let profileRowDownloadsKey = "downloads"
-    static let profileRowEndOfYearKey = "playback"
+    static let settingsRootKey = "profilePage"
+    static let settingsItemKey = "profileRow"
+    static let settingsRowDownloadsKey = "downloads"
     static let settingsHeadphoneKey = "headphoneSettings"
-    static let settingsRedeemGuestPassKey = "redeemGuestPassPage"
-    static let redeemGuestPassURLKey = "redeemGuestPassURLKey"
-
-    static let deviceApprovePageKey = "deviceApprovePageKey"
-    static let deviceApproveCodeKey = "deviceApproveCodeKey"
-
-    static let endOfYearStories = "endOfYearStories"
-    static let onboardingFlow = "onboardingFlow"
 
     static let settingsGeneralKey = "generalSettingsPage"
     static let settingsGeneralRowKey = "generalSettingsRow"
 
     static let upNextPageKey = "upNextPage"
-    static let signUpPageKey = "signUpPage"
-
-    static let featurePageKey = "featurePageKey"
-    static let featureKey = "featureKey"
 
     static let manualPlaylistsChooserKey = "manualPlaylistsChooserKey"
     static let manualPlaylistsChooserEpisodeKey = "manualPlaylistsChooserEpisodeKey"
@@ -140,14 +106,8 @@ class NavigationManager {
                 podcastInfo.iTunesId = podcastHeader.itunesId?.intValue
 
                 mainController?.navigateToPodcastInfo(podcastInfo, source: source)
-            } else if let searchResult = data[NavigationManager.podcastKey] as? PodcastFolderSearchResult {
+            } else if let searchResult = data[NavigationManager.podcastKey] as? PodcastSearchResult {
                 mainController?.navigateTo(podcast: searchResult, source: source)
-            }
-        } else if place == NavigationManager.folderPageKey {
-            guard let data else { return }
-
-            if let folder = data[NavigationManager.folderKey] as? Folder {
-                mainController?.navigateToFolder(folder, popToRootViewController: (data[NavigationManager.popToRootViewController] as? Bool) ?? true)
             }
         } else if place == NavigationManager.episodePageKey {
             guard let data, let uuid = data[NavigationManager.episodeUuidKey] as? String else { return }
@@ -173,97 +133,38 @@ class NavigationManager {
             }
         } else if place == NavigationManager.filesPageKey {
             mainController?.navigateToFiles()
-        } else if place == NavigationManager.subscriptionCancelledAcknowledgePageKey {
-            mainController?.showSubscriptionCancelledAcknowledge()
-        } else if place == NavigationManager.subscriptionRequiredPageKey {
-            if let data, let rootVC = data[NavigationManager.subscriptionUpgradeVCKey] as? UIViewController {
-                let source = (data["source"] as? PlusUpgradeViewSource) ?? .unknown
-                let context = data["context"] as? OnboardingFlow.Context
-                let flow = data["flow"] as? OnboardingFlow.Flow
-                mainController?.showSubscriptionRequired(rootVC, source: source, context: context, flow: flow ?? .plusUpsell)
-            }
-        } else if place == NavigationManager.showPlusMarketingPageKey {
-            mainController?.showPlusMarketingPage()
         } else if place == NavigationManager.showPrivacyPolicyPageKey {
             mainController?.showPrivacyPolicy()
         } else if place == NavigationManager.showTermsOfUsePageKey {
             mainController?.showTermsOfUse()
-        } else if place == NavigationManager.showWhatsNewPageKey {
-            if let data, let whatsNewInfo = data[NavigationManager.whatsNewInfoKey] as? WhatsNewInfo {
-                mainController?.showWhatsNew(whatsNewInfo: whatsNewInfo)
-            }
         } else if place == NavigationManager.settingsAppearanceKey {
             var showThemeSelection = false
             if let data, let showThemeSelectionValue = data[NavigationManager.settingsAppearanceShowThemeKey] as? Bool {
                 showThemeSelection = showThemeSelectionValue
             }
             mainController?.showSettingsAppearance(showThemeSelection: showThemeSelection)
-        } else if place == NavigationManager.settingsProfileKey {
-            navigateToProfile(data: data, animated: animated)
+        } else if place == NavigationManager.settingsRootKey {
+            navigateToSettings(data: data, animated: animated)
         }
         else if place == NavigationManager.settingsHeadphoneKey {
             mainController?.showHeadphoneSettings()
-        }
-        else if place == NavigationManager.settingsRedeemGuestPassKey {
-            guard let data, let url = data[NavigationManager.redeemGuestPassURLKey] as? URL else {
-                return
-            }
-            mainController?.showRedeemGuestPass(url: url)
-        }
-        else if place == NavigationManager.showPromotionPageKey {
-            var promoCode: String?
-            if let data, let promoString = data[NavigationManager.promotionInfoKey] as? String {
-                promoCode = promoString
-            }
-            mainController?.showPromotionPage(promoCode: promoCode)
-        } else if place == NavigationManager.showPromotionFinishedPageKey {
-            mainController?.showPromotionFinishedAcknowledge()
-        } else if place == NavigationManager.supporterSignInKey {
-            if let data {
-                if let podcastInfo = data[NavigationManager.supporterPodcastInfo] as? PodcastInfo {
-                    mainController?.showSupporterSignIn(podcastInfo: podcastInfo)
-                } else if let bundleUuid = data[NavigationManager.supporterBundleUuid] as? String {
-                    mainController?.showSupporterSignIn(bundleUuid: bundleUuid)
-                }
-            }
-        } else if place == NavigationManager.supporterBundlePageKey {
-            var bundleUuid: String?
-            if let data, let uuid = data[NavigationManager.supporterBundleUuid] as? String {
-                bundleUuid = uuid
-            }
-            mainController?.showSupporterBundleDetails(bundleUuid: bundleUuid)
         } else if place == NavigationManager.openUrlInSafariVCKey {
             if let data, let urlString = data[NavigationManager.safariVCUrlKey] as? String {
                 mainController?.showInSafariViewController(urlString: urlString)
             }
-        } else if place == NavigationManager.endOfYearStories {
-            mainController?.showEndOfYearStories()
-        } else if place == NavigationManager.onboardingFlow {
-            let flow: OnboardingFlow.Flow? = data?["flow"] as? OnboardingFlow.Flow
-            let source = data?["source"] as? PlusUpgradeViewSource
-            mainController?.showOnboardingFlow(flow: flow, source: source)
         } else if place == NavigationManager.settingsGeneralKey {
             mainController?.showGeneralSettings(row: data?[NavigationManager.settingsGeneralRowKey] as? GeneralSettingsViewController.TableRow)
         } else if place == NavigationManager.upNextPageKey {
             mainController?.navigateToUpNext(true)
-        } else if place == NavigationManager.signUpPageKey {
-            mainController?.showSignUp()
         } else if place == NavigationManager.settingsPageKey {
             let row = data?[NavigationManager.settingsRowKey] as? SettingsViewController.TableRow
             mainController?.showSettings(row: row)
-        } else if place == NavigationManager.featurePageKey {
-            navigateToFeature(data: data, animated: animated)
         } else if place == NavigationManager.manualPlaylistsChooserKey {
             if let episode = data?[NavigationManager.manualPlaylistsChooserEpisodeKey] as? Episode {
                 let root = data?[NavigationManager.manualPlaylistsChooserRootKey] as? UIViewController
                 let source = data?[NavigationManager.manualPlaylistsChooserSourceKey] as? String ?? "swipe"
                 mainController?.presentManualPlaylistsChooser(for: episode, rootViewController: root, source: source)
             }
-        } else if place == NavigationManager.deviceApprovePageKey {
-            guard let data else { return }
-            let code = data[NavigationManager.deviceApproveCodeKey] as? String
-
-            mainController?.showApproveDevice(code: code)
         }
     }
 
@@ -284,37 +185,13 @@ class NavigationManager {
         }
     }
 
-    func navigateToFeature(data: NSDictionary?, animated: Bool) {
-        guard let feature = data?[NavigationManager.featureKey] as? String else {
+    func navigateToSettings(data: NSDictionary?, animated: Bool) {
+        guard let row = data?[NavigationManager.settingsItemKey] as? String else {
+            mainController?.navigateToSettings(row: nil, animated: animated)
             return
         }
-        if feature == "suggestedFolders" {
-            mainController?.navigateToSuggestedFolders()
+        if row == NavigationManager.settingsRowDownloadsKey {
+            mainController?.navigateToSettings(row: .downloaded, animated: animated)
         }
-    }
-
-    func navigateToProfile(data: NSDictionary?, animated: Bool) {
-        guard let row = data?[NavigationManager.profileRowKey] as? String else {
-            mainController?.navigateToProfile(row: nil, animated: animated)
-            return
-        }
-        if row == NavigationManager.profileRowDownloadsKey {
-            mainController?.navigateToProfile(row: .downloaded, animated: animated)
-        }
-        if row == NavigationManager.profileRowEndOfYearKey {
-            mainController?.navigateToProfile(row: .endOfYearPrompt, animated: animated)
-        }
-    }
-
-    func showNotificationsPermissionsModal() {
-        mainController?.showNotificationsPermissions()
-    }
-}
-
-// MARK: - Helpers
-
-extension NavigationManager {
-    func showUpsellView(from controller: UIViewController, source: PlusUpgradeViewSource, context: OnboardingFlow.Context? = nil, flow: OnboardingFlow.Flow = .plusUpsell) {
-        navigateTo(Self.subscriptionRequiredPageKey, data: [Self.subscriptionUpgradeVCKey: controller, "source": source, "flow": flow, "context": context ?? [:]])
     }
 }

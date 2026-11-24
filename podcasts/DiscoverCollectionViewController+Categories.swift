@@ -24,7 +24,7 @@ extension DiscoverCollectionViewController {
             // Filter out items that don't match the selected category
             let categoryFilter = (item.categoryID == category?.id) || items.contains(item)
 
-            return categoryFilter && item.shouldShowAuthenticated() // We don't currently have authenticated category items, but handle them just in case
+            return categoryFilter // We don't currently have authenticated category items, but handle them just in case
         })
     }
 

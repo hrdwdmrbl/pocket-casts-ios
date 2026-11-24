@@ -60,7 +60,6 @@ class PodcastHeaderListViewController: PCViewController, UITableViewDataSource, 
 
     @objc private func handleShare() {
         guard let source = source?.deletingPathExtension() else { return }
-        Analytics.track(.discoverListShareTapped)
         let activityViewController = UIActivityViewController(activityItems: [source], applicationActivities: nil)
         present(activityViewController, animated: true)
     }
@@ -74,7 +73,6 @@ class PodcastHeaderListViewController: PCViewController, UITableViewDataSource, 
         }
         return UITableView.automaticDimension
     }
-
 
     func tableView(_ tableView: UITableView, estimatedHeightForRowAt indexPath: IndexPath) -> CGFloat {
         let preferredBodySize = UIFontMetrics.default.scaledValue(for: 17)
@@ -105,7 +103,6 @@ class PodcastHeaderListViewController: PCViewController, UITableViewDataSource, 
             cell = featuredCell as UITableViewCell
         } else {
             let discoverCell = tableView.dequeueReusableCell(withIdentifier: PodcastHeaderListViewController.cellId, for: indexPath) as! DiscoverPodcastTableCell
-            discoverCell.subscribeSource = .discoverRankedList
             if showRankingNumber {
                 discoverCell.populateFrom(podcast, number: indexPath.row + 1)
             } else {

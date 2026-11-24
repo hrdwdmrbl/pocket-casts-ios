@@ -32,7 +32,6 @@ class OpmlImporter: Operation, XMLParserDelegate, @unchecked Sendable {
 
     override func main() {
         autoreleasepool {
-            Analytics.track(.opmlImportStarted)
             // parse OPML file
             let parser = XMLParser(contentsOf: opmlFileUrl)
             parser?.delegate = self
@@ -46,8 +45,6 @@ class OpmlImporter: Operation, XMLParserDelegate, @unchecked Sendable {
                     } else {
                         NotificationCenter.postOnMainThread(notification: Constants.Notifications.opmlImportFailed)
                     }
-
-                    Analytics.track(.opmlImportFailed)
                 }
 
                 return
@@ -74,8 +71,6 @@ class OpmlImporter: Operation, XMLParserDelegate, @unchecked Sendable {
                 }
 
                 NotificationCenter.postOnMainThread(notification: Constants.Notifications.opmlImportCompleted)
-
-                Analytics.track(.opmlImportFinished, properties: ["count": self.initialPodcastCount, "number_parsed": self.initialPodcastCount])
             }
         }
     }

@@ -2,9 +2,9 @@ import Foundation
 import PocketCastsDataModel
 import PocketCastsUtils
 #if os(watchOS)
-    import WatchKit
+import WatchKit
 #else
-    import UIKit
+import UIKit
 #endif
 
 protocol BaseRequest: Encodable {
@@ -31,8 +31,6 @@ public class MainServerHandler {
 
         return queue
     }()
-
-    private let tokenHelper = TokenHelper.shared
 
     struct PodcastSearchQuery: BaseRequest {
         var q: String?
@@ -94,7 +92,7 @@ public class MainServerHandler {
     }
 
     public func sendOpmlChunk(feedUrls: [String] = [], pollUuids: [String] = [], completion: @escaping (ImportOpmlResponse?) -> Void) {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             completion(ImportOpmlResponse.failedResponse())
             return
         }
@@ -127,10 +125,9 @@ public class MainServerHandler {
         }.resume()
     }
 
-    public func exportPodcasts(uuids: [String], completion: @escaping (ExportPodcastsResponse?) -> Void) {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
-            completion(ExportPodcastsResponse.failedResponse())
-            return
+    public func exportPodcasts(uuids: [String]) async throws -> [String: URL] {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
+            throw URLError(.unknown)
         }
 
         var baseRequest: BaseRequest = ExportPodcastsRequest()
@@ -141,27 +138,31 @@ public class MainServerHandler {
 
         let url = ServerHelper.asUrl(ServerConstants.Urls.main() + "import/export_feed_urls")
         guard let request = ServerHelper.createJsonRequest(url: url, params: exportRequest, timeout: MainServerHandler.callTimeout, cachePolicy: .reloadIgnoringCacheData) else {
-            completion(ExportPodcastsResponse.failedResponse())
-            return
+            throw URLError(.badURL)
         }
 
-        URLSession.shared.dataTask(with: request) { data, _, error in
-            guard let data, error == nil else {
-                completion(ExportPodcastsResponse.failedResponse())
-                return
-            }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == ServerConstants.HttpConstants.ok else {
+            throw URLError(.badServerResponse)
+        }
+        let feedResponse = try JSONDecoder().decode(ExportPodcastsResponse.self, from: data)
+        guard feedResponse.success(), let feeds = feedResponse.result else {
+            throw URLError(.badServerResponse)
+        }
 
-            do {
-                let refreshResponse = try JSONDecoder().decode(ExportPodcastsResponse.self, from: data)
-                completion(refreshResponse)
-            } catch {
-                completion(ExportPodcastsResponse.failedResponse())
+        var feedURLs: [String: URL] = [:]
+        for uuid in uuids {
+            guard let feed = feeds[uuid], let feedURL = URL(string: feed),
+                  feedURL.scheme == "https" || feedURL.scheme == "http", feedURL.host != nil else {
+                throw URLError(.badServerResponse)
             }
-        }.resume()
+            feedURLs[uuid] = feedURL
+        }
+        return feedURLs
     }
 
     public func lookupShareLink(sharePath: String, completion: @escaping (ShareListResponse?) -> Void) {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             completion(ShareListResponse.failedResponse())
             return
         }
@@ -197,7 +198,8 @@ public class MainServerHandler {
             return
         }
 
-        tokenHelper.callSecureUrl(request: request) { response, data, error in
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            let response = response as? HTTPURLResponse
             let statusCode = response?.statusCode ?? 0
 
             guard statusCode == ServerConstants.HttpConstants.ok, let data else {
@@ -212,11 +214,11 @@ public class MainServerHandler {
             FileLog.shared.addMessage("Decoding Refresh Response)")
             let refreshResponse = ServerHelper.decodeRefreshResponse(from: data)
             completion(refreshResponse)
-        }
+        }.resume()
     }
 
     public func createRefreshRequest(podcasts: [Podcast]) -> URLRequest? {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             return nil
         }
 
@@ -224,9 +226,9 @@ public class MainServerHandler {
             ServerPodcastManager.shared.updateLatestEpisodeInfo(podcast: podcast, setDefaults: false)
         }
 
-        let pushEnabled = ServerConfig.shared.syncDelegate?.isPushEnabled() ?? false
-        let newEpisodePushEnabled = !FeatureFlag.newEpisodeNotificationsPushOptOut.enabled
-            || (ServerConfig.shared.syncDelegate?.isNewEpisodeNotificationsEnabled() ?? false)
+        let pushEnabled = ServerConfig.shared.refreshDelegate?.isPushEnabled() ?? false
+        let newEpisodePushEnabled = false
+            || (ServerConfig.shared.refreshDelegate?.isNewEpisodeNotificationsEnabled() ?? false)
 
         var jsonRequest = jsonWithStandardParams(uniqueId: uniqueId)
         jsonRequest["push_sound"] = "11" // for legacy reasons, this is always the push sound we send, since it's no longer configurable
@@ -249,7 +251,7 @@ public class MainServerHandler {
     }
 
     public func podcastSearch(searchTerm: String, completion: @escaping (PodcastSearchResponse?) -> Void) {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             completion(PodcastSearchResponse.failedResponse())
             return
         }
@@ -265,7 +267,7 @@ public class MainServerHandler {
     }
 
     func podcastSearchQuery(searchTerm: String) -> PodcastSearchQuery? {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             return nil
         }
 
@@ -279,7 +281,7 @@ public class MainServerHandler {
     }
 
     public func refreshPodcastFeed(podcast: Podcast, completion: @escaping (Bool) -> Void) {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             completion(false)
 
             return
@@ -311,7 +313,7 @@ public class MainServerHandler {
     }
 
     public func findPodcastByiTunesId(_ iTunesId: Int, completion: @escaping (String?) -> Void) {
-        guard let uniqueId = ServerConfig.shared.syncDelegate?.uniqueAppId() else {
+        guard let uniqueId = ServerConfig.shared.refreshDelegate?.uniqueAppId() else {
             completion(nil)
             return
         }
@@ -417,15 +419,15 @@ public class MainServerHandler {
         json["c"] = locale.region?.identifier
 
         #if os(watchOS)
-            json["m"] = WKInterfaceDevice.current().systemVersion
+        json["m"] = WKInterfaceDevice.current().systemVersion
         #else
-            json["m"] = UIDevice.current.systemVersion
+        json["m"] = UIDevice.current.systemVersion
         #endif
 
         json["dt"] = MainServerHandler.deviceType
         json["v"] = MainServerHandler.parserVersion
         json["device"] = uniqueId
-        json["av"] = ServerConfig.shared.syncDelegate?.appVersion()
+        json["av"] = ServerConfig.shared.refreshDelegate?.appVersion()
 
         return json
     }
@@ -436,14 +438,14 @@ public class MainServerHandler {
         baseRequest.c = locale.region?.identifier
 
         #if os(watchOS)
-            baseRequest.m = WKInterfaceDevice.current().systemVersion
+        baseRequest.m = WKInterfaceDevice.current().systemVersion
         #else
-            baseRequest.m = UIDevice.current.systemVersion
+        baseRequest.m = UIDevice.current.systemVersion
         #endif
 
         baseRequest.dt = MainServerHandler.deviceType
         baseRequest.v = MainServerHandler.parserVersion
         baseRequest.device = uniqueId
-        baseRequest.av = ServerConfig.shared.syncDelegate?.appVersion()
+        baseRequest.av = ServerConfig.shared.refreshDelegate?.appVersion()
     }
 }

@@ -4,12 +4,21 @@ import PocketCastsServer
 import PocketCastsDataModel
 
 actor TranscriptsDataRetriever {
+    static let shared = TranscriptsDataRetriever()
 
     typealias Transcript = Episode.Metadata.Transcript
 
     private var dataRequestMap: [URL: Task<Data, Error>] = [:]
 
     private let cache: URLCache
+
+    func clearCache() async {
+        let requests = Array(dataRequestMap.values)
+        for task in requests { task.cancel() }
+        for task in requests { _ = await task.result }
+        dataRequestMap.removeAll()
+        cache.removeAllCachedResponses()
+    }
 
     public init() {
         cache = URLCache(memoryCapacity: 1.megabytes, diskCapacity: 100.megabytes, diskPath: "transcripts")
@@ -49,9 +58,8 @@ actor TranscriptsDataRetriever {
                     dataRequestMap[url] = nil
                 }
 
-                guard response.extractStatusCode() == 200 else {
-                    FileLog.shared.addMessage("Transcripts Data Retriever: request failed for transcript url \(url).")
-                    return data
+                if let response = response as? HTTPURLResponse, response.statusCode != 200 {
+                    throw URLError(.badServerResponse)
                 }
 
                 let responseToCache = CachedURLResponse(response: response, data: data)

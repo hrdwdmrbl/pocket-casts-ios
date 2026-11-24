@@ -257,14 +257,9 @@ extension SessionManager {
     /// When feature flag is disabled, only uses sendMessage (old behavior).
     private func sendWithFallback(_ message: [String: Any]) {
         guard validateSessionActivated() else { return }
-
-        if FeatureFlag.watchTransferUserInfoApi.enabled {
-            WCSession.default.sendMessage(message, replyHandler: nil) { _ in
-                // sendMessage failed, fall back to transferUserInfo for guaranteed delivery
-                WCSession.default.transferUserInfo(message)
-            }
-        } else {
-            WCSession.default.sendMessage(message, replyHandler: nil)
+        WCSession.default.sendMessage(message, replyHandler: nil) { _ in
+            // sendMessage failed, fall back to transferUserInfo for guaranteed delivery
+            WCSession.default.transferUserInfo(message)
         }
     }
 

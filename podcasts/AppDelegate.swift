@@ -1,14 +1,11 @@
+import UIKit
 import AppIntents
-import AutomatticRemoteLogging
 import BackgroundTasks
 import Combine
-import Firebase
-import FirebasePerformance
 import Foundation
 import PocketCastsDataModel
 import PocketCastsServer
 import PocketCastsUtils
-import Sentry
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
     private static let initialRefreshDelay = 2.seconds
@@ -16,7 +13,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     private let shortcutManager = ShortcutManager()
     private let badgeHelper = BadgeHelper()
-    private let traceHandler = TraceHelper()
+    private let transcriptIndexingController = TranscriptIndexingController()
+    private var isResetting = false
 
     @objc var backgroundSessionCompletionHandler: (() -> Void)?
 
@@ -24,49 +22,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var progressDialog: ShiftyLoadingAlert?
     var modalController: UINavigationController?
 
-    lazy var appLifecycleAnalytics = AppLifecycleAnalytics()
-
-    private var backgroundSignOutListener: BackgroundSignOutListener?
-    private(set) var appInstallState: AppLifecycleAnalytics.AppInstallState?
-
-    lazy var whatsNew = WhatsNew()
-
     // MARK: - App Lifecycle
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        configureFirebase()
-        TraceManager.shared.setup(handler: traceHandler)
-
-        setupSecrets()
-        addAnalyticsObservers()
-        setupAnalytics()
-
-        DataManager.logger = SentryLogger()
-        ServerConfig.shared.errorLogger = SentryLogger()
-
-        appInstallState = appLifecycleAnalytics.checkApplicationInstalledOrUpgraded()
-
-        if let appInstallState {
-            switch appInstallState {
-            case .updated:
-                Settings.shouldShowNewFilterTip = false
-                Settings.shouldShowNewFilterTipInCreationView = false
-            case .installed:
-                //Never show the podcast feed reload tooltip for fresh install
-                Settings.shouldShowPodcastFeeReloadTip = false
-                Settings.shouldShowPodcastViewChangesTip = false
-                Settings.shouldShowRecentlyPlayedSortingTip = false
-                Settings.shouldShowUpNextSortDurationTip = false
-                Settings.shouldShowPlaylistsOnboarding = false
-                // Anchor the EAC cadence on fresh install so the modal waits a full interval before
-                // its first show (existing users updating leave it nil and see it immediately).
-                Settings.encourageAccountCreationReferenceDate = Date()
-                WhatsNewManager.shared.startFeed()
-            case .sameVersion:
-                break
-            }
-        }
-
         let defaults = UserDefaults.standard
 
         // check to see that this app has a unique ID, if not create one
@@ -81,13 +39,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         setupRoutes()
         PocketCastsAppShortcutsProvider.updateAppShortcutParameters()
 
-        if Settings.shouldResultEndOfYearSyncStatus {
-            Settings.setHasSyncedEpisodesForPlayback(false, year: 2025)
-            Settings.setHasSyncedEpisodesForPlaybackAsPlusUser(false, year: 2025)
-            Settings.shouldResultEndOfYearSyncStatus = false
-        }
-
-
         NotificationsHelper.shared.register(checkToken: false)
 
         DispatchQueue.global().async { [weak self] in
@@ -95,12 +46,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 return
             }
 
-            ServerConfig.shared.syncDelegate = ServerSyncManager.shared
+            ServerConfig.shared.refreshDelegate = ServerRefreshManager.shared
             ServerConfig.shared.playbackDelegate = PlaybackManager.shared
             checkDefaults()
-
-            logActiveDownloadTasks()
-            logStaleDownloads()
             postLaunchSetup()
             checkIfRestoreCleanupRequired()
 
@@ -109,10 +57,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             SiriShortcutsManager.shared.setup()
 
             DownloadManager.shared.startAllQueued()
-
-            if FeatureFlag.enableLocalizationHeaders.enabled {
-                LocalizationHelper.provider = InternationalizationProvider(userRegion: Settings.userRegion())
-            }
+            LocalizationHelper.provider = InternationalizationProvider(userRegion: Settings.userRegion())
         }
 
         badgeHelper.setup()
@@ -120,17 +65,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         shortcutManager.listenForShortcutChanges()
 
         setupBackgroundRefresh()
-
-        IAPHelper.shared.setup(hasSubscription: SubscriptionHelper.hasActiveSubscription())
-
-        setupSignOutListener()
-
-        if FeatureFlag.earlyReloadSubscriptionStatus.enabled,
-           SyncManager.isUserLoggedIn(),
-           appInstallState == .updated {
-            ApiServerHandler.shared.retrieveSubscriptionStatus()
-            FileLog.shared.addMessage("Reload subscription status early as the app updated")
-        }
 
         return true
     }
@@ -140,13 +74,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func handleEnterBackground() {
+        transcriptIndexingController.stop()
         scheduleNextBackgroundRefresh()
         FileLog.shared.forceFlush()
 
         UserDefaults.standard.set(Date(), forKey: Constants.UserDefaults.lastAppCloseDate)
         badgeHelper.updateBadge()
-
-        appLifecycleAnalytics.didEnterBackground()
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
@@ -154,23 +87,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func handleBecomeActive() {
-        setupSignOutListener()
-        appLifecycleAnalytics.didBecomeActive()
-
-        if FeatureFlag.whatsNewFeed.enabled {
-            WhatsNewManager.shared.refreshIfNeeded()
-        }
+        guard !isResetting else { return }
+        transcriptIndexingController.start()
 
         // give the network a few seconds to come up before refreshing, also only refresh if the last refresh was more than 5 minutes ago
         let lastUpdateTime = ServerSettings.lastRefreshEndTime()
         if DateUtil.hasEnoughTimePassed(since: lastUpdateTime, time: AppDelegate.minTimeBetweenRefreshes) {
-            Timer.scheduledTimer(withTimeInterval: AppDelegate.initialRefreshDelay, repeats: false, block: { _ in
+            Timer.scheduledTimer(withTimeInterval: AppDelegate.initialRefreshDelay, repeats: false, block: { [weak self] _ in
+                guard let self, !self.isResetting else { return }
                 RefreshManager.shared.refreshPodcasts()
             })
         } else {
             DispatchQueue.global(qos: .userInitiated).async {
                 PodcastManager.shared.checkForPendingAndAutoDownloads()
-                UserEpisodeManager.checkForPendingUploads()
             }
         }
         PlaybackManager.shared.updateIdleTimer()
@@ -209,8 +138,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         badgeHelper.teardown()
         shortcutManager.stopListeningForShortcutChanges()
-
-        IAPHelper.shared.tearDown()
         UIApplication.shared.endReceivingRemoteControlEvents()
     }
 
@@ -261,7 +188,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         })
     }
 
-
     private func setupBackgroundRefresh() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Constants.Values.refreshTaskId, using: nil) { task in
             FileLog.shared.addMessage("Background refresh called")
@@ -293,40 +219,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         badgeHelper.updateBadge()
     }
 
-    private func configureFirebase() {
-        FirebaseApp.configure()
-
-        FirebaseManager.refreshRemoteConfig() { [weak self] _ in
-            self?.updateEndOfYearRemoteValue()
-            self?.updateRemoteFeatureFlags()
-        }
-    }
-
-    func updateRemoteFeatureFlags(forceReload: Bool = false) {
-        guard BuildEnvironment.current != .debug || forceReload else { return }
-
-        try? FeatureFlagOverrideStore().override(FeatureFlag.slumber, withValue: Settings.slumberPromoCode?.isEmpty == false)
-
-        FeatureFlag.allCases.forEach { flag in
-            if let remoteKey = flag.remoteKey {
-                let remoteValue = RemoteConfig.remoteConfig().configValue(forKey: remoteKey)
-                if remoteValue.source == .remote {
-                    do {
-                        FileLog.shared.console("Override \(flag): \(remoteValue.boolValue)")
-                        try FeatureFlagOverrideStore().override(flag, withValue: remoteValue.boolValue)
-                    } catch {
-                        FileLog.shared.addMessage("Failed to set remote feature flag \(flag): \(error)")
-                    }
-                }
-            }
-        }
-    }
-
-    private func updateEndOfYearRemoteValue() {
-        // Update if EOY requires an account to be seen
-        EndOfYear.requireAccount = Settings.endOfYearRequireAccount
-    }
-
     private func postLaunchSetup() {
         if !UserDefaults.standard.bool(forKey: "CreatedDefPlaylistsV2") {
             PlaylistManager.createDefaultPlaylists()
@@ -335,6 +227,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         Task {
             await DownloadManager.shared.clearStuckDownloads()
         }
+    }
+
+    @MainActor
+    func resetApp() async throws {
+        isResetting = true
+        defer {
+            isResetting = false
+            transcriptIndexingController.start()
+        }
+
+        PlaybackManager.shared.endPlayback(saveCurrentEpisode: false)
+        await transcriptIndexingController.stopAndWait()
+        try await AppReset.reset()
+
+        UserDefaults.standard.set(UUID().uuidString, forKey: Constants.UserDefaults.appId)
+        checkDefaults()
+        postLaunchSetup()
+        Settings.shouldFollowSystemTheme = true
+        Theme.shared.toggleTheme()
+        LocalizationHelper.provider = InternationalizationProvider(userRegion: Settings.userRegion())
+        NotificationCenter.default.post(name: Constants.Notifications.remoteCommandSettingsChanged, object: nil)
+
+        SiriShortcutsManager.shared.publishSubscribedPodcasts()
+        WidgetHelper.shared.updateSharedUpNext()
+        badgeHelper.updateBadge()
+        PocketCastsAppShortcutsProvider.updateAppShortcutParameters()
+
+        for scene in UIApplication.shared.connectedScenes {
+            if let sceneDelegate = scene.delegate as? SceneDelegate {
+                sceneDelegate.window?.rootViewController = MainTabBarController()
+            }
+        }
+        NotificationCenter.postOnMainThread(notification: Constants.Notifications.podcastDeleted)
+        NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged)
     }
 
     private func checkIfRestoreCleanupRequired() {
@@ -392,36 +318,5 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         if includesCarPlay {
             FileLog.shared.addMessage("AppDelegate: CarPlay didDiscard")
         }
-    }
-
-    // MARK: Secrets
-
-    private func setupSecrets() {
-        ServerCredentials.sharing = ApiCredentials.sharingServerSecret
-    }
-
-    private func setupSignOutListener() {
-        guard backgroundSignOutListener == nil else {
-            return
-        }
-
-        backgroundSignOutListener = BackgroundSignOutListener(presentingViewController: SceneHelper.rootViewController())
-    }
-}
-
-struct SentryLogger: ErrorLogger {
-    func log(error: Error, context: [String: String]?) {
-        if BuildEnvironment.current == .appStore {
-            let crumb = Breadcrumb()
-            crumb.level = SentryLevel.info
-            crumb.category = "grdb"
-            crumb.message = error.localizedDescription
-            SentrySDK.addBreadcrumb(crumb)
-            return
-        }
-
-    #if os(iOS)
-    CrashLoggingAdapter.shared?.crashLogging?.logError(error, tags: context ?? [:], level: .warning)
-    #endif
     }
 }

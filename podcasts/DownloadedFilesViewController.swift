@@ -42,8 +42,6 @@ class DownloadedFilesViewController: PCViewController, UITableViewDelegate, UITa
         includeStarred = UserDefaults.standard.bool(forKey: Constants.UserDefaults.cleanupStarred)
 
         reloadFileSizes()
-
-        Analytics.track(.downloadsCleanUpShown)
     }
 
     // MARK: - UITableView Methods
@@ -155,7 +153,6 @@ class DownloadedFilesViewController: PCViewController, UITableViewDelegate, UITa
     }
 
     private func confirmCleanup() {
-        Analytics.track(.downloadsCleanUpButtonTapped)
         let alert = UIAlertController(
             title: L10n.cleanUp,
             message: L10n.downloadedFilesCleanupConfirmation,
@@ -175,8 +172,6 @@ class DownloadedFilesViewController: PCViewController, UITableViewDelegate, UITa
         UserDefaults.standard.set(deletePlayed, forKey: Constants.UserDefaults.cleanupPlayed)
         UserDefaults.standard.set(includeStarred, forKey: Constants.UserDefaults.cleanupStarred)
 
-        Analytics.track(.downloadsCleanUpCompleted, properties: ["unplayed": deleteUnplayed, "in_progress": deleteInProgress, "played": deletePlayed, "include_starred": includeStarred])
-
         let formattedUnplayedSize = SizeFormatter.shared.noDecimalFormat(bytes: Int64(unplayedSize))
         let formattedInProgressSize = SizeFormatter.shared.noDecimalFormat(bytes: Int64(inProgressSize))
         let formattedPlayedSize = SizeFormatter.shared.noDecimalFormat(bytes: Int64(playedSize))
@@ -185,10 +180,8 @@ class DownloadedFilesViewController: PCViewController, UITableViewDelegate, UITa
 
         DispatchQueue.global(qos: .default).async { () in
             EpisodeManager.deleteAllDownloadedFiles(unplayed: self.deleteUnplayed, inProgress: self.deleteInProgress, played: self.deletePlayed, includeStarred: self.includeStarred)
-            if FeatureFlag.cleanUpTmpFiles.enabled {
-                // Remove any lingering files in the temporary folder that were not removed above, those should be orphan files
-                EpisodeManager.cleanUpTmpFolder()
-            }
+            // Remove any lingering files in the temporary folder that were not removed above, those should be orphan files
+            EpisodeManager.cleanUpTmpFolder()
             self.performRefresh()
         }
     }
@@ -203,7 +196,7 @@ class DownloadedFilesViewController: PCViewController, UITableViewDelegate, UITa
         unplayedSize = EpisodeManager.downloadSizeOfUnplayedEpisodes(includeStarred: includeStarred)
         inProgressSize = EpisodeManager.downloadSizeOfInProgressEpisodes(includeStarred: includeStarred)
         playedSize = EpisodeManager.downloadSizeOfPlayedEpisodes(includeStarred: includeStarred)
-        tmpFilesSize = FeatureFlag.cleanUpTmpFiles.enabled ? EpisodeManager.tmpFolderSize() : 0
+        tmpFilesSize = EpisodeManager.tmpFolderSize()
 
         DispatchQueue.main.async { () in
             self.settingsTable.reloadData()

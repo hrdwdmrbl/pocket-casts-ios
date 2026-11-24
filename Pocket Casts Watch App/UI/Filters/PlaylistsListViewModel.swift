@@ -5,7 +5,7 @@ import PocketCastsDataModel
 class PlaylistsListViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var playlists: [PlaylistRepresentable] = []
-    private let playSourceViewModel = PlaySourceHelper.playSourceViewModel
+    private let playSourceViewModel = PhoneSourceViewModel()
     private var cancellables = Set<AnyCancellable>()
 
     init() {

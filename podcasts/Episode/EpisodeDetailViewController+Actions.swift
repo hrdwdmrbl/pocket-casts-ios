@@ -33,7 +33,7 @@ extension EpisodeDetailViewController {
 
         let addToPlaylistAction = OptionAction(label: L10n.playlistManualEpisodeAddToPlaylist, icon: "plus-circle") { [weak self] in
             guard let self else { return }
-            let chooser = ManualPlaylistsChooserViewController(episode: self.episode, analyticsSource: "episode_details")
+            let chooser = ManualPlaylistsChooserViewController(episode: self.episode)
             let navVC = SJUIUtils.navController(for: chooser)
             self.present(navVC, animated: true, completion: nil)
         }
@@ -43,7 +43,6 @@ extension EpisodeDetailViewController {
     }
 
     @IBAction func episodeStatusTapped(_ sender: Any) {
-        AnalyticsEpisodeHelper.shared.currentSource = analyticsSource
 
         if episode.played() {
             EpisodeManager.markAsUnplayed(episode: episode, fireNotification: true)
@@ -78,7 +77,7 @@ extension EpisodeDetailViewController {
         let timestamp = time ?? timestamp
         if isPlaying {
             if let timestamp {
-                DataManager.shared.saveEpisode(playedUpTo: timestamp, episode: episode, updateSyncFlag: false)
+                DataManager.shared.saveEpisode(playedUpTo: timestamp, episode: episode)
                 PlaybackManager.shared.seekTo(time: timestamp, startPlaybackAfterSeek: false)
                 updateProgress()
             }
@@ -215,7 +214,6 @@ extension EpisodeDetailViewController {
     // MARK: - Helpers
 
     private func deleteDownloadedFile() {
-        EpisodeManager.analyticsHelper.currentSource = analyticsSource
 
         PlaybackManager.shared.removeIfPlayingOrQueued(episode: episode, fireNotification: true, userInitiated: false)
         EpisodeManager.deleteDownloadedFiles(episode: episode, userInitated: true)

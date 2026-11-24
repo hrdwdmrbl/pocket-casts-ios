@@ -30,11 +30,7 @@ extension PlaylistDetailViewController: UITableViewDataSource {
                     for: indexPath,
                     in: tableView,
                     statusBarStyle: preferredStatusBarStyle
-                ) { [weak self] allAboveAreSelected in
-                    self?.track(allAboveAreSelected ? .filterDeselectAllAbove : .filterSelectAllAbove)
-                } allBelowAction: { [weak self] allBelowAreSelected in
-                    self?.track(allBelowAreSelected ? .filterDeselectAllBelow : .filterSelectAllBelow)
-                }
+                )
             } else {
                 longPressMultiSelectIndexPath = indexPath
                 isMultiSelectEnabled = true
@@ -53,8 +49,6 @@ extension PlaylistDetailViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let onToggleChange: (Bool) -> Void = { [weak self] selected in
             guard let self else { return }
-
-            self.track(selected ? .filterShowArchivedTapped : .filterHideArchivedTapped)
             self.viewModel.updateShowArchivedEpisodes(show: selected)
             self.viewModel.reloadEpisodeList(animated: true)
         }
@@ -106,8 +100,7 @@ extension PlaylistDetailViewController: UITableViewDataSource {
                     title: L10n.episodeFilterNoEpisodesTitle.sentenceCased,
                     message: archivedPlaceholder.message,
                     actions: [
-                        .init(title: L10n.podcastShowArchived.sentenceCased, action: { [weak self] in
-                            self?.track(.filterShowArchivedCtaEmptyTapped)
+                        .init(title: L10n.podcastShowArchived.sentenceCased, action: {
                             onToggleChange(true)
                         })
                     ]
@@ -229,8 +222,6 @@ extension PlaylistDetailViewController: UITableViewDelegate {
                 let episodeUuid = selectedEpisode.uuid
                 let view = ModalMessageViewController.episodeUnavailableAlert { [weak self] in
                     guard let self else { return }
-                    self.track(.filterRemoveFromPlaylistTapped)
-                    self.track(episode: selectedEpisode, added: false, to: self.viewModel.playlist, source: "unavailable_episode")
                     self.viewModel.remove(episode: episodeUuid, at: indexPath.row)
                 }
                 BottomSheetSwiftUIWrapper.present(

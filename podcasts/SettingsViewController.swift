@@ -2,34 +2,29 @@ import PocketCastsServer
 import PocketCastsUtils
 import SwiftUI
 import UIKit
-import WatchConnectivity
 
 class SettingsViewController: PCViewController, UITableViewDataSource, UITableViewDelegate {
     enum TableRow: String {
         case general, notifications, appearance, storageAndDataUse
         case autoArchive, autoDownload, autoAddToUpNext, siriShortcuts
-        case watch, customFiles, importSteps, opml
-        case about, pocketCastsPlus, privacy
-        case upNextHistory, foldersHistory
+        case importSteps, opml
+        case downloaded, starred, listeningHistory, allStats, uploadedFiles
+        case about
+        case upNextHistory
         case headphoneControls
-        case developer, beta
-
-        /// Whether the section should be displayed or not
-        var visible: Bool {
-            switch self {
-            case .watch:
-                return WCSession.isSupported()
-
-            case .pocketCastsPlus:
-                return !SubscriptionHelper.hasActiveSubscription()
-
-            default:
-                return true
-            }
-        }
 
         var display: (text: String, image: UIImage?) {
             switch self {
+            case .downloaded:
+                return (L10n.downloads, UIImage(named: "profile-download"))
+            case .starred:
+                return (L10n.statusStarred, UIImage(named: "filter_starred"))
+            case .listeningHistory:
+                return (L10n.listeningHistory, UIImage(named: "profile-history"))
+            case .allStats:
+                return (L10n.settingsStats, UIImage(named: "profile-stats"))
+            case .uploadedFiles:
+                return (L10n.files, UIImage(named: "profile_files"))
             case .general:
                 return (L10n.settingsGeneral, UIImage(named: "profile-settings"))
             case .notifications:
@@ -52,24 +47,10 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
                 return (L10n.settingsAbout, UIImage(named: "settings_about"))
             case .siriShortcuts:
                 return (L10n.settingsSiriShortcuts, UIImage(named: "settings_shortcuts"))
-            case .customFiles:
-                return (L10n.files, UIImage(named: "profile_files"))
-            case .watch:
-                return (L10n.appleWatch, UIImage(named: "settings_watch"))
-            case .pocketCastsPlus:
-                return (L10n.pocketCastsPlus, UIImage(named: "plusGold24"))
-            case .privacy:
-                return (L10n.settingsPrivacy, UIImage(named: "privacy"))
-            case .developer:
-                return ("Developer", UIImage(systemName: "ladybug.fill"))
-            case .beta:
-                return ("Beta Features", UIImage(systemName: "testtube.2"))
             case .headphoneControls:
                 return (L10n.settingsHeadphoneControls, .init(named: "settings_headphone_controls"))
             case .upNextHistory:
                 return (L10n.upNextHistory, .init(named: "upnext"))
-            case .foldersHistory:
-                return (L10n.foldersHistory, .init(named: "folder-empty"))
             }
         }
     }
@@ -77,24 +58,15 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
     private var tableData: [[TableRow]] = []
 
     /// All the possible settings sections
-    private let allSections: [[TableRow]] = {
-        #if DEBUG
-        let developerSection: [TableRow] = [.developer, .beta]
-        #else
-        let developerSection: [TableRow] = []
-        #endif
-
-        return [
-            developerSection,
-            [.pocketCastsPlus],
-            [.general, .notifications, .appearance],
-            [.autoArchive, .autoDownload, .autoAddToUpNext],
-            [.storageAndDataUse, .siriShortcuts, .headphoneControls, .watch, .customFiles],
-            [.importSteps, .opml],
-            [.upNextHistory, .foldersHistory],
-            [.privacy, .about]
-        ]
-    }()
+    private let allSections: [[TableRow]] = [
+        [.downloaded, .starred, .listeningHistory, .allStats, .uploadedFiles],
+        [.general, .notifications, .appearance],
+        [.autoArchive, .autoDownload, .autoAddToUpNext],
+        [.storageAndDataUse, .siriShortcuts, .headphoneControls],
+        [.importSteps, .opml],
+        [.upNextHistory],
+        [.about]
+    ]
 
     private let settingsCellId = "SettingsCell"
 
@@ -134,19 +106,14 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: settingsCellId, for: indexPath) as! TopLevelSettingsCell
-        cell.plusIndicator.isHidden = true
 
         let tableRow = tableData[indexPath.section][indexPath.row]
         cell.settingsLabel.text = tableRow.display.text
-        cell.settingsLabel.accessibilityIdentifier = tableRow.rawValue
+        cell.isAccessibilityElement = true
+        cell.accessibilityLabel = tableRow.display.text
+        cell.accessibilityIdentifier = tableRow.rawValue
+        cell.accessibilityTraits.insert(.button)
         cell.settingsImage.image = tableRow.display.image
-
-        switch tableRow {
-        case .appearance, .customFiles, .watch:
-            cell.plusIndicator.isHidden = SubscriptionHelper.hasActiveSubscription()
-        default:
-            break
-        }
 
         return cell
     }
@@ -160,6 +127,16 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
 
     func selectRow(_ tableRow: TableRow) {
         switch tableRow {
+        case .downloaded:
+            navigationController?.pushViewController(DownloadsViewController(), animated: true)
+        case .starred:
+            navigationController?.pushViewController(StarredViewController(), animated: true)
+        case .listeningHistory:
+            navigationController?.pushViewController(ListeningHistoryViewController(), animated: true)
+        case .allStats:
+            navigationController?.pushViewController(StatsViewController(), animated: true)
+        case .uploadedFiles:
+            navigationController?.pushViewController(UploadedViewController(), animated: true)
         case .general:
             navigationController?.pushViewController(GeneralSettingsViewController(), animated: true)
         case .notifications:
@@ -175,12 +152,11 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
         case .autoDownload:
             navigationController?.pushViewController(DownloadSettingsViewController(), animated: true)
         case .importSteps:
-            let controller = ImportViewModel.make(source: "settings", showSubtitle: false)
+            let controller = ImportViewModel.make()
             navigationController?.present(controller, animated: true)
         case .opml:
             navigationController?.pushViewController(ImportExportViewController(), animated: true)
         case .about:
-            Analytics.track(.settingsAboutShown)
 
             let aboutView = AboutView()
                 .environmentObject(Theme.shared)
@@ -189,30 +165,11 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
             navigationController?.present(hostingController, animated: true, completion: nil)
         case .siriShortcuts:
             navigationController?.pushViewController(SiriSettingsViewController(), animated: true)
-        case .customFiles:
-            navigationController?.pushViewController(UploadedSettingsViewController(), animated: true)
-        case .watch:
-            navigationController?.pushViewController(WatchSettingsViewController(), animated: true)
-        case .pocketCastsPlus:
-                navigationController?.present(OnboardingFlow.shared.begin(flow: .plusUpsell, source: .settings, traitCollection: traitCollection), animated: true)
-        case .privacy:
-            navigationController?.pushViewController(PrivacySettingsViewController(), animated: true)
-        case .developer:
-            let hostingController = UIHostingController(rootView: DeveloperMenu().setupDefaultEnvironment())
-            hostingController.title = "Developer"
-            navigationController?.pushViewController(hostingController, animated: true)
-        case .beta:
-            let hostingController = UIHostingController(rootView: BetaMenu().setupDefaultEnvironment())
-            hostingController.title = "Beta Features"
-            navigationController?.pushViewController(hostingController, animated: true)
         case .headphoneControls:
             navigationController?.pushViewController(HeadphoneSettingsViewController(), animated: true)
         case .upNextHistory:
             let upNextHistory = UpNextHistoryViewController()
             navigationController?.pushViewController(upNextHistory, animated: true)
-        case .foldersHistory:
-            let foldersHistoryViewController = FolderHistoryViewController()
-            navigationController?.pushViewController(foldersHistoryViewController, animated: true)
         }
     }
 
@@ -221,9 +178,7 @@ class SettingsViewController: PCViewController, UITableViewDataSource, UITableVi
     }
 
     private func reloadTable() {
-        tableData = allSections.compactMap {
-            $0.filter(\.visible).nilIfEmpty()
-        }
+        tableData = allSections
 
         settingsTable.reloadData()
     }

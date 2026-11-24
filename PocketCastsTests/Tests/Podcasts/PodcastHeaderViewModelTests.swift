@@ -7,17 +7,6 @@ import XCTest
 
 /// The header's category and author line: what each part is, and where tapping it goes.
 final class PodcastHeaderViewModelTests: XCTestCase {
-    private let featureFlagMock = FeatureFlagMock()
-
-    override func setUp() {
-        super.setUp()
-        featureFlagMock.set(.networkDiscovery, value: true)
-    }
-
-    override func tearDown() {
-        featureFlagMock.reset()
-        super.tearDown()
-    }
 
     func testTheAuthorOpensTheNetworkThePodcastBelongsTo() {
         let line = viewModel(networkListId: "cdb75bc0-9f5a-4217-b1ca-f573821a7913").displayCategoryAndAuthor(networkTint: .red)
@@ -30,14 +19,6 @@ final class PodcastHeaderViewModelTests: XCTestCase {
         let line = viewModel(networkListId: nil).displayCategoryAndAuthor(networkTint: .red)
 
         XCTAssertEqual(String(line.characters), "Technology · Relay")
-        XCTAssertNil(text(of: line, linkedTo: .author))
-    }
-
-    func testANetworkIsOnlyOfferedWhileTheAppShowsNetworks() {
-        featureFlagMock.set(.networkDiscovery, value: false)
-
-        let line = viewModel(networkListId: "cdb75bc0-9f5a-4217-b1ca-f573821a7913").displayCategoryAndAuthor(networkTint: .red)
-
         XCTAssertNil(text(of: line, linkedTo: .author))
     }
 

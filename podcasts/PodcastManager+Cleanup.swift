@@ -5,8 +5,8 @@ import PocketCastsUtils
 
 extension PodcastManager {
     func deletePodcastIfUnused(_ podcast: Podcast) async {
-        // we don't delete podcasts that haven't been synced or you're still subscribed to
-        if podcast.syncStatus == SyncStatus.notSynced.rawValue || podcast.isSubscribed() { return }
+        // Keep followed podcasts.
+        if podcast.isSubscribed() { return }
 
         // we don't delete podcasts added to the phone in the last week. This is to prevent stuff you just leave open in discover from being removed
         if let addedDate = podcast.addedDate, abs(addedDate.timeIntervalSinceNow) < 1.week { return }
@@ -97,29 +97,6 @@ extension PodcastManager {
         let podcasts = dataManager.allUnsubscribedPodcasts()
         for podcast in podcasts {
             await deletePodcastIfUnused(podcast)
-        }
-    }
-
-    func checkForExpiredPodcastsAndCleanup() {
-        let allPaidPodcasts = dataManager.allPaidPodcasts()
-
-        let licenseRestrictedPodcasts = allPaidPodcasts.filter { $0.licensing == PodcastLicensing.deleteEpisodesAfterExpiry.rawValue }
-        if licenseRestrictedPodcasts.isEmpty { return }
-
-        for podcast in licenseRestrictedPodcasts {
-            guard let subscription = SubscriptionHelper.subscription(forPodcastUuid: podcast.uuid) else { continue }
-
-            let expiryDate = Date(timeIntervalSince1970: subscription.expiryDate)
-            if expiryDate.timeIntervalSinceNow < 0, !subscription.autoRenewing {
-                let downloadedEpisodes = dataManager.findEpisodesWhere(customWhere: "podcast_id == ? AND episodeStatus == ?", arguments: [podcast.id, DownloadStatus.downloaded.rawValue])
-                for episode in downloadedEpisodes {
-                    FileLog.shared.addMessage("Deleting downloaded episode \(episode.title ?? "No Title"), licensing expired")
-
-                    PlaybackManager.shared.removeIfPlayingOrQueued(episode: episode, fireNotification: false)
-                    downloadManager.removeFromQueue(episode: episode, fireNotification: false, userInitiated: false)
-                    EpisodeManager.deleteDownloadedFiles(episode: episode)
-                }
-            }
         }
     }
 }

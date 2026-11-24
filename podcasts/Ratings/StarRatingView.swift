@@ -6,11 +6,6 @@ struct StarRatingView: View {
     @EnvironmentObject var theme: Theme
     @ObservedObject var viewModel: PodcastRatingViewModel
 
-    @State private var dismissAction: RatePodcastViewModel.DismissAction = .default
-
-    // To reload the view after rate and dismiss the rating sheet
-    private var onRate: () -> Void
-
     /// Keeps track of when we appear to determine if we should animate
     private var startDate: Date = .now
 
@@ -21,9 +16,8 @@ struct StarRatingView: View {
         viewModel.rating != nil && Date().timeIntervalSince(startDate) > Constants.minTimeBeforeAnimating
     }
 
-    init(viewModel: PodcastRatingViewModel, style: Style = .long, onRate: @escaping () -> Void) {
+    init(viewModel: PodcastRatingViewModel, style: Style = .long) {
         self.viewModel = viewModel
-        self.onRate = onRate
         self.style = style
     }
 
@@ -46,33 +40,7 @@ struct StarRatingView: View {
                 ratingView(rating: viewModel.rating)
                     .frame(height: starSize)
                     .animation(.easeIn(duration: Constants.animationDuration), value: shouldAnimate)
-                    .onTapGesture {
-                        viewModel.didTapRating(source: .stars)
-                    }
-                if style == .long {
-                    Spacer()
-
-                    Text(L10n.rate)
-                        .font(.system(.callout))
-                        .foregroundStyle(theme.primaryText01)
-                        .buttonize {
-                            viewModel.didTapRating()
-                        }
-                }
             }
-            .sheet(isPresented: $viewModel.presentingGiveRatings, onDismiss: {
-                switch dismissAction {
-                case .dismissAndTracking(let event):
-                    Analytics.track(event)
-                default:
-                    break
-                }
-                dismissAction = .default
-            }, content: {
-                if let podcast = viewModel.podcast {
-                    RatePodcastView(viewModel: RatePodcastViewModel(presented: $viewModel.presentingGiveRatings, dismissAction: $dismissAction, podcast: podcast, onRate: onRate))
-                }
-            })
             if style == .long {
                 Rectangle()
                     .foregroundStyle(theme.primaryUi05)

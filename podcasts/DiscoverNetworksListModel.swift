@@ -46,7 +46,7 @@ class DiscoverNetworksListModel: ObservableObject {
 
         guard let source = delegate?.replaceRegionCode(string: item.source) ?? item.source else { return }
 
-        serverHandler.discoverPodcastCollection(source: source, authenticated: item.authenticated) { [weak self] collection in
+        serverHandler.discoverPodcastCollection(source: source) { [weak self] collection in
             guard let networks = collection?.lists else { return }
 
             DispatchQueue.main.async {
@@ -58,13 +58,6 @@ class DiscoverNetworksListModel: ObservableObject {
     }
 
     func showAll() {
-        guard delegate != nil, let item else { return }
-
-        if let listId = item.uuid {
-            AnalyticsHelper.listShowAllTapped(listId: listId, dateTime: datetime)
-        } else {
-            Analytics.track(.discoverShowAllTapped, properties: ["list_id": item.inferredListId])
-        }
 
         showGrid()
     }
@@ -91,7 +84,7 @@ class DiscoverNetworksListModel: ObservableObject {
     func show(network: NetworkListSummary) {
         guard let delegate, let source = network.source else { return }
 
-        serverHandler.discoverPodcastCollection(source: source, authenticated: item?.authenticated) { [weak self] collection in
+        serverHandler.discoverPodcastCollection(source: source) { [weak self] collection in
             guard let self, let collection else { return }
 
             DispatchQueue.main.async {

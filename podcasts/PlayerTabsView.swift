@@ -10,7 +10,6 @@ enum PlayerTabs: Int {
     case nowPlaying
     case showNotes
     case chapters
-    case bookmarks
 
     var description: String {
         switch self {
@@ -20,8 +19,6 @@ enum PlayerTabs: Int {
             return L10n.playerShowNotesTitle
         case .chapters:
             return L10n.chapters
-        case .bookmarks:
-            return L10n.bookmarks
         }
     }
 }
@@ -37,24 +34,6 @@ class PlayerTabsView: UIScrollView {
     var currentTab = 0 {
         didSet {
             animateTabChange(fromIndex: oldValue, toIndex: currentTab)
-
-            guard oldValue != currentTab, let tab = tabs[safe: currentTab] else {
-                return
-            }
-
-            trackTabChanged(tab: tab)
-
-            switch tab {
-            case .nowPlaying:
-                break
-            case .showNotes:
-                AnalyticsHelper.playerShowNotesOpened()
-            case .chapters:
-                AnalyticsHelper.chaptersOpened()
-                trackChaptersShown()
-            case .bookmarks:
-                break
-            }
         }
     }
 
@@ -173,7 +152,6 @@ class PlayerTabsView: UIScrollView {
     }
 }
 
-
 private enum TabConstants {
     static let titleFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
     static let spacing: CGFloat = 0
@@ -245,40 +223,6 @@ private extension PlayerTabsView {
         required init?(coder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
         }
-    }
-}
-
-// MARK: - Private: Analytics
-
-private extension PlayerTabsView {
-    func trackTabChanged(tab: PlayerTabs) {
-        let tabName: String
-        switch tab {
-        case .nowPlaying:
-            tabName = "now_playing"
-        case .showNotes:
-            tabName = "show_notes"
-        case .chapters:
-            tabName = "chapters"
-        case .bookmarks:
-            tabName = "bookmarks"
-        }
-
-        Analytics.track(.playerTabSelected, properties: ["tab": tabName])
-    }
-
-    /// Emitted when the user switches to the Chapters tab and the episode has
-    /// chapters, matching Android's `chapters_shown` (fired from its player
-    /// pager with the same guard against empty chapter lists).
-    private func trackChaptersShown() {
-        guard PlaybackManager.shared.chapterCount() > 0 else { return }
-
-        Analytics.track(.chaptersShown, properties: [
-            "episode_uuid": PlaybackManager.shared.currentEpisode?.uuid ?? "unknown",
-            "podcast_uuid": PlaybackManager.shared.currentPodcast?.uuid ?? "unknown",
-            "origin": PlaybackManager.shared.chaptersOriginAnalyticsValue,
-            "source": "fullscreen_player"
-        ])
     }
 }
 

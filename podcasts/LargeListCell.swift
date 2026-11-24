@@ -82,7 +82,7 @@ class LargeListCell: ThemeableCollectionCell {
         let size = ExplicitBadgeHelper.badgeSize
         NSLayoutConstraint.activate([
             explicitBadgeView.widthAnchor.constraint(equalToConstant: size),
-            explicitBadgeView.heightAnchor.constraint(equalToConstant: size),
+            explicitBadgeView.heightAnchor.constraint(equalToConstant: size)
         ])
         podcastTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         explicitBadgeView.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -97,7 +97,7 @@ class LargeListCell: ThemeableCollectionCell {
         self.discoverPodcast = discoverPodcast
         if let title = discoverPodcast.title?.localized {
             podcastTitle.text = title
-            let isExplicit = FeatureFlag.showExplicitBadges.enabled && (discoverPodcast.isExplicit ?? false)
+            let isExplicit = true && (discoverPodcast.isExplicit ?? false)
             explicitBadgeView.isHidden = !isExplicit
             if isExplicit {
                 explicitBadgeView.image = ExplicitBadgeHelper.badgeImage()

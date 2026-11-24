@@ -22,7 +22,7 @@ struct NowPlayingContainerView: View {
                 NowPlayingEmptyView()
             }
         }
-        .navigationTitle(L10n.nowPlayingShortTitle.prefixSourceUnicode)
+        .navigationTitle(L10n.nowPlayingShortTitle)
         .navigationDestination(item: $presentedView) { type in
             destination(for: type)
         }

@@ -3,14 +3,11 @@ import PocketCastsUtils
 import UIKit
 
 enum CommonWidgetHelper {
-    static let appGroupId = "group.au.com.shiftyjelly.pocketcasts"
+    static let appGroupId = "group.com.marcbeaupre.podcasta"
     static let iconSize: CGFloat = 28
 
     static func loadAppIconName() -> String {
-        guard let sharedDefaults = UserDefaults(suiteName: SharedConstants.GroupUserDefaults.groupContainerId), let appIcon = sharedDefaults.object(forKey: SharedConstants.GroupUserDefaults.appIcon) as? String else {
-            return "AppIcon-Default"
-        }
-        return appIcon
+        "AppIcon-Default"
     }
 
     static func loadNowPlayingEpisode() -> WidgetEpisode? {

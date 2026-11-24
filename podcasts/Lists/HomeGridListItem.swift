@@ -10,10 +10,6 @@ class HomeGridListItem: ListItem {
         gridItem?.podcast
     }
 
-    var folder: Folder? {
-        gridItem?.folder
-    }
-
     let theme: Theme.ThemeType
     let badgeType: BadgeType
     var frozenBadgeCount = -1 // used for comparisons only
@@ -31,8 +27,6 @@ class HomeGridListItem: ListItem {
     override var differenceIdentifier: String {
         if let podcast {
             return "podcast-\(podcast.uuid)"
-        } else if let folder {
-            return "folder-\(folder.uuid)"
         }
         return "empty"
     }
@@ -63,16 +57,6 @@ class HomeGridListItem: ListItem {
                 podcast.boostVolume == otherPodcast.boostVolume &&
                 podcast.trimSilenceAmount == otherPodcast.trimSilenceAmount &&
                 podcast.settings == otherPodcast.settings
-        } else if let otherFolder = rhs.folder, let folder {
-            return differenceIdentifier == rhs.differenceIdentifier &&
-                frozenBadgeCount == rhs.frozenBadgeCount &&
-                badgeType == rhs.badgeType &&
-                folder.name == otherFolder.name &&
-                folder.color == otherFolder.color &&
-                folder.syncModified == otherFolder.syncModified &&
-                folder.sortType == otherFolder.sortType &&
-                folder.sortOrder == otherFolder.sortOrder &&
-                theme.rawValue == rhs.theme.rawValue // since folders use different colours in different themes, we need to compare that as well
         }
 
         return false

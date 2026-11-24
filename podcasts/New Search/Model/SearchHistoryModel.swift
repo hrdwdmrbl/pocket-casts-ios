@@ -6,7 +6,7 @@ import Combine
 struct SearchHistoryEntry: Codable, Hashable {
     var searchTerm: String?
     var episode: EpisodeSearchResult?
-    var podcast: PodcastFolderSearchResult?
+    var podcast: PodcastSearchResult?
 }
 
 class SearchHistoryModel: ObservableObject {
@@ -17,68 +17,12 @@ class SearchHistoryModel: ObservableObject {
     private let defaults: UserDefaults
     private let maxNumberOfEntries = 20
 
-    private var notifications = Set<AnyCancellable>()
-
     init(userDefaults: UserDefaults = UserDefaults.standard) {
         self.defaults = userDefaults
 
         self.entries = userDefaults.data(forKey: Constants.UserDefaults.searchHistoryEntries).flatMap {
             try? JSONDecoder().decode([SearchHistoryEntry].self, from: $0)
         } ?? []
-
-        addNotificationObservers()
-        updateFolders()
-    }
-
-    private func addNotificationObservers() {
-        let notificationCenter = NotificationCenter.default
-
-        // Listen for folder and subscription changes
-        Publishers.Merge(
-            notificationCenter.publisher(for: ServerNotifications.subscriptionStatusChanged),
-            notificationCenter.publisher(for: Constants.Notifications.folderEdited)
-        )
-        .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-        .sink { [weak self] _ in
-            self?.updateFolders()
-        }
-        .store(in: &notifications)
-
-        // Listen for folder deletion changes
-        notificationCenter.publisher(for: Constants.Notifications.folderDeleted)
-            .receive(on: RunLoop.main)
-            .compactMap { $0.object as? String }
-            .sink { [weak self] uuid in
-                self?.folderDeleted(uuid)
-            }
-            .store(in: &notifications)
-    }
-
-    private func updateFolders() {
-        guard SubscriptionHelper.hasActiveSubscription() else {
-            // User is not subscribed anymore, remove all folders from search history
-            entries = entries.filter { $0.podcast?.kind != .folder }
-            save()
-            return
-        }
-
-        // A folder was changed, update all folders inside the search history
-        entries = entries.compactMap { entry in
-            if entry.podcast?.kind == .folder, let uuid = entry.podcast?.uuid {
-                return DataManager.shared.findFolder(uuid: uuid).map {
-                    SearchHistoryEntry(podcast: PodcastFolderSearchResult(from: $0))
-                }
-            }
-
-            return entry
-        }
-
-        save()
-    }
-
-    private func folderDeleted(_ uuid: String) {
-        entries = entries.filter { $0.podcast?.uuid != uuid }
-        save()
     }
 
     func add(searchTerm: String) {
@@ -89,7 +33,7 @@ class SearchHistoryModel: ObservableObject {
         add(entry: SearchHistoryEntry(episode: episode))
     }
 
-    func add(podcast: PodcastFolderSearchResult) {
+    func add(podcast: PodcastSearchResult) {
         add(entry: SearchHistoryEntry(podcast: podcast))
     }
 

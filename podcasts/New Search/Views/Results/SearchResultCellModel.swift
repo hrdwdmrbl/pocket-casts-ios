@@ -12,7 +12,7 @@ private enum EpisodeLookupError: Error {
 class SearchResultCellModel: ObservableObject, MainEpisodeActionViewDelegate {
 
     var episode: EpisodeSearchResult?
-    var podcastFolder: PodcastFolderSearchResult?
+    var podcastResult: PodcastSearchResult?
     private(set) var realEpisode: BaseEpisode?
 
     @Published var refreshTrigger: Bool = true
@@ -27,9 +27,9 @@ class SearchResultCellModel: ObservableObject, MainEpisodeActionViewDelegate {
 
     private var cancellables = Set<AnyCancellable>()
 
-    init(episode: EpisodeSearchResult?, podcastFolder: PodcastFolderSearchResult?) {
+    init(episode: EpisodeSearchResult?, podcastResult: PodcastSearchResult?) {
         self.episode = episode
-        self.podcastFolder = podcastFolder
+        self.podcastResult = podcastResult
         reloadRealEpisode()
         setupObservers()
     }
@@ -144,7 +144,7 @@ class SearchResultCellModel: ObservableObject, MainEpisodeActionViewDelegate {
         Publishers.Merge3(
             NotificationCenter.default.publisher(for: Constants.Notifications.playbackStarted),
             NotificationCenter.default.publisher(for: Constants.Notifications.playbackEnded),
-            NotificationCenter.default.publisher(for: Constants.Notifications.playbackPaused),
+            NotificationCenter.default.publisher(for: Constants.Notifications.playbackPaused)
         )
         .receive(on: DispatchQueue.main)
         .sink(receiveValue: { [weak self] _ in

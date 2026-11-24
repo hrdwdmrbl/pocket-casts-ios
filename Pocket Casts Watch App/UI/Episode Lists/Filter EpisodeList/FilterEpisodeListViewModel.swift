@@ -4,12 +4,12 @@ import Foundation
 class FilterEpisodeListViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var episodes: [EpisodeRowViewModel]
-    private var playSource = PlaySourceHelper.playSourceViewModel
+    private var playSource = PhoneSourceViewModel()
     private var cancellables = Set<AnyCancellable>()
     let filter: PlaylistRepresentable
 
     convenience init?(filterUUID: String) {
-        guard let filter = PlaySourceHelper.playSourceViewModel.fetchPlaylist(filterUUID) else { return nil }
+        guard let filter = PhoneSourceViewModel().fetchPlaylist(filterUUID) else { return nil }
         self.init(filter: filter)
     }
 

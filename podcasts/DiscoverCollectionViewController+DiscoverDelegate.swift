@@ -1,6 +1,5 @@
 import PocketCastsServer
 import PocketCastsDataModel
-import EndOfYear
 import UIKit
 
 extension DiscoverCollectionViewController: DiscoverDelegate {
@@ -68,10 +67,6 @@ extension DiscoverCollectionViewController: DiscoverDelegate {
 
     func showExpanded(item: PocketCastsServer.DiscoverItem, category: PocketCastsServer.DiscoverCategory?) {
         if let category {
-            if let categoryId = category.id, let categoryName = category.name, let discoverLayout {
-                let currentRegion = Settings.discoverRegion(discoverLayout: discoverLayout)
-                Analytics.track(.discoverCategoryShown, properties: ["name": categoryName, "region": currentRegion, "id": categoryId])
-            }
             reload(except: [item], category: category)
         } else {
             reload(except: [item], category: nil)
@@ -108,7 +103,7 @@ extension DiscoverCollectionViewController: DiscoverDelegate {
 
         guard let source = item.source else { return }
 
-        DiscoverServerHandler.shared.discoverPodcastList(source: source, authenticated: item.authenticated, completion: { [weak self] podcastList in
+        DiscoverServerHandler.shared.discoverPodcastList(source: source, completion: { [weak self] podcastList in
             guard let self, let discoverPodcast = podcastList?.podcasts else { return }
 
             let podcasts: [DiscoverPodcast]
@@ -129,11 +124,6 @@ extension DiscoverCollectionViewController: DiscoverDelegate {
     }
 
     func showExpanded(item: DiscoverItem, podcasts: [DiscoverPodcast], podcastCollection: PodcastCollection?, datetime: String? = nil) {
-        if let listId = item.uuid {
-            AnalyticsHelper.listShowAllTapped(listId: listId, dateTime: datetime)
-        } else {
-            Analytics.track(.discoverShowAllTapped, properties: ["list_id": item.inferredListId])
-        }
 
         if item.expandedStyle == "descriptive_list" || item.expandedStyle == "grid" || item.expandedStyle == "network_grid" {
             let collectionListVC = ExpandedCollectionViewController(item: item, podcasts: podcasts)
@@ -154,10 +144,6 @@ extension DiscoverCollectionViewController: DiscoverDelegate {
 
     func showExpanded(item: DiscoverItem, episodes: [DiscoverEpisode], podcastCollection: PodcastCollection?) {
         guard let podcastCollection else { return }
-
-        if let listId = item.uuid {
-            AnalyticsHelper.listShowAllTapped(listId: listId, dateTime: podcastCollection.datetime)
-        }
 
         let listView = ExpandedEpisodeListViewController(podcastCollection: podcastCollection)
         listView.delegate = self
@@ -207,9 +193,6 @@ extension DiscoverCollectionViewController: DiscoverDelegate {
         }
 
         HapticsHelper.triggerSubscribedHaptic()
-
-        let uuid = podcast.uuid ?? podcast.iTunesId ?? "unknown"
-        Analytics.track(.podcastSubscribed, properties: ["source": analyticsSource, "uuid": uuid])
     }
 
     func show(discoverEpisode: DiscoverEpisode, podcast: Podcast) {

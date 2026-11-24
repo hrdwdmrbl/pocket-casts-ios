@@ -77,7 +77,7 @@ class PlaylistPreviewViewController: PCViewController {
         let playlist: EpisodeFilter
 
         switch mode {
-            case .creation:
+        case .creation:
             playlist = PlaylistManager.createNewPlaylist()
             playlist.setTitle(playlistName, defaultTitle: L10n.playlistsDefaultNewPlaylist.localizedCapitalized)
             playlistUUID = playlist.uuid
@@ -198,7 +198,7 @@ class PlaylistPreviewViewController: PCViewController {
                 ),
                 label.trailingAnchor.constraint(
                     equalTo: saveButton.trailingAnchor, constant: -8
-                ),
+                )
             ])
         }
     }
@@ -243,27 +243,6 @@ class PlaylistPreviewViewController: PCViewController {
         delegate?.filterCreated(newFilter: viewModel.newPlaylist)
         NotificationCenter.postOnMainThread(notification: Constants.Notifications.playlistChanged, object: viewModel.newPlaylist)
 
-        if Settings.firstTimePlaylistCreated {
-            Settings.shouldShowDragAndDropTip = true
-        }
-
-        Analytics.track(.filterCreated, properties: [
-            "all_podcasts": viewModel.newPlaylist.filterAllPodcasts,
-            "media_type": AudioVideoFilter(rawValue: viewModel.newPlaylist.filterAudioVideoType) ?? .all,
-            "downloaded": viewModel.newPlaylist.filterDownloaded,
-            "not_downloaded": viewModel.newPlaylist.filterNotDownloaded,
-            "episode_status_played": viewModel.newPlaylist.filterFinished,
-            "episode_status_unplayed": viewModel.newPlaylist.filterUnplayed,
-            "episode_status_in_progress": viewModel.newPlaylist.filterPartiallyPlayed,
-            "release_date": ReleaseDateFilterOption(rawValue: viewModel.newPlaylist.filterHours) ?? .anytime,
-            "starred": viewModel.newPlaylist.filterStarred,
-            "duration": viewModel.newPlaylist.filterDuration,
-            "duration_longer_than": viewModel.newPlaylist.longerThan,
-            "duration_shorter_than": viewModel.newPlaylist.shorterThan,
-            "color": viewModel.newPlaylist.playlistColor().hexString(),
-            "icon_name": viewModel.newPlaylist.iconImageName() ?? "unknown"
-        ])
-
         delegate?.presentingPlaylistDetail = true
 
         dismiss()
@@ -274,7 +253,6 @@ class PlaylistPreviewViewController: PCViewController {
         switch rule {
         case .podcast:
             let filterSettingsVC = PodcastFilterOverlayController(nibName: "PodcastChooserViewController", bundle: nil)
-            filterSettingsVC.analyticsSource = .filters
             filterSettingsVC.filterToEdit = viewModel.newPlaylist
             viewController = filterSettingsVC
         case .duration:
@@ -284,7 +262,7 @@ class PlaylistPreviewViewController: PCViewController {
             let filterSettingsVC = EpisodeFilterOverlayController(nibName: "FilterSettingsOverlayController", bundle: nil)
             filterSettingsVC.filterToEdit = viewModel.newPlaylist
             viewController = filterSettingsVC
-        case .releaseDate, .downloadStatus, .mediaType, .starred:
+        case .releaseDate, .downloadStatus, .mediaType, .starred, .archived:
             assertionFailure("\(rule) renders as an inline picker and has no screen to push")
             return
         }

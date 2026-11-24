@@ -11,7 +11,7 @@ class FilesListViewModel: ObservableObject {
         }
     }
 
-    private var playSource = PlaySourceHelper.playSourceViewModel
+    private var playSource = PhoneSourceViewModel()
     private var cancellables = Set<AnyCancellable>()
 
     var supportsSort: Bool {
